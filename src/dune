@@ -1,0 +1,8 @@
+(library
+ (name        kx)
+ (public_name kx)
+ (synopsis "OCaml client for kdb+")
+ (c_names k_stubs c)
+ (c_flags (-DKXVER=3))
+ ; (flags (:standard -w -9-3))
+ (libraries bigstring uuidm ptime))
