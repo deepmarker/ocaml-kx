@@ -4,7 +4,9 @@
    --------------------------------------------------------------------------*/
 
 #include <string.h>
+#include <errno.h>
 #include <caml/mlvalues.h>
+#include <caml/alloc.h>
 #include <caml/memory.h>
 #include <caml/custom.h>
 #include "k.h"
@@ -157,6 +159,62 @@ CAMLprim value kz_stub (value f) {
 }
 
 CAMLprim value kG_stub (value k) { return Val_int(K_val(k)->g); }
+
+CAMLprim value khpu_stub (value host, value port, value username) {
+    CAMLparam3(host, port, username);
+    CAMLlocal2(ret, errmsg);
+    int rc = khpu(String_val(host), Int_val(port), String_val(username));
+    if (rc > 0) {
+        ret = caml_alloc(1, 0);
+        Store_field(ret, 0, Val_int(rc));
+    }
+    else {
+        ret = caml_alloc(1, 1);
+        errmsg = caml_copy_string(strerror(errno));
+        Store_field(ret, 0, errmsg);
+    }
+    CAMLreturn(ret);
+}
+
+CAMLprim value khpun_stub(value host, value port,
+                          value username, value timeout) {
+    return Val_int(khpun(String_val(host), Int_val(port),
+                         String_val(username), Int_val(timeout)));
+}
+
+CAMLprim value k0_stub(value conn, value msg) {
+    CAMLparam2(conn, msg);
+    CAMLlocal3(ret, errmsg, kk);
+    K r = k(Int_val(conn), String_val(msg), (K)0);
+    if (!r) {
+        ret = caml_alloc(1, 1);
+        errmsg = caml_copy_string(strerror(errno));
+        Store_field(ret, 0, errmsg);
+    }
+    else {
+        ret = caml_alloc(1, 0);
+        kk = alloc_K(r);
+        Store_field(ret, 0, kk);
+    }
+    CAMLreturn(ret);
+}
+
+CAMLprim value k1_stub(value conn, value msg, value a) {
+    CAMLparam3(conn, msg, a);
+    CAMLlocal3(ret, errmsg, kk);
+    K r = k(Int_val(conn), String_val(msg), K_val(a), (K)0);
+    if (!r) {
+        ret = caml_alloc(1, 1);
+        errmsg = caml_copy_string(strerror(errno));
+        Store_field(ret, 0, errmsg);
+    }
+    else {
+        ret = caml_alloc(1, 0);
+        kk = alloc_K(r);
+        Store_field(ret, 0, kk);
+    }
+    CAMLreturn(ret);
+}
 
 /*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
