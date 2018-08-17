@@ -3,31 +3,66 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-type k
-(** K object *)
+type kb (** boolean *)
 
-type t =
-  | Bool of bool
-  | Guid of Uuidm.t
-  | Byte of int
-  | Short of int
-  | Int of int32
-  | Long of int64
-  | Real of float
-  | Double of float
-  | Char of char
-  | Symbol of string
-  | Timestamp of int64
-  | Month of int32
-  | Date of int32
-  | Timespan of int64
-  | Minute of int32
-  | Second of int32
-  | Millisecond of int32
-  | Datetime of float
+type uu (** uuid *)
+
+type kg (** byte *)
+
+type kh (** short *)
+
+type ki (** int *)
+
+type kj (** long *)
+
+type ke (** real *)
+
+type kf (** float *)
+
+type kc (** char *)
+
+type ks (** symbol *)
+
+type kp (** timestamp *)
+
+type km (** month *)
+
+type kd (** date *)
+
+type kn (** timespan *)
+
+type ku (** minute *)
+
+type kv (** second *)
+
+type kt (** time *)
+
+type kz (** datetime *)
+
+type k (** K object *)
+
+type _ t =
+  | Bool : bool -> kb t
+  | Guid : Uuidm.t -> uu t
+  | Byte : int -> kg t
+  | Short : int -> kh t
+  | Int : int32 -> ki t
+  | Long : int64 -> kj t
+  | Real : float -> ke t
+  | Double : float -> kf t
+  | Char : char -> kc t
+  | Symbol : string -> ks t
+  | Timestamp : int64 -> kp t
+  | Month : int32 -> km t
+  | Date : int32 -> kd t
+  | Timespan : int64 -> kn t
+  | Minute : int32 -> ku t
+  | Second : int32 -> kv t
+  | Millisecond : int32 -> kt t
+  | Datetime : float -> kz t
 (** Parsed K object *)
 
-val pack : t -> k
+val pack : _ t -> k
 (** [pack t] is the K object serialization of [t]. *)
 
 (* val kG : t -> int option

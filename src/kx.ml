@@ -3,26 +3,48 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
+type kb (* boolean *)
+type uu (* uuid *)
+type kg (* byte *)
+type kh (* short *)
+type ki (* int *)
+type kj (* long *)
+type ke (* real *)
+type kf (* float *)
+type kc (* char *)
+type ks (* symbol *)
+
+type kp (* timestamp *)
+type km (* month *)
+type kd (* date *)
+
+type kn (* timespan *)
+type ku (* minute *)
+type kv (* second *)
+type kt (* time *)
+
+type kz (* datetime *)
+
 type k
-type t =
-  | Bool of bool
-  | Guid of Uuidm.t
-  | Byte of int
-  | Short of int
-  | Int of int32
-  | Long of int64
-  | Real of float
-  | Double of float
-  | Char of char
-  | Symbol of string
-  | Timestamp of int64
-  | Month of int32
-  | Date of int32
-  | Timespan of int64
-  | Minute of int32
-  | Second of int32
-  | Millisecond of int32
-  | Datetime of float
+type _ t =
+  | Bool : bool -> kb t
+  | Guid : Uuidm.t -> uu t
+  | Byte : int -> kg t
+  | Short : int -> kh t
+  | Int : int32 -> ki t
+  | Long : int64 -> kj t
+  | Real : float -> ke t
+  | Double : float -> kf t
+  | Char : char -> kc t
+  | Symbol : string -> ks t
+  | Timestamp : int64 -> kp t
+  | Month : int32 -> km t
+  | Date : int32 -> kd t
+  | Timespan : int64 -> kn t
+  | Minute : int32 -> ku t
+  | Second : int32 -> kv t
+  | Millisecond : int32 -> kt t
+  | Datetime : float -> kz t
 
 external kb : bool -> k = "kb_stub"
 external ku : string -> k = "ku_stub"
@@ -48,7 +70,7 @@ external ktimestamp : int64 -> k = "ktimestamp_stub"
 external ktimespan : int64 -> k = "ktimespan_stub"
 external kz : float -> k = "kz_stub"
 
-let pack = function
+let pack : type a. a t -> k = function
   | Bool b -> kb b
   | Guid u -> ku (Uuidm.to_bytes u)
   | Byte i -> kg i
