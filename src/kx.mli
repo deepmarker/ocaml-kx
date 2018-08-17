@@ -49,7 +49,7 @@ type _ t =
   | Int : int32 -> ki t
   | Long : int64 -> kj t
   | Real : float -> ke t
-  | Double : float -> kf t
+  | Float : float -> kf t
   | Char : char -> kc t
   | Symbol : string -> ks t
   | Timestamp : int64 -> kp t
@@ -58,12 +58,15 @@ type _ t =
   | Timespan : int64 -> kn t
   | Minute : int32 -> ku t
   | Second : int32 -> kv t
-  | Millisecond : int32 -> kt t
+  | Time : int32 -> kt t
   | Datetime : float -> kz t
 (** Parsed K object *)
 
 val pack : _ t -> k
-(** [pack t] is the K object serialization of [t]. *)
+(** [pack t] packs [t] into a K object. *)
+
+val pack_list : _ t list -> k
+(** [pack_list ts] packs [ts] into a K object. *)
 
 (* val kG : t -> int option
  * val kC : t -> char option *)

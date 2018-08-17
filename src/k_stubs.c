@@ -18,9 +18,13 @@ static int compare_K(value a, value b) {
     return (aa == bb ? 0 : (aa < bb ? -1 : 1));
 }
 
+static void finalize_K(value k) {
+    r0(K_val(k));
+}
+
 static struct custom_operations kx_K_ops =
     { .identifier = "kx_K",
-      .finalize = custom_finalize_default,
+      .finalize = finalize_K,
       .compare = compare_K,
       .compare_ext = custom_compare_ext_default,
       .hash = custom_hash_default,
@@ -28,9 +32,52 @@ static struct custom_operations kx_K_ops =
       .deserialize = custom_deserialize_default };
 
 static value alloc_K (K a) {
-    value custom = alloc_custom(&kx_K_ops, sizeof(struct k0), 0, 1);
+    value custom = caml_alloc_custom(&kx_K_ops, sizeof(K), 0, 1);
     K_val(custom) = a;
     return custom;
+}
+
+CAMLprim value k_objtyp (value k) { return Val_int(K_val(k)->t); }
+CAMLprim value k_objattrs (value k) { return Val_int(K_val(k)->u); }
+CAMLprim value k_refcount (value k) { return Val_int(K_val(k)->r); }
+CAMLprim value k_length (value k) { return Val_int(K_val(k)->n); }
+CAMLprim value k_g (value k) { return Val_int(K_val(k)->g); }
+CAMLprim value k_h (value k) { return Val_int(K_val(k)->h); }
+CAMLprim value k_i (value k) {
+    CAMLparam1(k);
+    CAMLlocal1(ret);
+    ret = caml_copy_int32(K_val(k)->i);
+    CAMLreturn(ret);
+}
+CAMLprim value k_j (value k) {
+    CAMLparam1(k);
+    CAMLlocal1(ret);
+    ret = caml_copy_int64(K_val(k)->j);
+    CAMLreturn(ret);
+}
+CAMLprim value k_e (value k) {
+    CAMLparam1(k);
+    CAMLlocal1(ret);
+    ret = caml_copy_double(K_val(k)->e);
+    CAMLreturn(ret);
+}
+CAMLprim value k_f (value k) {
+    CAMLparam1(k);
+    CAMLlocal1(ret);
+    ret = caml_copy_double(K_val(k)->f);
+    CAMLreturn(ret);
+}
+CAMLprim value k_s (value k) {
+    CAMLparam1(k);
+    CAMLlocal1(ret);
+    ret = caml_copy_string(K_val(k)->s);
+    CAMLreturn(ret);
+}
+CAMLprim value k_k (value k) {
+    CAMLparam1(k);
+    CAMLlocal1(ret);
+    ret = alloc_K(K_val(k)->k);
+    CAMLreturn(ret);
 }
 
 CAMLprim value kb_stub (value b) {
@@ -99,6 +146,18 @@ CAMLprim value ks_stub (value s) {
     k = alloc_K(ks(String_val(s)));
     CAMLreturn(k);
 }
+CAMLprim value kp_stub (value s) {
+    CAMLparam1(s);
+    CAMLlocal1(k);
+    k = alloc_K(kp(String_val(s)));
+    CAMLreturn(k);
+}
+CAMLprim value kpn_stub (value s, value n) {
+    CAMLparam1(s);
+    CAMLlocal1(k);
+    k = alloc_K(kpn(String_val(s), Int_val(n)));
+    CAMLreturn(k);
+}
 
 CAMLprim value ktimestamp_stub (value j) {
     CAMLparam1(j);
@@ -158,7 +217,78 @@ CAMLprim value kz_stub (value f) {
     CAMLreturn(k);
 }
 
-CAMLprim value kG_stub (value k) { return Val_int(K_val(k)->g); }
+CAMLprim value ktn_stub (value t, value len) {
+    CAMLparam2(t, len);
+    CAMLlocal1(k);
+    k = alloc_K(ktn(Int_val(t), Long_val(len)));
+    CAMLreturn(k);
+}
+
+CAMLprim value ja_int_stub (value k, value i) {
+    int ii = Int_val(i);
+    K ret = ja(Data_custom_val(k), &ii);
+    K_val(k) = ret;
+    return Val_unit;
+}
+
+CAMLprim value ja_long_stub (value k, value j) {
+    int jj = Long_val(j);
+    K ret = ja(Data_custom_val(k), &jj);
+    K_val(k) = ret;
+    return Val_unit;
+}
+
+CAMLprim value ja_int32_stub (value k, value i) {
+    int ii = Int32_val(i);
+    K ret = ja(Data_custom_val(k), &ii);
+    K_val(k) = ret;
+    return Val_unit;
+}
+
+CAMLprim value ja_int64_stub (value k, value j) {
+    long jj = Int64_val(j);
+    K ret = ja(Data_custom_val(k), &jj);
+    K_val(k) = ret;
+    return Val_unit;
+}
+
+CAMLprim value ja_double_stub (value k, value f) {
+    double ff = Double_val(f);
+    K ret = ja(Data_custom_val(k), &ff);
+    K_val(k) = ret;
+    return Val_unit;
+}
+
+CAMLprim value ja_bool_stub (value k, value b) {
+    int bb = Bool_val(b);
+    K ret = ja(Data_custom_val(k), &bb);
+    K_val(k) = ret;
+    return Val_unit;
+}
+
+CAMLprim value ja_uuid_stub(value k, value u) {
+    K ret = ja(Data_custom_val(k), String_val(u));
+    K_val(k) = ret;
+    return Val_unit;
+}
+
+CAMLprim value js_stub (value k, value s) {
+    K ret = js(Data_custom_val(k), ss(String_val(s)));
+    K_val(k) = ret;
+    return Val_unit;
+}
+
+CAMLprim value jk_stub (value k, value v) {
+    K ret = jk(Data_custom_val(k), K_val(v));
+    K_val(k) = ret;
+    return Val_unit;
+}
+
+CAMLprim value jv_stub (value k, value v) {
+    K ret = jv(Data_custom_val(k), K_val(v));
+    K_val(k) = ret;
+    return Val_unit;
+}
 
 CAMLprim value khpu_stub (value host, value port, value username) {
     CAMLparam3(host, port, username);

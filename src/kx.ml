@@ -34,7 +34,7 @@ type _ t =
   | Int : int32 -> ki t
   | Long : int64 -> kj t
   | Real : float -> ke t
-  | Double : float -> kf t
+  | Float : float -> kf t
   | Char : char -> kc t
   | Symbol : string -> ks t
   | Timestamp : int64 -> kp t
@@ -43,8 +43,28 @@ type _ t =
   | Timespan : int64 -> kn t
   | Minute : int32 -> ku t
   | Second : int32 -> kv t
-  | Millisecond : int32 -> kt t
+  | Time : int32 -> kt t
   | Datetime : float -> kz t
+
+let inttype_of_t : type a. a t -> int = function
+  | Bool _ -> 1
+  | Guid _ -> 2
+  | Byte _ -> 4
+  | Short _ -> 5
+  | Int _ -> 6
+  | Long _ -> 7
+  | Real _ -> 8
+  | Float _ -> 9
+  | Char _ -> 10
+  | Symbol _ -> 11
+  | Timestamp _ -> 12
+  | Month _ -> 13
+  | Date _ -> 14
+  | Timespan _ -> 16
+  | Minute _ -> 17
+  | Second _ -> 18
+  | Time _ -> 19
+  | Datetime _ -> 15
 
 external kb : bool -> k = "kb_stub"
 external ku : string -> k = "ku_stub"
@@ -70,6 +90,16 @@ external ktimestamp : int64 -> k = "ktimestamp_stub"
 external ktimespan : int64 -> k = "ktimespan_stub"
 external kz : float -> k = "kz_stub"
 
+external ktn : int -> int -> k = "ktn_stub"
+external ja_int : k -> int -> unit = "ja_int_stub"
+(* external ja_long : k -> int -> unit = "ja_long_stub" *)
+external ja_int32 : k -> int32 -> unit = "ja_int32_stub"
+external ja_int64 : k -> int64 -> unit = "ja_int32_stub"
+external ja_double : k -> float -> unit = "ja_double_stub"
+external ja_bool : k -> bool -> unit = "ja_double_stub"
+external ja_uuid : k -> string -> unit = "ja_uuid_stub"
+external js : k -> string -> unit = "js_stub"
+
 let pack : type a. a t -> k = function
   | Bool b -> kb b
   | Guid u -> ku (Uuidm.to_bytes u)
@@ -78,7 +108,7 @@ let pack : type a. a t -> k = function
   | Int i -> ki i
   | Long j -> kj j
   | Real f -> ke f
-  | Double f -> kf f
+  | Float f -> kf f
   | Char c -> kc c
   | Symbol s -> ks s
   | Timestamp ts -> ktimestamp ts
@@ -87,8 +117,35 @@ let pack : type a. a t -> k = function
   | Date i -> kd i
   | Minute i -> kminute i
   | Second i -> ksecond i
-  | Millisecond i -> kt i
+  | Time i -> kt i
   | Datetime f -> kz f
+
+let cons : type a. k -> a t -> unit = fun k -> function
+  | Bool b -> ja_bool k b
+  | Guid u -> ja_uuid k (Uuidm.to_bytes u)
+  | Byte i -> ja_int k i
+  | Short i -> ja_int k i
+  | Int i -> ja_int32 k i
+  | Long j -> ja_int64 k j
+  | Real f -> ja_double k f
+  | Float f -> ja_double k f
+  | Char c -> ja_int k (Char.code c)
+  | Symbol s -> js k s
+  | Timestamp ts -> ja_int64 k ts
+  | Timespan ts -> ja_int64 k ts
+  | Month m -> ja_int32 k m
+  | Date i -> ja_int32 k i
+  | Minute i -> ja_int32 k i
+  | Second i -> ja_int32 k i
+  | Time i -> ja_int32 k i
+  | Datetime f -> ja_double k f
+
+let pack_list = function
+  | [] -> ktn 0 0
+  | h :: _ as l ->
+    let k = ktn (inttype_of_t h) 0 in
+    List.iter (cons k) l ;
+    k
 
 (* external kG : t -> int = "kG_stub" [@@noalloc] *)
 
