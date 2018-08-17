@@ -3,89 +3,56 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-type kb (* boolean *)
-type uu (* uuid *)
-type kg (* byte *)
-type kh (* short *)
-type ki (* int *)
-type kj (* long *)
-type ke (* real *)
-type kf (* float *)
-type kc (* char *)
-type ks (* symbol *)
-
-type kp (* timestamp *)
-type km (* month *)
-type kd (* date *)
-
-type kn (* timespan *)
-type ku (* minute *)
-type kv (* second *)
-type kt (* time *)
-
-type kz (* datetime *)
-
-type _ typ =
-  | Boolean : bool typ
-  | Guid : Uuidm.t typ
-  | Byte : int typ
-  | Short : int typ
-  | Int : int32 typ
-  | Long : int64 typ
-  | Real : float typ
-  | Float : float typ
-  | Char : char typ
-  | Symbol : string typ
-  | Timestamp : int64 typ
-  | Month : int32 typ
-  | Date : int32 typ
-  | Timespan : int64 typ
-  | Minute : int typ
-  | Second : int typ
-  | Time : int typ
-  | Datetime : float typ
-
 type k
 
-type _ t =
-  | Bool : bool -> kb t
-  | Guid : Uuidm.t -> uu t
-  | Byte : int -> kg t
-  | Short : int -> kh t
-  | Int : int32 -> ki t
-  | Long : int64 -> kj t
-  | Real : float -> ke t
-  | Float : float -> kf t
-  | Char : char -> kc t
-  | Symbol : string -> ks t
-  | Timestamp : int64 -> kp t
-  | Month : int32 -> km t
-  | Date : int32 -> kd t
-  | Timespan : int64 -> kn t
-  | Minute : int32 -> ku t
-  | Second : int32 -> kv t
-  | Time : int32 -> kt t
-  | Datetime : float -> kz t
+type _ atom =
+  | Bool      : bool atom
+  | Guid      : Uuidm.t atom
+  | Byte      : int atom
+  | Short     : int atom
+  | Int       : int32 atom
+  | Long      : int64 atom
+  | Real      : float atom
+  | Float     : float atom
+  | Char      : char atom
+  | Symbol    : string atom
+  | Timestamp : int64 atom
+  | Month     : int32 atom
+  | Date      : int32 atom
+  | Timespan  : int64 atom
+  | Minute    : int32 atom
+  | Second    : int32 atom
+  | Time      : int32 atom
+  | Datetime  : float atom
 
-let inttype_of_t : type a. a t -> int = function
-  | Bool _ -> 1
-  | Guid _ -> 2
-  | Byte _ -> 4
-  | Short _ -> 5
-  | Int _ -> 6
-  | Long _ -> 7
-  | Real _ -> 8
-  | Float _ -> 9
-  | Char _ -> 10
-  | Symbol _ -> 11
-  | Timestamp _ -> 12
-  | Month _ -> 13
-  | Date _ -> 14
-  | Timespan _ -> 16
-  | Minute _ -> 17
-  | Second _ -> 18
-  | Time _ -> 19
-  | Datetime _ -> 15
+type dyn
+
+type _ t =
+  | Atom : 'a atom * 'a -> 'a t
+  | Vector : ('a atom * 'a) list -> 'a t
+  | List : dyn list -> dyn t
+  | Dict : 'a t * 'b t -> ('a * 'b) t
+  | Table : 'a t * 'b t -> ('a * 'b) t
+
+let int_of_atom : type a. a atom -> int = function
+  | Bool       -> 1
+  | Guid       -> 2
+  | Byte       -> 4
+  | Short      -> 5
+  | Int        -> 6
+  | Long       -> 7
+  | Real       -> 8
+  | Float      -> 9
+  | Char       -> 10
+  | Symbol     -> 11
+  | Timestamp  -> 12
+  | Month      -> 13
+  | Date       -> 14
+  | Timespan   -> 16
+  | Minute     -> 17
+  | Second     -> 18
+  | Time       -> 19
+  | Datetime   -> 15
 
 (* Accessors *)
 
@@ -143,142 +110,143 @@ external ja_bool : k -> bool -> unit = "ja_double_stub"
 external ja_uuid : k -> string -> unit = "ja_uuid_stub"
 external js : k -> string -> unit = "js_stub"
 
-let pack : type a. a t -> k = function
-  | Bool b -> kb b
-  | Guid u -> ku (Uuidm.to_bytes u)
-  | Byte i -> kg i
-  | Short i -> kh i
-  | Int i -> ki i
-  | Long j -> kj j
-  | Real f -> ke f
-  | Float f -> kf f
-  | Char c -> kc c
-  | Symbol s -> ks s
-  | Timestamp ts -> ktimestamp ts
-  | Timespan ts -> ktimespan ts
-  | Month m -> kmonth m
-  | Date i -> kd i
-  | Minute i -> kminute i
-  | Second i -> ksecond i
-  | Time i -> kt i
-  | Datetime f -> kz f
+let pack : type a. a atom -> a -> k = fun t v -> match t, v with
+  | Bool, b  -> kb b
+  | Guid, u -> ku (Uuidm.to_bytes u)
+  | Byte, i -> kg i
+  | Short, i -> kh i
+  | Int, i -> ki i
+  | Long, j -> kj j
+  | Real, f -> ke f
+  | Float, f -> kf f
+  | Char, c -> kc c
+  | Symbol, s -> ks s
+  | Timestamp, ts -> ktimestamp ts
+  | Timespan, ts -> ktimespan ts
+  | Month, m -> kmonth m
+  | Date, i -> kd i
+  | Minute, i -> kminute i
+  | Second, i -> ksecond i
+  | Time, i -> kt i
+  | Datetime, f -> kz f
 
-let cons : type a. k -> a t -> unit = fun k -> function
-  | Bool b -> ja_bool k b
-  | Guid u -> ja_uuid k (Uuidm.to_bytes u)
-  | Byte i -> ja_int k i
-  | Short i -> ja_int k i
-  | Int i -> ja_int32 k i
-  | Long j -> ja_int64 k j
-  | Real f -> ja_double k f
-  | Float f -> ja_double k f
-  | Char c -> ja_int k (Char.code c)
-  | Symbol s -> js k s
-  | Timestamp ts -> ja_int64 k ts
-  | Timespan ts -> ja_int64 k ts
-  | Month m -> ja_int32 k m
-  | Date i -> ja_int32 k i
-  | Minute i -> ja_int32 k i
-  | Second i -> ja_int32 k i
-  | Time i -> ja_int32 k i
-  | Datetime f -> ja_double k f
+let cons :
+  type a. k -> a atom -> a -> unit = fun k t v -> match t, v with
+  | Bool, b -> ja_bool k b
+  | Guid, u -> ja_uuid k (Uuidm.to_bytes u)
+  | Byte, i -> ja_int k i
+  | Short, i -> ja_int k i
+  | Int, i -> ja_int32 k i
+  | Long, j -> ja_int64 k j
+  | Real, f -> ja_double k f
+  | Float, f -> ja_double k f
+  | Char, c -> ja_int k (Char.code c)
+  | Symbol, s -> js k s
+  | Timestamp, ts -> ja_int64 k ts
+  | Timespan, ts -> ja_int64 k ts
+  | Month, m -> ja_int32 k m
+  | Date, i -> ja_int32 k i
+  | Minute, i -> ja_int32 k i
+  | Second, i -> ja_int32 k i
+  | Time, i -> ja_int32 k i
+  | Datetime, f -> ja_double k f
 
 let pack_list = function
   | [] -> ktn 0 0
-  | h :: _ as l ->
-    let k = ktn (inttype_of_t h) 0 in
-    List.iter (cons k) l ;
+  | (t, _) :: _ as l ->
+    let k = ktn (int_of_atom t) 0 in
+    List.iter (fun (t, v) -> cons k t v) l ;
     k
 
 let unpack_bool k =
   match k_objtyp k, k_g k with
-  | -1, 0 -> Some (Bool false)
-  | -1, _ -> Some (Bool true)
+  | -1, 0 -> Some false
+  | -1, _ -> Some true
   | _ -> None
 
 let unpack_guid k =
   match k_objtyp k with
-  | -2 -> Some (Guid (k_u k))
+  | -2 -> Some (k_u k)
   | _ -> None
 
 let unpack_byte k =
   match k_objtyp k with
-  | -4 -> Some (Byte (k_g k))
+  | -4 -> Some (k_g k)
   | _ -> None
 
 let unpack_short k =
   match k_objtyp k with
-  | -5 -> Some (Short (k_h k))
+  | -5 -> Some (k_h k)
   | _ -> None
 
 let unpack_int k =
   match k_objtyp k with
-  | -6 -> Some (Int (k_i k))
+  | -6 -> Some (k_i k)
   | _ -> None
 
 let unpack_long k =
   match k_objtyp k with
-  | -7 -> Some (Long (k_j k))
+  | -7 -> Some (k_j k)
   | _ -> None
 
 let unpack_real k =
   match k_objtyp k with
-  | -8 -> Some (Real (k_e k))
+  | -8 -> Some (k_e k)
   | _ -> None
 
 let unpack_float k =
   match k_objtyp k with
-  | -9 -> Some (Float (k_f k))
+  | -9 -> Some (k_f k)
   | _ -> None
 
 let unpack_char k =
   match k_objtyp k with
-  | -10 -> Some (Char (Char.chr (k_g k)))
+  | -10 -> Some (Char.chr (k_g k))
   | _ -> None
 
 let unpack_symbol k =
   match k_objtyp k with
-  | -11 -> Some (Symbol (k_s k))
+  | -11 -> Some (k_s k)
   | _ -> None
 
 let unpack_timestamp k =
   match k_objtyp k with
-  | -12 -> Some (Timestamp (k_j k))
+  | -12 -> Some (k_j k)
   | _ -> None
 
 let unpack_month k =
   match k_objtyp k with
-  | -13 -> Some (Month (k_i k))
+  | -13 -> Some (k_i k)
   | _ -> None
 
 let unpack_date k =
   match k_objtyp k with
-  | -13 -> Some (Date (k_i k))
+  | -13 -> Some (k_i k)
   | _ -> None
 
 let unpack_timespan k =
   match k_objtyp k with
-  | -16 -> Some (Timespan (k_j k))
+  | -16 -> Some (k_j k)
   | _ -> None
 
 let unpack_date k =
   match k_objtyp k with
-  | -17 -> Some (Minute (k_i k))
+  | -17 -> Some (k_i k)
   | _ -> None
 
 let unpack_date k =
   match k_objtyp k with
-  | -18 -> Some (Second (k_i k))
+  | -18 -> Some (k_i k)
   | _ -> None
 
 let unpack_date k =
   match k_objtyp k with
-  | -19 -> Some (Time (k_i k))
+  | -19 -> Some (k_i k)
   | _ -> None
 
 let unpack_datetime k =
   match k_objtyp k with
-  | -15 -> Some (Datetime (k_f k))
+  | -15 -> Some (k_f k)
   | _ -> None
 
 (*---------------------------------------------------------------------------

@@ -18,7 +18,7 @@ val write0 : conn -> string -> (Kx.k, string) result
 (** [w0 conn msg] asynchronously writes [msg] to [conn] and
     (immediately) returns either success or an error message. *)
 
-val write1 : conn -> string -> _ Kx.t -> (Kx.k, string) result
+(* val write1 : conn -> string -> _ Kx.t -> (Kx.k, string) result *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
