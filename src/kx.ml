@@ -25,7 +25,28 @@ type kt (* time *)
 
 type kz (* datetime *)
 
+type _ typ =
+  | Boolean : bool typ
+  | Guid : Uuidm.t typ
+  | Byte : int typ
+  | Short : int typ
+  | Int : int32 typ
+  | Long : int64 typ
+  | Real : float typ
+  | Float : float typ
+  | Char : char typ
+  | Symbol : string typ
+  | Timestamp : int64 typ
+  | Month : int32 typ
+  | Date : int32 typ
+  | Timespan : int64 typ
+  | Minute : int typ
+  | Second : int typ
+  | Time : int typ
+  | Datetime : float typ
+
 type k
+
 type _ t =
   | Bool : bool -> kb t
   | Guid : Uuidm.t -> uu t
@@ -65,6 +86,28 @@ let inttype_of_t : type a. a t -> int = function
   | Second _ -> 18
   | Time _ -> 19
   | Datetime _ -> 15
+
+(* Accessors *)
+
+external k_objtyp : k -> int = "k_objtyp" [@@noalloc]
+external k_objattrs : k -> int = "k_objattrs" [@@noalloc]
+external k_refcount : k -> int = "k_refcount" [@@noalloc]
+external k_length : k -> int = "k_length" [@@noalloc]
+
+external k_g : k -> int = "k_g" [@@noalloc]
+external k_h : k -> int = "k_h" [@@noalloc]
+
+external k_i : k -> int32 = "k_i"
+external k_j : k -> int64 = "k_j"
+external k_e : k -> float = "k_e"
+external k_f : k -> float = "k_f"
+
+external k_s : k -> string = "k_s"
+external k_u : k -> string = "k_u"
+let k_u k =
+  match Uuidm.of_bytes (k_u k) with
+  | None -> invalid_arg "k_u"
+  | Some u -> u
 
 external kb : bool -> k = "kb_stub"
 external ku : string -> k = "ku_stub"
@@ -147,9 +190,96 @@ let pack_list = function
     List.iter (cons k) l ;
     k
 
-(* external kG : t -> int = "kG_stub" [@@noalloc] *)
+let unpack_bool k =
+  match k_objtyp k, k_g k with
+  | -1, 0 -> Some (Bool false)
+  | -1, _ -> Some (Bool true)
+  | _ -> None
 
-(* let kC t = Char.chr (kG t) *)
+let unpack_guid k =
+  match k_objtyp k with
+  | -2 -> Some (Guid (k_u k))
+  | _ -> None
+
+let unpack_byte k =
+  match k_objtyp k with
+  | -4 -> Some (Byte (k_g k))
+  | _ -> None
+
+let unpack_short k =
+  match k_objtyp k with
+  | -5 -> Some (Short (k_h k))
+  | _ -> None
+
+let unpack_int k =
+  match k_objtyp k with
+  | -6 -> Some (Int (k_i k))
+  | _ -> None
+
+let unpack_long k =
+  match k_objtyp k with
+  | -7 -> Some (Long (k_j k))
+  | _ -> None
+
+let unpack_real k =
+  match k_objtyp k with
+  | -8 -> Some (Real (k_e k))
+  | _ -> None
+
+let unpack_float k =
+  match k_objtyp k with
+  | -9 -> Some (Float (k_f k))
+  | _ -> None
+
+let unpack_char k =
+  match k_objtyp k with
+  | -10 -> Some (Char (Char.chr (k_g k)))
+  | _ -> None
+
+let unpack_symbol k =
+  match k_objtyp k with
+  | -11 -> Some (Symbol (k_s k))
+  | _ -> None
+
+let unpack_timestamp k =
+  match k_objtyp k with
+  | -12 -> Some (Timestamp (k_j k))
+  | _ -> None
+
+let unpack_month k =
+  match k_objtyp k with
+  | -13 -> Some (Month (k_i k))
+  | _ -> None
+
+let unpack_date k =
+  match k_objtyp k with
+  | -13 -> Some (Date (k_i k))
+  | _ -> None
+
+let unpack_timespan k =
+  match k_objtyp k with
+  | -16 -> Some (Timespan (k_j k))
+  | _ -> None
+
+let unpack_date k =
+  match k_objtyp k with
+  | -17 -> Some (Minute (k_i k))
+  | _ -> None
+
+let unpack_date k =
+  match k_objtyp k with
+  | -18 -> Some (Second (k_i k))
+  | _ -> None
+
+let unpack_date k =
+  match k_objtyp k with
+  | -19 -> Some (Time (k_i k))
+  | _ -> None
+
+let unpack_datetime k =
+  match k_objtyp k with
+  | -15 -> Some (Datetime (k_f k))
+  | _ -> None
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

@@ -3,43 +3,30 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-type kb (** boolean *)
+type kb (* boolean *)
+type uu (* uuid *)
+type kg (* byte *)
+type kh (* short *)
+type ki (* int *)
+type kj (* long *)
+type ke (* real *)
+type kf (* float *)
+type kc (* char *)
+type ks (* symbol *)
 
-type uu (** uuid *)
+type kp (* timestamp *)
+type km (* month *)
+type kd (* date *)
 
-type kg (** byte *)
+type kn (* timespan *)
+type ku (* minute *)
+type kv (* second *)
+type kt (* time *)
 
-type kh (** short *)
+type kz (* datetime *)
 
-type ki (** int *)
-
-type kj (** long *)
-
-type ke (** real *)
-
-type kf (** float *)
-
-type kc (** char *)
-
-type ks (** symbol *)
-
-type kp (** timestamp *)
-
-type km (** month *)
-
-type kd (** date *)
-
-type kn (** timespan *)
-
-type ku (** minute *)
-
-type kv (** second *)
-
-type kt (** time *)
-
-type kz (** datetime *)
-
-type k (** K object *)
+type k
+(** Type of K objects in memory *)
 
 type _ t =
   | Bool : bool -> kb t
@@ -67,9 +54,6 @@ val pack : _ t -> k
 
 val pack_list : _ t list -> k
 (** [pack_list ts] packs [ts] into a K object. *)
-
-(* val kG : t -> int option
- * val kC : t -> char option *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
