@@ -6,40 +6,34 @@
 type k
 (** Type of K objects in memory *)
 
-type _ atom =
-  | Bool      : bool atom
-  | Guid      : Uuidm.t atom
-  | Byte      : int atom
-  | Short     : int atom
-  | Int       : int32 atom
-  | Long      : int64 atom
-  | Real      : float atom
-  | Float     : float atom
-  | Char      : char atom
-  | Symbol    : string atom
-  | Timestamp : int64 atom
-  | Month     : int32 atom
-  | Date      : int32 atom
-  | Timespan  : int64 atom
-  | Minute    : int32 atom
-  | Second    : int32 atom
-  | Time      : int32 atom
-  | Datetime  : float atom
+type t =
+  | Atom of atom
+  | Vector of atom list
+  | List of atom list
+  | Dict of t * t
+  | Table of t * t
+and atom =
+  | Bool      of bool
+  | Guid      of Uuidm.t
+  | Byte      of int
+  | Short     of int
+  | Int       of int32
+  | Long      of int64
+  | Real      of float
+  | Float     of float
+  | Char      of char
+  | Symbol    of string
+  | Timestamp of int64
+  | Month     of int32
+  | Date      of int32
+  | Timespan  of int64
+  | Minute    of int32
+  | Second    of int32
+  | Time      of int32
+  | Datetime  of float
 
-type dyn
-
-type _ t =
-  | Atom : 'a atom * 'a -> 'a t
-  | Vector : ('a atom * 'a) list -> 'a t
-  | List : dyn list -> dyn t
-  | Dict : 'a t * 'b t -> ('a * 'b) t
-  | Table : 'a t * 'b t -> ('a * 'b) t
-
-val pack : 'a atom -> 'a -> k
-(** [pack t] packs [t] into a K object. *)
-
-val pack_list : ('a atom * 'a) list -> k
-(** [pack_list ts] packs [ts] into a K object. *)
+(* val pack : t -> k
+ * (\** [pack t] packs [t] into a K object. *\) *)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
