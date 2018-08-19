@@ -24,7 +24,7 @@ type float64_ba =
 
 type _ ve =
   | Bool : bool_ba ve
-  | Guid : Bigstring.t ve
+  | Guid : uint8_ba ve
   | Byte : uint8_ba ve
   | Short : int16_ba ve
   | Int : int32_ba ve
@@ -41,6 +41,26 @@ type _ ve =
   | Second : int32_ba ve
   | Time : int32_ba ve
   | Datetime : float64_ba ve
+
+let int_of_ve : type a. a ve -> int = function
+  | Bool      -> 1
+  | Guid      -> 2
+  | Byte      -> 4
+  | Short     -> 5
+  | Int       -> 6
+  | Long      -> 7
+  | Real      -> 8
+  | Float     -> 9
+  | Char      -> 10
+  | Symbol    -> 11
+  | Timestamp -> 12
+  | Month     -> 13
+  | Date      -> 14
+  | Timespan  -> 16
+  | Minute    -> 17
+  | Second    -> 18
+  | Time      -> 19
+  | Datetime  -> 15
 
 let bool_vect = Bool
 let guid_vect = Guid
@@ -87,6 +107,25 @@ let eq_ve : type a b. a ve -> b ve -> (a,b) eq option = fun a b ->
 
 type vector = Vect : 'a ve * 'a -> vector
 
+let create_bool_vect v = Vect (bool_vect, v)
+let create_guid_vect v = Vect (guid_vect, v)
+let create_byte_vect v = Vect (byte_vect, v)
+let create_short_vect v = Vect (short_vect, v)
+let create_int_vect v = Vect (int_vect, v)
+let create_long_vect v = Vect (long_vect, v)
+let create_real_vect v = Vect (real_vect, v)
+let create_float_vect v = Vect (float_vect, v)
+let create_char_vect v = Vect (char_vect, v)
+let create_symbol_vect v = Vect (symbol_vect, v)
+let create_timestamp_vect v = Vect (timestamp_vect, v)
+let create_month_vect v = Vect (month_vect, v)
+let create_date_vect v = Vect (date_vect, v)
+let create_timespan_vect v = Vect (timespan_vect, v)
+let create_minute_vect v = Vect (minute_vect, v)
+let create_second_vect v = Vect (second_vect, v)
+let create_time_vect v = Vect (time_vect, v)
+let create_datetime_vect v = Vect (datetime_vect, v)
+
 let get_vector :
   type a. a ve -> vector -> a option = fun a (Vect(b,x)) ->
   match eq_ve a b with
@@ -119,35 +158,7 @@ and atom =
   | Time      of int32
   | Datetime  of float
 
-let int_of_atom = function
-  | Bool _      -> 1
-  | Guid _      -> 2
-  | Byte _      -> 4
-  | Short _     -> 5
-  | Int _       -> 6
-  | Long _      -> 7
-  | Real _      -> 8
-  | Float _     -> 9
-  | Char _      -> 10
-  | Symbol _    -> 11
-  | Timestamp _ -> 12
-  | Month _     -> 13
-  | Date _      -> 14
-  | Timespan _  -> 16
-  | Minute _    -> 17
-  | Second _    -> 18
-  | Time _      -> 19
-  | Datetime _  -> 15
-
-let int_of_t = function
-  | List _ -> 0
-  | Dict _ -> 99
-  | Table _ -> 98
-  | Atom a -> ~- (int_of_atom a)
-  | Vector v when get_vector bool_vect v <> None -> 1
-  | Vector v when get_vector guid_vect v <> None -> 2
-  | Vector v when get_vector byte_vect v <> None -> 4
-  | _ -> invalid_arg "int_of_t: unknown type"
+external r0 : k -> unit = "r0_stub" [@@noalloc]
 
 (* Accessors *)
 
@@ -175,18 +186,50 @@ let k_u k =
 (* List accessors *)
 
 external kK : k -> int -> k = "kK_stub"
-external kU : k -> int -> string = "kU_stub"
-let kU k i =
-  match Uuidm.of_bytes (kU k i) with
-  | None -> invalid_arg "kU"
-  | Some u -> u
-external kG : k -> int -> int = "kG_stub" [@@noalloc]
-external kH : k -> int -> int = "kH_stub" [@@noalloc]
-external kI : k -> int -> int32 = "kI_stub"
-external kJ : k -> int -> int64 = "kJ_stub"
-external kE : k -> int -> float = "kE_stub"
-external kF : k -> int -> float = "kF_stub"
+external kK_set : k -> int -> k -> unit = "kK_set_stub"
 external kS : k -> int -> string = "kS_stub"
+external kS_set : k -> int -> string -> unit = "kS_set_stub"
+
+external kG_bool : k -> bool_ba = "kG_stub"
+let kG_bool k =
+  let r = kG_bool k in
+  Gc.finalise_last (fun () -> r0 k) r ;
+  r
+external kG_char : k -> char_ba = "kG_stub"
+let kG_char k =
+  let r = kG_char k in
+  Gc.finalise_last (fun () -> r0 k) r ;
+  r
+external kG : k -> uint8_ba = "kG_stub"
+let kG k =
+  let r = kG k in
+  Gc.finalise_last (fun () -> r0 k) r ;
+  r
+external kH : k -> int16_ba = "kH_stub"
+let kH k =
+  let r = kH k in
+  Gc.finalise_last (fun () -> r0 k) r ;
+  r
+external kI : k -> int32_ba = "kI_stub"
+let kI k =
+  let r = kI k in
+  Gc.finalise_last (fun () -> r0 k) r ;
+  r
+external kJ : k -> int64_ba = "kJ_stub"
+let kJ k =
+  let r = kJ k in
+  Gc.finalise_last (fun () -> r0 k) r ;
+  r
+external kE : k -> float32_ba = "kE_stub"
+let kE k =
+  let r = kE k in
+  Gc.finalise_last (fun () -> r0 k) r ;
+  r
+external kF : k -> float64_ba = "kF_stub"
+let kF k =
+  let r = kF k in
+  Gc.finalise_last (fun () -> r0 k) r ;
+  r
 
 (* Atom constructors *)
 
@@ -222,36 +265,16 @@ external ktn : int -> int64 -> k = "ktn_stub"
 
 external xD : k -> k -> k = "xD_stub"
 external xT : k -> k = "xT_stub"
-external ktd : k -> k = "ktd_stub"
+(* external ktd : k -> k = "ktd_stub" *)
 
-external ja_int : k -> int -> unit = "ja_int_stub"
+(* external ja_int : k -> int -> unit = "ja_int_stub" *)
 (* external ja_long : k -> int -> unit = "ja_long_stub" *)
-external ja_int32 : k -> int32 -> unit = "ja_int32_stub"
-external ja_int64 : k -> int64 -> unit = "ja_int32_stub"
-external ja_double : k -> float -> unit = "ja_double_stub"
-external ja_bool : k -> bool -> unit = "ja_double_stub"
-external ja_uuid : k -> string -> unit = "ja_uuid_stub"
-external js : k -> string -> unit = "js_stub"
-
-let append k = function
-  | Bool b       -> ja_bool k b
-  | Guid u       -> ja_uuid k (Uuidm.to_bytes u)
-  | Byte i       -> ja_int k i
-  | Short i      -> ja_int k i
-  | Int i        -> ja_int32 k i
-  | Long j       -> ja_int64 k j
-  | Real f       -> ja_double k f
-  | Float f      -> ja_double k f
-  | Char c       -> ja_int k (Char.code c)
-  | Symbol s     -> js k s
-  | Timestamp ts -> ja_int64 k ts
-  | Timespan ts  -> ja_int64 k ts
-  | Month m      -> ja_int32 k m
-  | Date i       -> ja_int32 k i
-  | Minute i     -> ja_int32 k i
-  | Second i     -> ja_int32 k i
-  | Time i       -> ja_int32 k i
-  | Datetime f   -> ja_double k f
+(* external ja_int32 : k -> int32 -> unit = "ja_int32_stub"
+ * external ja_int64 : k -> int64 -> unit = "ja_int32_stub"
+ * external ja_double : k -> float -> unit = "ja_double_stub"
+ * external ja_bool : k -> bool -> unit = "ja_double_stub"
+ * external ja_uuid : k -> string -> unit = "ja_uuid_stub"
+ * external js : k -> string -> unit = "js_stub" *)
 
 let rec pack_atom = function
   | Bool b       -> kb b
@@ -273,18 +296,196 @@ let rec pack_atom = function
   | Time i       -> kt i
   | Datetime f   -> kz f
 
-and pack_list = function
-  | [] -> ktn 0 0L
-  | t :: _ as l ->
-    let k = ktn (int_of_atom t) 0L in
-    List.iter (append k) l ;
-    k
-
 and pack = function
   | Atom a -> pack_atom a
-  | Vector v when get_vector bool_vect v <> None ->
-    ktn 0 0L
-  | _ -> invalid_arg "pack: not implemeneted"
+  | Vector v when get_vector bool_vect v <> None -> begin
+    match get_vector bool_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve bool_vect) len in
+      let ba = kG_bool k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector guid_vect v <> None -> begin
+    match get_vector guid_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve guid_vect) len in
+      let ba = kG k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector byte_vect v <> None -> begin
+    match get_vector byte_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve byte_vect) len in
+      let ba = kG k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector short_vect v <> None -> begin
+    match get_vector short_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve short_vect) len in
+      let ba = kH k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector int_vect v <> None -> begin
+    match get_vector int_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve int_vect) len in
+      let ba = kI k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector long_vect v <> None -> begin
+    match get_vector long_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve long_vect) len in
+      let ba = kJ k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector real_vect v <> None -> begin
+    match get_vector real_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve real_vect) len in
+      let ba = kE k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector float_vect v <> None -> begin
+    match get_vector float_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve float_vect) len in
+      let ba = kF k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector char_vect v <> None -> begin
+    match get_vector char_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve char_vect) len in
+      let ba = kG_char k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector symbol_vect v <> None -> begin
+    match get_vector symbol_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Array.length v) in
+      let k = ktn (int_of_ve symbol_vect) len in
+      Array.iteri (kS_set k) v ;
+      k
+  end
+  | Vector v when get_vector timestamp_vect v <> None -> begin
+    match get_vector timestamp_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve timestamp_vect) len in
+      let ba = kJ k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector month_vect v <> None -> begin
+    match get_vector month_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve month_vect) len in
+      let ba = kI k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector date_vect v <> None -> begin
+    match get_vector date_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve date_vect) len in
+      let ba = kI k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector timespan_vect v <> None -> begin
+    match get_vector timespan_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve timespan_vect) len in
+      let ba = kJ k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector minute_vect v <> None -> begin
+    match get_vector minute_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve minute_vect) len in
+      let ba = kI k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector second_vect v <> None -> begin
+    match get_vector second_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve second_vect) len in
+      let ba = kI k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v when get_vector time_vect v <> None -> begin
+    match get_vector time_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve time_vect) len in
+      let ba = kI k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | Vector v -> begin
+    match get_vector datetime_vect v with
+    | None -> assert false
+    | Some v ->
+      let len = Int64.of_int (Bigarray.Array1.dim v) in
+      let k = ktn (int_of_ve datetime_vect) len in
+      let ba = kF k in
+      Bigarray.Array1.blit v ba ;
+      k
+  end
+  | List ts ->
+    let len = Int64.of_int (Array.length ts) in
+    let k = ktn 0 len in
+    Array.iteri (fun i t -> kK_set k i (pack t)) ts ;
+    k
+  | Dict (k, v) ->
+    xD (pack k) (pack v)
+  | Table (k, v) ->
+    xT (xD (pack k) (pack v))
 
 let rec unpack_atom k =
   match ~- (k_objtyp k) with
@@ -308,8 +509,29 @@ let rec unpack_atom k =
   | 15 -> Datetime (k_f k)
   | _  -> invalid_arg "unpack_atom: not an atom"
 
-and unpack_vector _k =
-  Vect (byte_vect, Bigarray.(Array1.create int8_unsigned c_layout 0))
+and unpack_vector k =
+  match k_objtyp k with
+  | 1 -> create_bool_vect (kG_bool k)
+  | 2 -> create_guid_vect (kG k)
+  | 4 -> create_byte_vect (kG k)
+  | 5 -> create_short_vect (kH k)
+  | 6 -> create_int_vect (kI k)
+  | 7 -> create_long_vect (kJ k)
+  | 8 -> create_real_vect (kE k)
+  | 9 -> create_float_vect (kF k)
+  | 10 -> create_char_vect (kG_char k)
+  | 11 ->
+    let len = Int64.to_int (k_length k) in
+    create_symbol_vect (Array.init len (kS k))
+  | 12 -> create_timestamp_vect (kJ k)
+  | 13 -> create_month_vect (kI k)
+  | 14 -> create_date_vect (kI k)
+  | 16 -> create_timespan_vect (kJ k)
+  | 17 -> create_minute_vect (kI k)
+  | 18 -> create_second_vect (kI k)
+  | 19 -> create_time_vect (kI k)
+  | 15 -> create_datetime_vect (kF k)
+  | _ -> invalid_arg "unpack_vector: not a vector"
 
 and unpack_list k =
   let len = Int64.to_int (k_length k) in

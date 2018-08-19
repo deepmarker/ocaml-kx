@@ -6,6 +6,18 @@
 type k
 (** Type of K objects in memory *)
 
+val k_objtyp : k -> int
+(** Type of K object *)
+
+val k_objattrs : k -> int
+(** Attributes of K object (0 = no attributes) *)
+
+val k_refcount : k -> int
+(** Reference count of K object *)
+
+val k_length : k -> int64
+(** Number of elements in a list *)
+
 type bool_ba =
   (bool, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
 type char_ba =
@@ -25,7 +37,7 @@ type float64_ba =
 
 type _ ve
 val bool_vect : bool_ba ve
-val guid_vect : Bigstring.t ve
+val guid_vect : uint8_ba ve
 val byte_vect : uint8_ba ve
 val short_vect : int16_ba ve
 val int_vect : int32_ba ve
@@ -46,6 +58,26 @@ val datetime_vect : float64_ba ve
 
 type vector
 (** Type of a vector. *)
+
+val create_bool_vect : bool_ba -> vector
+val create_guid_vect : uint8_ba -> vector
+val create_byte_vect : uint8_ba -> vector
+val create_short_vect : int16_ba -> vector
+val create_int_vect : int32_ba -> vector
+val create_long_vect : int64_ba -> vector
+val create_real_vect : float32_ba -> vector
+val create_float_vect : float64_ba -> vector
+val create_char_vect : char_ba -> vector
+val create_symbol_vect : string array -> vector
+val create_timestamp_vect : int64_ba -> vector
+val create_month_vect : int32_ba -> vector
+val create_date_vect : int32_ba -> vector
+val create_timespan_vect : int64_ba -> vector
+val create_minute_vect : int32_ba -> vector
+val create_second_vect : int32_ba -> vector
+val create_time_vect : int32_ba -> vector
+val create_datetime_vect : float64_ba -> vector
+(** Vector constructors *)
 
 val get_vector : 'a ve -> vector -> 'a option
 (** [get_vector typ v] is the underlying storage of the vector
@@ -77,8 +109,8 @@ and atom =
   | Time      of int32
   | Datetime  of float
 
-(* val pack : t -> k
- * (\** [pack t] packs [t] into a K object. *\) *)
+val pack : t -> k
+(** [pack t] packs [t] into a K object. *)
 
 val unpack : k -> t
 (** [unpack k] is the OCaml representation of [k], a K object. *)
