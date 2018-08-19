@@ -7,8 +7,8 @@ type k
 
 type t =
   | Atom of atom
-  | Vector of atom list
-  | List of atom list
+  | Vector of atom array
+  | List of atom array
   | Dict of t * t
   | Table of t * t
 and atom =
@@ -51,12 +51,21 @@ let int_of_atom = function
   | Time _      -> 19
   | Datetime _  -> 15
 
+let int_of_t = function
+  | Atom a -> ~- (int_of_atom a)
+  | Vector [||] ->
+    invalid_arg "int_of_t: cannot know type of empty vector"
+  | Vector v -> int_of_atom v.(0)
+  | List _ -> 0
+  | Dict _ -> 99
+  | Table _ -> 98
+
 (* Accessors *)
 
 external k_objtyp : k -> int = "k_objtyp" [@@noalloc]
 external k_objattrs : k -> int = "k_objattrs" [@@noalloc]
 external k_refcount : k -> int = "k_refcount" [@@noalloc]
-external k_length : k -> int = "k_length" [@@noalloc]
+external k_length : k -> int64 = "k_length"
 
 external k_g : k -> int = "k_g" [@@noalloc]
 external k_h : k -> int = "k_h" [@@noalloc]
@@ -72,6 +81,24 @@ let k_u k =
   match Uuidm.of_bytes (k_u k) with
   | None -> invalid_arg "k_u"
   | Some u -> u
+
+(* List accessors *)
+
+external kK : k -> int -> k = "kK_stub"
+external kU : k -> int -> string = "kU_stub"
+let kU k i =
+  match Uuidm.of_bytes (kU k i) with
+  | None -> invalid_arg "kU"
+  | Some u -> u
+external kG : k -> int -> int = "kG_stub" [@@noalloc]
+external kH : k -> int -> int = "kH_stub" [@@noalloc]
+external kI : k -> int -> int32 = "kI_stub"
+external kJ : k -> int -> int64 = "kJ_stub"
+external kE : k -> int -> float = "kE_stub"
+external kF : k -> int -> float = "kF_stub"
+external kS : k -> int -> string = "kS_stub"
+
+(* Atom constructors *)
 
 external kb : bool -> k = "kb_stub"
 external ku : string -> k = "ku_stub"
@@ -97,7 +124,16 @@ external ktimestamp : int64 -> k = "ktimestamp_stub"
 external ktimespan : int64 -> k = "ktimespan_stub"
 external kz : float -> k = "kz_stub"
 
+(* List constructors *)
+
 external ktn : int -> int -> k = "ktn_stub"
+
+(* Dict/Table accessors *)
+
+external xD : k -> k -> k = "xD_stub"
+external xT : k -> k = "xT_stub"
+external ktd : k -> k = "ktd_stub"
+
 external ja_int : k -> int -> unit = "ja_int_stub"
 (* external ja_long : k -> int -> unit = "ja_long_stub" *)
 external ja_int32 : k -> int32 -> unit = "ja_int32_stub"
@@ -127,7 +163,7 @@ let pack_atom = function
   | Time i -> kt i
   | Datetime f -> kz f
 
-let cons k = function
+let append k = function
   | Bool b -> ja_bool k b
   | Guid u -> ja_uuid k (Uuidm.to_bytes u)
   | Byte i -> ja_int k i
@@ -151,99 +187,63 @@ let pack_list = function
   | [] -> ktn 0 0
   | t :: _ as l ->
     let k = ktn (int_of_atom t) 0 in
-    List.iter (cons k) l ;
+    List.iter (append k) l ;
     k
 
-let unpack_bool k =
-  match k_objtyp k, k_g k with
-  | -1, 0 -> Some false
-  | -1, _ -> Some true
-  | _ -> None
+let unpack_atom k =
+  match ~- (k_objtyp k) with
+  | 1 -> (match k_g k with 0 -> Bool false | _ -> Bool true)
+  | 2 -> Guid (k_u k)
+  | 4 -> Byte (k_g k)
+  | 5 -> Short (k_h k)
+  | 6 -> Int (k_i k)
+  | 7 -> Long (k_j k)
+  | 8 -> Real (k_e k)
+  | 9 -> Float (k_f k)
+  | 10 -> Char (Char.chr (k_g k))
+  | 11 -> Symbol (k_s k)
+  | 12 -> Timestamp (k_j k)
+  | 13 -> Month (k_i k)
+  | 14 -> Date (k_i k)
+  | 16 -> Timespan (k_j k)
+  | 17 -> Minute (k_i k)
+  | 18 -> Second (k_i k)
+  | 19 -> Time (k_i k)
+  | 15 -> Datetime (k_f k)
+  | _ -> invalid_arg "unpack_atom: not an atom"
 
-let unpack_guid k =
-  match k_objtyp k with
-  | -2 -> Some (k_u k)
-  | _ -> None
+let unpack_vector k =
+  let objtyp = k_objtyp k in
+  if objtyp < 1 then
+    invalid_arg "unpack_vector: argument is not a vector" ;
+  let len = Int64.to_int (k_length k) in
+  Array.init len begin fun i ->
+    match objtyp with
+    | 1 -> Bool (kG k i <> 0)
+    | 2 -> Guid (kU k i)
+    | 4 -> Byte (kG k i)
+    | 5 -> Short (kH k i)
+    | 6 -> Int (kI k i)
+    | 7 -> Long (kJ k i)
+    | 8 -> Real (kE k i)
+    | 9 -> Float (kF k i)
+    | 10 -> Char (Char.chr (kG k i))
+    | 11 -> Symbol (kS k i)
+    | 12 -> Timestamp (kJ k i)
+    | 13 -> Month (kI k i)
+    | 14 -> Date (kI k i)
+    | 16 -> Timespan (kJ k i)
+    | 17 -> Minute (kI k i)
+    | 18 -> Second (kI k i)
+    | 19 -> Time (kI k i)
+    | 15 -> Datetime (kF k i)
+    | _ -> invalid_arg "unpack_vector: unknown type"
+  end
 
-let unpack_byte k =
-  match k_objtyp k with
-  | -4 -> Some (k_g k)
-  | _ -> None
-
-let unpack_short k =
-  match k_objtyp k with
-  | -5 -> Some (k_h k)
-  | _ -> None
-
-let unpack_int k =
-  match k_objtyp k with
-  | -6 -> Some (k_i k)
-  | _ -> None
-
-let unpack_long k =
-  match k_objtyp k with
-  | -7 -> Some (k_j k)
-  | _ -> None
-
-let unpack_real k =
-  match k_objtyp k with
-  | -8 -> Some (k_e k)
-  | _ -> None
-
-let unpack_float k =
-  match k_objtyp k with
-  | -9 -> Some (k_f k)
-  | _ -> None
-
-let unpack_char k =
-  match k_objtyp k with
-  | -10 -> Some (Char.chr (k_g k))
-  | _ -> None
-
-let unpack_symbol k =
-  match k_objtyp k with
-  | -11 -> Some (k_s k)
-  | _ -> None
-
-let unpack_timestamp k =
-  match k_objtyp k with
-  | -12 -> Some (k_j k)
-  | _ -> None
-
-let unpack_month k =
-  match k_objtyp k with
-  | -13 -> Some (k_i k)
-  | _ -> None
-
-let unpack_date k =
-  match k_objtyp k with
-  | -13 -> Some (k_i k)
-  | _ -> None
-
-let unpack_timespan k =
-  match k_objtyp k with
-  | -16 -> Some (k_j k)
-  | _ -> None
-
-let unpack_date k =
-  match k_objtyp k with
-  | -17 -> Some (k_i k)
-  | _ -> None
-
-let unpack_date k =
-  match k_objtyp k with
-  | -18 -> Some (k_i k)
-  | _ -> None
-
-let unpack_date k =
-  match k_objtyp k with
-  | -19 -> Some (k_i k)
-  | _ -> None
-
-let unpack_datetime k =
-  match k_objtyp k with
-  | -15 -> Some (k_f k)
-  | _ -> None
+let unpack_list k =
+  if k_objtyp k <> 0 then
+    invalid_arg "unpack_list: argument is not a mixed list" ;
+  ()
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

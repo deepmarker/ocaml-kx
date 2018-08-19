@@ -40,7 +40,7 @@ static value caml_alloc_K (K a) {
 CAMLprim value k_objtyp (value k) { return Val_int(K_val(k)->t); }
 CAMLprim value k_objattrs (value k) { return Val_int(K_val(k)->u); }
 CAMLprim value k_refcount (value k) { return Val_int(K_val(k)->r); }
-CAMLprim value k_length (value k) { return Val_int(K_val(k)->n); }
+CAMLprim value k_length (value k) { return caml_copy_int64(K_val(k)->n); }
 CAMLprim value k_g (value k) { return Val_int(K_val(k)->g); }
 CAMLprim value k_h (value k) { return Val_int(K_val(k)->h); }
 CAMLprim value k_i (value k) {
@@ -84,6 +84,65 @@ CAMLprim value k_u (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
     ret = caml_alloc_initialized_string(16, K_val(k)->G0);
+    CAMLreturn(ret);
+}
+
+/* List accessors */
+
+CAMLprim value kK_stub (value k, value i) {
+    CAMLparam2(k, i);
+    CAMLlocal1(ret);
+    ret = caml_alloc_K(kK(K_val(k))[Int_val(i)]);
+    CAMLreturn(ret);
+}
+
+CAMLprim value kG_stub (value k, value i) {
+    return(Val_int((kG(K_val(k))[Int_val(i)])));
+}
+
+CAMLprim value kU_stub (value k, value i) {
+    CAMLparam2(k, i);
+    CAMLlocal1(ret);
+    ret = caml_alloc_initialized_string(16, (kU(K_val(k))[Int_val(i)]).g);
+    CAMLreturn(ret);
+}
+
+CAMLprim value kH_stub (value k, value i) {
+    return(Val_int((kH(K_val(k))[Int_val(i)])));
+}
+
+CAMLprim value kI_stub (value k, value i) {
+    CAMLparam2(k, i);
+    CAMLlocal1(ret);
+    ret = caml_copy_int32(kI(K_val(k))[Int_val(i)]);
+    CAMLreturn(ret);
+}
+
+CAMLprim value kJ_stub (value k, value i) {
+    CAMLparam2(k, i);
+    CAMLlocal1(ret);
+    ret = caml_copy_int64(kJ(K_val(k))[Int_val(i)]);
+    CAMLreturn(ret);
+}
+
+CAMLprim value kE_stub (value k, value i) {
+    CAMLparam2(k, i);
+    CAMLlocal1(ret);
+    ret = caml_copy_double(kE(K_val(k))[Int_val(i)]);
+    CAMLreturn(ret);
+}
+
+CAMLprim value kF_stub (value k, value i) {
+    CAMLparam2(k, i);
+    CAMLlocal1(ret);
+    ret = caml_copy_double(kF(K_val(k))[Int_val(i)]);
+    CAMLreturn(ret);
+}
+
+CAMLprim value kS_stub (value k, value i) {
+    CAMLparam2(k, i);
+    CAMLlocal1(ret);
+    ret = caml_copy_string(kS(K_val(k))[Int_val(i)]);
     CAMLreturn(ret);
 }
 
@@ -228,6 +287,27 @@ CAMLprim value ktn_stub (value t, value len) {
     CAMLparam2(t, len);
     CAMLlocal1(k);
     k = caml_alloc_K(ktn(Int_val(t), Long_val(len)));
+    CAMLreturn(k);
+}
+
+CAMLprim value xD_stub (value keys, value values) {
+    CAMLparam2(keys, values);
+    CAMLlocal1(k);
+    k = caml_alloc_K(xD(K_val(keys), K_val(values)));
+    CAMLreturn(k);
+}
+
+CAMLprim value xT_stub (value dict) {
+    CAMLparam1(dict);
+    CAMLlocal1(k);
+    k = caml_alloc_K(xT(K_val(dict)));
+    CAMLreturn(k);
+}
+
+CAMLprim value ktd_stub (value kt) {
+    CAMLparam1(kt);
+    CAMLlocal1(k);
+    k = caml_alloc_K(ktd(K_val(kt)));
     CAMLreturn(k);
 }
 

@@ -8,8 +8,8 @@ type k
 
 type t =
   | Atom of atom
-  | Vector of atom list
-  | List of atom list
+  | Vector of atom array
+  | List of atom array
   | Dict of t * t
   | Table of t * t
 and atom =
