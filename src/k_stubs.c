@@ -286,7 +286,7 @@ CAMLprim value kz_stub (value f) {
 CAMLprim value ktn_stub (value t, value len) {
     CAMLparam2(t, len);
     CAMLlocal1(k);
-    k = caml_alloc_K(ktn(Int_val(t), Long_val(len)));
+    k = caml_alloc_K(ktn(Int_val(t), Int64_val(len)));
     CAMLreturn(k);
 }
 

@@ -6,7 +6,7 @@
  (c_names k_stubs c)
  (c_flags (-DKXVER=3))
  ; (flags (:standard -w -9-3))
- (libraries bigstring uuidm ptime))
+ (libraries bigstring uuidm))
 
 (library
  (name        kx_lwt)
