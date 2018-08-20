@@ -1,0 +1,14 @@
+opam-version: "1.2"
+maintainer: "Vincent Bernardoff <vb@luminar.eu.org>"
+authors: ["Vincent Bernardoff <vb@luminar.eu.org>"]
+homepage: "https://github.com/vbmithr/ocaml-kx"
+license: "ISC"
+dev-repo: "https://github.com/vbmithr/ocaml-kx.git"
+bug-reports: "https://github.com/vbmithr/ocaml-kx/issues"
+tags: []
+available: [ ocaml-version >= "4.03.0"]
+depends: [
+  "dune" {build & >= "1.1.1"}
+  "uuidm" {>= "0.9.6"}
+]
+build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
