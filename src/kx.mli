@@ -115,6 +115,14 @@ val pack : t -> k
 val unpack : k -> t
 (** [unpack k] is the OCaml representation of [k], a K object. *)
 
+val bigstring_of_k : k -> char_ba option
+(** [bigstring_of_k k] is [Some ba] iff [k] is a char vector. *)
+
+val of_bigstring : char_ba -> (k, string) result
+val of_bigstring_exn : char_ba -> k
+
+val serialize : ?mode:int -> k -> (char_ba, string) result
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
 

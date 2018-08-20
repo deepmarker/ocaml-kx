@@ -396,6 +396,36 @@ CAMLprim value jv_stub (value k, value v) {
     return Val_unit;
 }
 
+CAMLprim value d9_stub (value k) {
+    CAMLparam1(k);
+    CAMLlocal2(ret, errmsg);
+    K x = ee(d9(K_val(k)));
+    if (xt == -128) {
+        ret = caml_alloc(1, 1);
+        errmsg = caml_copy_string(x->s?x->s:"");
+    }
+    else {
+        ret = caml_alloc(1, 0);
+        Store_field(ret, 0, caml_alloc_K(x));
+    }
+    CAMLreturn(ret);
+}
+
+CAMLprim value b9_stub (value mode, value k) {
+    CAMLparam2(mode, k);
+    CAMLlocal2(ret, errmsg);
+    K x = ee(b9(Int_val(mode), K_val(k)));
+    if (xt == -128) {
+        ret = caml_alloc(1, 1);
+        errmsg = caml_copy_string(x->s?x->s:"");
+    }
+    else {
+        ret = caml_alloc(1, 0);
+        Store_field(ret, 0, caml_alloc_K(x));
+    }
+    CAMLreturn(ret);
+}
+
 CAMLprim value khpu_stub (value host, value port, value username) {
     CAMLparam3(host, port, username);
     CAMLlocal2(ret, errmsg);

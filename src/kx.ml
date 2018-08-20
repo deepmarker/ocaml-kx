@@ -555,6 +555,33 @@ and unpack k =
   | 98           -> unpack_table k
   | _            -> Vector (unpack_vector k)
 
+(* Serialization *)
+
+external b9 : int -> k -> (k, string) result = "b9_stub"
+external d9 : k -> (k, string) result = "d9_stub"
+
+let of_bigstring s =
+  d9 (pack (Vector (create_char_vect s)))
+
+let of_bigstring_exn s =
+  match (of_bigstring s) with
+  | Error msg -> invalid_arg msg
+  | Ok s -> s
+
+let bigstring_of_k k =
+  match k_objtyp k with
+  | 10 -> Some (kG_char k)
+  | _ -> None
+
+let serialize ?(mode = ~-1) k =
+  match b9 mode k with
+  | Error e -> Error e
+  | Ok r ->
+    match get_vector char_vect (unpack_vector r) with
+    | None -> invalid_arg "serialize: internal error"
+    | Some bs -> Ok bs
+
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
 
