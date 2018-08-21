@@ -18,6 +18,13 @@ val k_refcount : k -> int
 val k_length : k -> int64
 (** Number of elements in a list *)
 
+val k_g : k -> int
+val k_h : k -> int
+val k_i : k -> int32
+val k_j : k -> int64
+val k_e : k -> float
+val k_f : k -> float
+
 type ('a, 'b) storage = ('a, 'b, Bigarray.c_layout) Bigarray.Array1.t
 
 type bool_arr    = (bool, Bigarray.int8_unsigned_elt) storage
