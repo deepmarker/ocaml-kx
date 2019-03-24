@@ -11,4 +11,4 @@ depends: [
   "dune" {build & >= "1.1.1"}
   "uuidm" {>= "0.9.6"}
 ]
-build: [ "dune" "build" "-j" jobs "-p" name "@install" ]
+build: [ "dune" "build" "-j" jobs "-p" name ]
