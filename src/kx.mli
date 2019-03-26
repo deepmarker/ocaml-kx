@@ -18,70 +18,65 @@ val k_refcount : k -> int
 val k_length : k -> int64
 (** Number of elements in a list *)
 
-type bool_ba =
-  (bool, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
-type char_ba =
-  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
-type uint8_ba =
-  (int, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
-type int16_ba =
-  (int, Bigarray.int16_signed_elt, Bigarray.c_layout) Bigarray.Array1.t
-type int32_ba =
-  (int32, Bigarray.int32_elt, Bigarray.c_layout) Bigarray.Array1.t
-type int64_ba =
-  (int32, Bigarray.int32_elt, Bigarray.c_layout) Bigarray.Array1.t
-type float32_ba =
-  (float, Bigarray.float32_elt, Bigarray.c_layout) Bigarray.Array1.t
-type float64_ba =
-  (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t
+type ('a, 'b) storage = ('a, 'b, Bigarray.c_layout) Bigarray.Array1.t
 
-type _ ve
-val bool_vect : bool_ba ve
-val guid_vect : uint8_ba ve
-val byte_vect : uint8_ba ve
-val short_vect : int16_ba ve
-val int_vect : int32_ba ve
-val long_vect : int64_ba ve
-val real_vect : float32_ba ve
-val float_vect : float64_ba ve
-val char_vect : char_ba ve
-val symbol_vect : string array ve
-val timestamp_vect : int64_ba ve
-val month_vect : int32_ba ve
-val date_vect : int32_ba ve
-val timespan_vect : int64_ba ve
-val minute_vect : int32_ba ve
-val second_vect : int32_ba ve
-val time_vect : int32_ba ve
-val datetime_vect : float64_ba ve
-(** Values representing types of vector elements. *)
+type bool_arr    = (bool, Bigarray.int8_unsigned_elt) storage
+type char_arr    = (char, Bigarray.int8_unsigned_elt) storage
+type uint8_arr   = (int, Bigarray.int8_unsigned_elt) storage
+type int16_arr   = (int, Bigarray.int16_signed_elt) storage
+type int32_arr   = (int32, Bigarray.int32_elt) storage
+type int64_arr   = (int32, Bigarray.int32_elt) storage
+type float32_arr = (float, Bigarray.float32_elt) storage
+type float64_arr = (float, Bigarray.float64_elt) storage
+
+type _ kw
+(** Type witness for k types. *)
+
+val bool      : bool_arr kw
+val guid      : uint8_arr kw
+val byte      : uint8_arr kw
+val short     : int16_arr kw
+val int       : int32_arr kw
+val long      : int64_arr kw
+val real      : float32_arr kw
+val float     : float64_arr kw
+val char      : char_arr kw
+val symbol    : string array kw
+val timestamp : int64_arr kw
+val month     : int32_arr kw
+val date      : int32_arr kw
+val timespan  : int64_arr kw
+val minute    : int32_arr kw
+val second    : int32_arr kw
+val time      : int32_arr kw
+val datetime  : float64_arr kw
 
 type vector
 (** Type of a vector. *)
 
-val create_bool_vect : bool_ba -> vector
-val create_guid_vect : uint8_ba -> vector
-val create_byte_vect : uint8_ba -> vector
-val create_short_vect : int16_ba -> vector
-val create_int_vect : int32_ba -> vector
-val create_long_vect : int64_ba -> vector
-val create_real_vect : float32_ba -> vector
-val create_float_vect : float64_ba -> vector
-val create_char_vect : char_ba -> vector
-val create_symbol_vect : string array -> vector
-val create_timestamp_vect : int64_ba -> vector
-val create_month_vect : int32_ba -> vector
-val create_date_vect : int32_ba -> vector
-val create_timespan_vect : int64_ba -> vector
-val create_minute_vect : int32_ba -> vector
-val create_second_vect : int32_ba -> vector
-val create_time_vect : int32_ba -> vector
-val create_datetime_vect : float64_ba -> vector
+val bool_vect      : bool_arr     -> vector
+val guid_vect      : uint8_arr    -> vector
+val byte_vect      : uint8_arr    -> vector
+val short_vect     : int16_arr    -> vector
+val int_vect       : int32_arr    -> vector
+val long_vect      : int64_arr    -> vector
+val real_vect      : float32_arr  -> vector
+val float_vect     : float64_arr  -> vector
+val char_vect      : char_arr     -> vector
+val symbol_vect    : string array -> vector
+val timestamp_vect : int64_arr    -> vector
+val month_vect     : int32_arr    -> vector
+val date_vect      : int32_arr    -> vector
+val timespan_vect  : int64_arr    -> vector
+val minute_vect    : int32_arr    -> vector
+val second_vect    : int32_arr    -> vector
+val time_vect      : int32_arr    -> vector
+val datetime_vect  : float64_arr  -> vector
 (** Vector constructors *)
 
-val get_vector : 'a ve -> vector -> 'a option
+val get_vector : 'a kw -> vector -> 'a option
 (** [get_vector typ v] is the underlying storage of the vector
-    value. *)
+   value. *)
 
 type t =
   | Atom      of atom
@@ -100,13 +95,13 @@ and atom =
   | Float     of float
   | Char      of char
   | Symbol    of string
-  | Timestamp of int64
-  | Month     of int32
-  | Date      of int32
-  | Timespan  of int64
-  | Minute    of int32
-  | Second    of int32
-  | Time      of int32
+  | Timestamp of Ptime.t
+  | Month     of int
+  | Date      of int
+  | Timespan  of Ptime.time * int
+  | Minute    of int * int
+  | Second    of int * int * int
+  | Time      of Ptime.time * int
   | Datetime  of float
 
 val pack : t -> k
@@ -115,13 +110,13 @@ val pack : t -> k
 val unpack : k -> t
 (** [unpack k] is the OCaml representation of [k], a K object. *)
 
-val bigstring_of_k : k -> char_ba option
-(** [bigstring_of_k k] is [Some ba] iff [k] is a char vector. *)
+val bigstring_of_k : k -> char_arr option
+(** [bigstring_of_k k] is [Some arr] iff [k] is a char vector. *)
 
-val of_bigstring : char_ba -> (k, string) result
-val of_bigstring_exn : char_ba -> k
+val of_bigstring : char_arr -> (k, string) result
+val of_bigstring_exn : char_arr -> k
 
-val serialize : ?mode:int -> k -> (char_ba, string) result
+val serialize : ?mode:int -> k -> (char_arr, string) result
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
