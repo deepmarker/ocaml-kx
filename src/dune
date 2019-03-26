@@ -6,9 +6,9 @@
  (synopsis "OCaml client for kdb+")
  (c_names k_stubs c)
  (c_flags (-DKXVER=3))
- (c_library_flags -pthread)
+ (c_library_flags (-pthread))
  ; (flags (:standard -w -9-3))
- (libraries bigarray uuidm ptime))
+ (libraries bigarray bigstring uuidm ptime))
 
 (library
  (name        kx_lwt)

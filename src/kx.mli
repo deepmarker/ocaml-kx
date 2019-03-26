@@ -25,30 +25,45 @@ val k_j : k -> int64
 val k_e : k -> float
 val k_f : k -> float
 
+val dj : int -> int
+val ymd : int -> int -> int -> int
+
 type ('a, 'b) storage = ('a, 'b, Bigarray.c_layout) Bigarray.Array1.t
 
-type bool_arr    = (bool, Bigarray.int8_unsigned_elt) storage
-type char_arr    = (char, Bigarray.int8_unsigned_elt) storage
 type uint8_arr   = (int, Bigarray.int8_unsigned_elt) storage
 type int16_arr   = (int, Bigarray.int16_signed_elt) storage
 type int32_arr   = (int32, Bigarray.int32_elt) storage
-type int64_arr   = (int32, Bigarray.int32_elt) storage
+type int64_arr   = (int64, Bigarray.int64_elt) storage
 type float32_arr = (float, Bigarray.float32_elt) storage
 type float64_arr = (float, Bigarray.float64_elt) storage
+
+val guid_arr : Uuidm.t list -> Bigstring.t
+val bool_arr : bool array -> uint8_arr
+val uint8_arr : int array -> uint8_arr
+val int16_arr : int array -> int16_arr
+val int32_arr : int32 array -> int32_arr
+val int64_arr : int64 array -> int64_arr
+val float32_arr : float array -> float32_arr
+val float64_arr : float array -> float64_arr
+val timestamp_arr : Ptime.t list -> int64_arr
+
+val guids_of_arr : Bigstring.t -> Uuidm.t list
 
 type _ kw
 (** Type witness for k types. *)
 
-val bool      : bool_arr kw
-val guid      : uint8_arr kw
+(** Values for k-types type witnesses *)
+
+val bool      : uint8_arr kw
+val guid      : Bigstring.t kw
 val byte      : uint8_arr kw
 val short     : int16_arr kw
 val int       : int32_arr kw
 val long      : int64_arr kw
 val real      : float32_arr kw
 val float     : float64_arr kw
-val char      : char_arr kw
-val symbol    : string array kw
+val char      : Bigstring.t kw
+val symbol    : string list kw
 val timestamp : int64_arr kw
 val month     : int32_arr kw
 val date      : int32_arr kw
@@ -61,16 +76,16 @@ val datetime  : float64_arr kw
 type vector
 (** Type of a vector. *)
 
-val bool_vect      : bool_arr     -> vector
-val guid_vect      : uint8_arr    -> vector
+val bool_vect      : uint8_arr    -> vector
+val guid_vect      : Bigstring.t  -> vector
 val byte_vect      : uint8_arr    -> vector
 val short_vect     : int16_arr    -> vector
 val int_vect       : int32_arr    -> vector
 val long_vect      : int64_arr    -> vector
 val real_vect      : float32_arr  -> vector
 val float_vect     : float64_arr  -> vector
-val char_vect      : char_arr     -> vector
-val symbol_vect    : string array -> vector
+val char_vect      : Bigstring.t  -> vector
+val symbol_vect    : string list -> vector
 val timestamp_vect : int64_arr    -> vector
 val month_vect     : int32_arr    -> vector
 val date_vect      : int32_arr    -> vector
@@ -104,12 +119,25 @@ and atom =
   | Symbol    of string
   | Timestamp of Ptime.t
   | Month     of int
-  | Date      of int
+  | Date      of { year: int ; month: int ; day: int }
   | Timespan  of Ptime.time * int
   | Minute    of int * int
   | Second    of int * int * int
   | Time      of Ptime.time * int
   | Datetime  of float
+
+val equal : t -> t -> bool
+
+val zero_timespan : atom
+val create_timespan :
+  ?tz_offset:int -> hh:int -> mm:int ->
+  ss:int -> ns:int -> unit -> atom
+
+val atom : atom -> t
+val vector : vector -> t
+val list : t array -> t
+val dict : t -> t -> t
+val table : t -> t -> t
 
 val pack : t -> k
 (** [pack t] packs [t] into a K object. *)
@@ -117,13 +145,13 @@ val pack : t -> k
 val unpack : k -> t
 (** [unpack k] is the OCaml representation of [k], a K object. *)
 
-val bigstring_of_k : k -> char_arr option
+val bigstring_of_k : k -> Bigstring.t option
 (** [bigstring_of_k k] is [Some arr] iff [k] is a char vector. *)
 
-val of_bigstring : char_arr -> (k, string) result
-val of_bigstring_exn : char_arr -> k
+val of_bigstring : Bigstring.t -> (k, string) result
+val of_bigstring_exn : Bigstring.t -> k
 
-val serialize : ?mode:int -> k -> (char_arr, string) result
+val serialize : ?mode:int -> k -> (Bigstring.t, string) result
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

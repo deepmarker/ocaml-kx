@@ -426,6 +426,22 @@ CAMLprim value b9_stub (value mode, value k) {
     CAMLreturn(ret);
 }
 
+CAMLprim value khp_stub (value host, value port) {
+    CAMLparam2(host, port);
+    CAMLlocal2(ret, errmsg);
+    int rc = khp(String_val(host), Int_val(port));
+    if (rc > 0) {
+        ret = caml_alloc(1, 0);
+        Store_field(ret, 0, Val_int(rc));
+    }
+    else {
+        ret = caml_alloc(1, 1);
+        errmsg = caml_copy_string(strerror(errno));
+        Store_field(ret, 0, errmsg);
+    }
+    CAMLreturn(ret);
+}
+
 CAMLprim value khpu_stub (value host, value port, value username) {
     CAMLparam3(host, port, username);
     CAMLlocal2(ret, errmsg);
@@ -444,8 +460,26 @@ CAMLprim value khpu_stub (value host, value port, value username) {
 
 CAMLprim value khpun_stub(value host, value port,
                           value username, value timeout) {
-    return Val_int(khpun(String_val(host), Int_val(port),
-                         String_val(username), Int_val(timeout)));
+    CAMLparam4(host, port, username, timeout);
+    CAMLlocal2(ret, errmsg);
+    int rc = khpun(String_val(host), Int_val(port),
+                   String_val(username), Int_val(timeout));
+    if (rc > 0) {
+        ret = caml_alloc(1, 0);
+        Store_field(ret, 0, Val_int(rc));
+    }
+    else {
+        ret = caml_alloc(1, 1);
+        errmsg = caml_copy_string(strerror(errno));
+        Store_field(ret, 0, errmsg);
+    }
+    CAMLreturn(ret);
+}
+
+
+CAMLprim value kclose_stub(value fd) {
+    kclose(Int_val(fd));
+    return Val_unit;
 }
 
 CAMLprim value k0_stub(value conn, value msg) {
@@ -481,6 +515,14 @@ CAMLprim value k1_stub(value conn, value msg, value a) {
     }
     CAMLreturn(ret);
 }
+
+CAMLprim value ymd_stub(value year, value month, value day) {
+    return Val_int(ymd(Int_val(year), Int_val(month), Int_val(day)));
+}
+CAMLprim value dj_stub(value i) {
+    return Val_int(dj(Int_val(i)));
+}
+
 
 /*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
