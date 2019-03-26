@@ -90,9 +90,25 @@ let test_pack_unpack () =
   pack_unpack_vect () ;
   ()
 
+let finally f f_final =
+  try f () ; f_final ()  with exn -> f_final () ; raise exn
+
+let test_server () =
+  match Kx.khpu ~host:"localhost" ~port:5001 ~username:"vb" with
+  | Error msg -> fail msg
+  | Ok k ->
+    finally begin fun () ->
+      match k0 k "f:1" with
+      | Error msg -> fail msg
+      | Ok res ->
+        let t = unpack res in
+        Format.printf "%a" pp t
+    end (fun () -> kclose k)
+
 let trip = [
   test_case "bindings" `Quick bindings ;
   test_case "pack_unpack" `Quick test_pack_unpack ;
+  test_case "server" `Quick test_server ;
 ]
 
 let () =

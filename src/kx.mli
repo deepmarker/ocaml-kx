@@ -163,6 +163,8 @@ val khpun :
   host:string -> port:int -> username:string -> timeout_ms:int ->
   (Unix.file_descr, string) result
 
+val kclose : Unix.file_descr -> unit
+
 val k0 : Unix.file_descr -> string -> (k, string) result
 val k1 : Unix.file_descr -> string -> k -> (k, string) result
 

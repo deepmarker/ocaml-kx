@@ -714,6 +714,7 @@ and unpack_table k =
   Table (unpack (kK kk 0), unpack (kK k 1))
 
 and unpack k =
+  Printf.eprintf "k_objtyp = %d\n%!" (k_objtyp k) ;
   match k_objtyp k with
   | 0            -> List (unpack_list k)
   | n when n < 0 -> Atom (unpack_atom k)
@@ -751,6 +752,7 @@ external khpu : string -> int -> string ->
   (Unix.file_descr, string) result = "khpu_stub"
 external khpun : string -> int -> string -> int ->
   (Unix.file_descr, string) result = "khpun_stub"
+external kclose : Unix.file_descr -> unit = "kclose_stub" [@@noalloc]
 
 let khpu ~host ~port ~username =
   khpu host port username
