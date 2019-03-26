@@ -745,6 +745,22 @@ let serialize ?(mode = ~-1) k =
     | None -> invalid_arg "serialize: internal error"
     | Some bs -> Ok bs
 
+external khpu : string -> int -> string ->
+  (Unix.file_descr, string) result = "khpu_stub"
+external khpun : string -> int -> string -> int ->
+  (Unix.file_descr, string) result = "khpun_stub"
+
+let khpu ~host ~port ~username =
+  khpu host port username
+
+let khpun ~host ~port ~username ~timeout_ms =
+  khpun host port username timeout_ms
+
+external k0 :
+  Unix.file_descr -> string -> (k, string) result = "k0_stub"
+external k1 :
+  Unix.file_descr -> string -> k -> (k, string) result = "k1_stub"
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
 

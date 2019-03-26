@@ -153,6 +153,19 @@ val of_bigstring_exn : Bigstring.t -> k
 
 val serialize : ?mode:int -> k -> (Bigstring.t, string) result
 
+(** Connect to kdb+ *)
+
+val khpu :
+  host:string -> port:int -> username:string ->
+  (Unix.file_descr, string) result
+
+val khpun :
+  host:string -> port:int -> username:string -> timeout_ms:int ->
+  (Unix.file_descr, string) result
+
+val k0 : Unix.file_descr -> string -> (k, string) result
+val k1 : Unix.file_descr -> string -> k -> (k, string) result
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
 

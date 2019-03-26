@@ -3,23 +3,14 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-external khpu : string -> int -> string ->
-  (Unix.file_descr, string) result = "khpu_stub"
-external khpun : string -> int -> string -> int ->
-  (Unix.file_descr, string) result = "khpun_stub"
-
-external k0 :
-  Unix.file_descr -> string -> (Kx.k, string) result = "k0_stub"
-(* external k1 :
- *   Unix.file_descr -> string -> Kx.k -> (Kx.k, string) result = "k1_stub" *)
-
+open Kx
 type conn = Lwt_unix.file_descr
 
 let connect ?timeout_ms ~host ~port ~username () =
   let res =
     match timeout_ms with
-    | None -> khpu host port username
-    | Some timeout -> khpun host port username timeout in
+    | None -> khpu ~host ~port ~username
+    | Some timeout_ms -> khpun ~host ~port ~username ~timeout_ms in
   match res with
   | Error string -> Error string
   | Ok fd ->
