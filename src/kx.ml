@@ -714,7 +714,6 @@ and unpack_table k =
   Table (unpack (kK kk 0), unpack (kK k 1))
 
 and unpack k =
-  Printf.eprintf "k_objtyp = %d\n%!" (k_objtyp k) ;
   match k_objtyp k with
   | 0            -> List (unpack_list k)
   | n when n < 0 -> Atom (unpack_atom k)
@@ -748,11 +747,16 @@ let serialize ?(mode = ~-1) k =
     | None -> invalid_arg "serialize: internal error"
     | Some bs -> Ok bs
 
+type 'a h = int constraint 'a = [<`Sync | `Async]
+
+let sync h = abs h
+let async h = -(abs h)
+
 external khpu : string -> int -> string ->
-  (Unix.file_descr, string) result = "khpu_stub"
+  ([`Sync] h, string) result = "khpu_stub"
 external khpun : string -> int -> string -> int ->
-  (Unix.file_descr, string) result = "khpun_stub"
-external kclose : Unix.file_descr -> unit = "kclose_stub" [@@noalloc]
+  ([`Sync] h, string) result = "khpun_stub"
+external kclose : _ h -> unit = "kclose_stub" [@@noalloc]
 
 let khpu ~host ~port ~username =
   khpu host port username
@@ -760,10 +764,8 @@ let khpu ~host ~port ~username =
 let khpun ~host ~port ~username ~timeout_ms =
   khpun host port username timeout_ms
 
-external k0 :
-  Unix.file_descr -> string -> (k, string) result = "k0_stub"
-external k1 :
-  Unix.file_descr -> string -> k -> (k, string) result = "k1_stub"
+external k0 : _ h -> string -> (k, string) result = "k0_stub"
+external k1 : _ h -> string -> k -> (k, string) result = "k1_stub"
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

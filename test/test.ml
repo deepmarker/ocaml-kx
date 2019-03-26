@@ -11,6 +11,10 @@ let list_of_ba ?(f=fun a -> a) ba =
 
 let pp_sep ppf () = Format.fprintf ppf " "
 let pp ppf = function
+  | Atom (Char a) ->
+    Format.pp_print_char ppf a
+  | Atom (Long a) ->
+    Format.fprintf ppf "%Ld" a
   | Atom (Date { year ; month ; day }) ->
     Format.fprintf ppf "%d%d%d" year month day
   | Vector v -> begin
@@ -94,11 +98,11 @@ let finally f f_final =
   try f () ; f_final ()  with exn -> f_final () ; raise exn
 
 let test_server () =
-  match Kx.khpu ~host:"localhost" ~port:5001 ~username:"vb" with
+  match khpu ~host:"localhost" ~port:5001 ~username:"vb" with
   | Error msg -> fail msg
   | Ok k ->
     finally begin fun () ->
-      match k0 k "f:1" with
+      match k0 (async k) "6*7" with
       | Error msg -> fail msg
       | Ok res ->
         let t = unpack res in

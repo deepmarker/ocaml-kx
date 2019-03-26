@@ -9,11 +9,3 @@
  (c_library_flags (-pthread))
  ; (flags (:standard -w -9-3))
  (libraries bigarray bigstring uuidm ptime))
-
-(library
- (name        kx_lwt)
- (public_name kx_lwt)
- (modules Kx_lwt)
- (synopsis "OCaml client for kdb+ (Lwt functions)")
- ; (flags (:standard -w -9-3))
- (libraries kx lwt.unix))

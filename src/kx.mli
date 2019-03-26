@@ -155,18 +155,24 @@ val serialize : ?mode:int -> k -> (Bigstring.t, string) result
 
 (** Connect to kdb+ *)
 
+type 'a h constraint 'a = [<`Sync | `Async]
+(** Type of a connection handle*)
+
+val sync : _ h -> [`Sync] h
+val async : _ h -> [`Async] h
+
 val khpu :
   host:string -> port:int -> username:string ->
-  (Unix.file_descr, string) result
+  ([`Sync] h, string) result
 
 val khpun :
   host:string -> port:int -> username:string -> timeout_ms:int ->
-  (Unix.file_descr, string) result
+  ([`Sync] h, string) result
 
-val kclose : Unix.file_descr -> unit
+val kclose : _ h -> unit
 
-val k0 : Unix.file_descr -> string -> (k, string) result
-val k1 : Unix.file_descr -> string -> k -> (k, string) result
+val k0 : _ h -> string -> (k, string) result
+val k1 : _ h -> string -> k -> (k, string) result
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
