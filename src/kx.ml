@@ -346,7 +346,7 @@ external dj : int -> int = "dj_stub" [@@noalloc]
 type t =
   | Atom      of atom
   | Vector    of vector
-  | List      of t array
+  | List      of t list
   | Dict      of t * t
   | Table     of t * t
 and atom =
@@ -599,9 +599,9 @@ and pack = function
       k
   end
   | List ts ->
-    let len = Int64.of_int (Array.length ts) in
+    let len = Int64.of_int (List.length ts) in
     let k = ktn 0 len in
-    Array.iteri (fun i t -> kK_set k i (pack t)) ts ;
+    List.iteri (fun i t -> kK_set k i (pack t)) ts ;
     k
   | Dict (k, v) ->
     xD (pack k) (pack v)
@@ -699,10 +699,12 @@ and unpack_vector k =
 
 and unpack_list k =
   let len = Int64.to_int (k_length k) in
-  Array.init len begin fun i ->
+  let res = ref [] in
+  for i = len - 1 downto 0 do
     let kk = kK k i in
-    unpack kk
-  end
+    res := unpack kk :: !res
+  done ;
+  !res
 
 and unpack_dict k =
   Dict (unpack (kK k 0), unpack (kK k 1))

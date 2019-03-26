@@ -103,7 +103,7 @@ val get_vector : 'a kw -> vector -> 'a option
 type t =
   | Atom      of atom
   | Vector    of vector
-  | List      of t array
+  | List      of t list
   | Dict      of t * t
   | Table     of t * t
 and atom =
@@ -135,7 +135,7 @@ val create_timespan :
 
 val atom : atom -> t
 val vector : vector -> t
-val list : t array -> t
+val list : t list -> t
 val dict : t -> t -> t
 val table : t -> t -> t
 
