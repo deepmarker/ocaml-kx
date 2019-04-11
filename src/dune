@@ -5,7 +5,7 @@
  ; (preprocess (pps ppx_sexp_conv))
  (synopsis "OCaml client for kdb+")
  (c_names k_stubs c)
- (c_flags (-DKXVER=3))
+ (c_flags (-DKXVER=3 -gdwarf-2 -g3))
  (c_library_flags (-pthread))
  ; (flags (:standard -w -9-3))
  (libraries bigarray bigstring uuidm ptime))
