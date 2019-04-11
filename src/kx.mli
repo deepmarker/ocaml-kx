@@ -156,7 +156,7 @@ val serialize : ?mode:int -> k -> (Bigstring.t, string) result
 (** Connect to kdb+ *)
 
 type 'a h constraint 'a = [<`Sync | `Async]
-(** Type of a connection handle*)
+(** Type of a connection handle *)
 
 val sync : _ h -> [`Sync] h
 val async : _ h -> [`Async] h
