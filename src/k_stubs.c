@@ -427,93 +427,94 @@ CAMLprim value b9_stub (value mode, value k) {
 }
 
 CAMLprim value khp_stub (value host, value port) {
-    CAMLparam2(host, port);
-    CAMLlocal2(ret, errmsg);
-    int rc = khp(String_val(host), Int_val(port));
-    if (rc > 0) {
-        ret = caml_alloc(1, 0);
-        Store_field(ret, 0, Val_int(rc));
-    }
-    else {
-        ret = caml_alloc(1, 1);
-        errmsg = caml_copy_string(strerror(errno));
-        Store_field(ret, 0, errmsg);
-    }
-    CAMLreturn(ret);
+    return Val_int(khp(String_val(host), Int_val(port)));
 }
 
 CAMLprim value khpu_stub (value host, value port, value username) {
-    CAMLparam3(host, port, username);
-    CAMLlocal2(ret, errmsg);
-    int rc = khpu(String_val(host), Int_val(port), String_val(username));
-    if (rc > 0) {
-        ret = caml_alloc(1, 0);
-        Store_field(ret, 0, Val_int(rc));
-    }
-    else {
-        ret = caml_alloc(1, 1);
-        errmsg = caml_copy_string(strerror(errno));
-        Store_field(ret, 0, errmsg);
-    }
-    CAMLreturn(ret);
+    return Val_int(khpu(String_val(host), Int_val(port), String_val(username)));
 }
 
 CAMLprim value khpun_stub(value host, value port,
                           value username, value timeout) {
-    CAMLparam4(host, port, username, timeout);
-    CAMLlocal2(ret, errmsg);
-    int rc = khpun(String_val(host), Int_val(port),
-                   String_val(username), Int_val(timeout));
-    if (rc > 0) {
-        ret = caml_alloc(1, 0);
-        Store_field(ret, 0, Val_int(rc));
-    }
-    else {
-        ret = caml_alloc(1, 1);
-        errmsg = caml_copy_string(strerror(errno));
-        Store_field(ret, 0, errmsg);
-    }
-    CAMLreturn(ret);
+    return Val_int(khpun(String_val(host), Int_val(port),
+                         String_val(username), Int_val(timeout)));
 }
-
+CAMLprim value khpunc_stub(value host, value port,
+                           value username, value timeout, value capability) {
+    return Val_int(khpunc(String_val(host),
+                         Int_val(port),
+                         String_val(username),
+                         Int_val(timeout),
+                         Int_val(capability)));
+}
 
 CAMLprim value kclose_stub(value fd) {
     kclose(Int_val(fd));
     return Val_unit;
 }
 
-CAMLprim value k0_stub(value conn, value msg) {
-    CAMLparam2(conn, msg);
-    CAMLlocal3(ret, errmsg, kk);
-    K r = k(Int_val(conn), String_val(msg), (K)0);
-    if (!r) {
-        ret = caml_alloc(1, 1);
-        errmsg = caml_copy_string(strerror(errno));
-        Store_field(ret, 0, errmsg);
-    }
-    else {
-        ret = caml_alloc(1, 0);
-        kk = caml_alloc_K(r);
-        Store_field(ret, 0, kk);
-    }
-    CAMLreturn(ret);
+CAMLprim value kread_stub(value fd) {
+    CAMLparam1(fd);
+    CAMLlocal1(kk);
+    K r = k(Int_val(fd), (S)NULL);
+    kk = r ? caml_alloc_K(r) : caml_alloc_K(krr("Connection closed"));
+    CAMLreturn(kk);
 }
 
-CAMLprim value k1_stub(value conn, value msg, value a) {
-    CAMLparam3(conn, msg, a);
-    CAMLlocal3(ret, errmsg, kk);
-    K r = k(Int_val(conn), String_val(msg), K_val(a), (K)0);
-    if (!r) {
-        ret = caml_alloc(1, 1);
-        errmsg = caml_copy_string(strerror(errno));
-        Store_field(ret, 0, errmsg);
+CAMLprim value k0_stub(value fd, value msg) {
+    K r = k(-Int_val(fd), String_val(msg), (K)NULL);
+    return Val_bool(r->g);
+}
+CAMLprim value k1_stub(value fd, value msg, value a) {
+    K r = k(-Int_val(fd), String_val(msg), K_val(a), (K)NULL);
+    return Val_bool(r->g);
+}
+CAMLprim value k2_stub(value fd, value msg, value a, value b) {
+    K r = k(-Int_val(fd), String_val(msg), K_val(a), K_val(b), (K)NULL);
+    return Val_bool(r->g);
+}
+CAMLprim value k3_stub(value fd, value msg, value a, value b, value c) {
+    K r = k(-Int_val(fd), String_val(msg), K_val(a), K_val(b), K_val(c), (K)NULL);
+    return Val_bool(r->g);
+}
+CAMLprim value kn_stub(value fd, value msg, value a) {
+    K r;
+    switch (Wosize_val(a)) {
+    case 0:
+        r = k(-Int_val(fd), String_val(msg), (K)NULL);
+        break;
+    case 1:
+        r = k(-Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), (K)NULL);
+        break;
+    case 2:
+        r = k(-Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), K_val(Field(a, 1)), (K)NULL);
+        break;
+    case 3:
+        r = k(-Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), K_val(Field(a, 1)),
+              K_val(Field(a, 2)), (K)NULL);
+        break;
+    case 4:
+        r = k(-Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), K_val(Field(a, 1)),
+              K_val(Field(a, 2)), K_val(Field(a, 3)), (K)NULL);
+        break;
+    case 5:
+        r = k(-Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), K_val(Field(a, 1)),
+              K_val(Field(a, 2)), K_val(Field(a, 3)),
+              K_val(Field(a, 4)), (K)NULL);
+        break;
+    case 6:
+        r = k(-Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), K_val(Field(a, 1)),
+              K_val(Field(a, 2)), K_val(Field(a, 3)),
+              K_val(Field(a, 4)), K_val(Field(a, 5)), (K)NULL);
+        break;
     }
-    else {
-        ret = caml_alloc(1, 0);
-        kk = caml_alloc_K(r);
-        Store_field(ret, 0, kk);
-    }
-    CAMLreturn(ret);
+    return Val_bool(r->g);
 }
 
 CAMLprim value ymd_stub(value year, value month, value day) {

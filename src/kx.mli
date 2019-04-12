@@ -24,6 +24,7 @@ val k_i : k -> int32
 val k_j : k -> int64
 val k_e : k -> float
 val k_f : k -> float
+val k_s : k -> string
 
 val dj : int -> int
 val ymd : int -> int -> int -> int
@@ -153,26 +154,36 @@ val of_bigstring_exn : Bigstring.t -> k
 
 val serialize : ?mode:int -> k -> (Bigstring.t, string) result
 
-(** Connect to kdb+ *)
+(**/*)
 
-type 'a h constraint 'a = [<`Sync | `Async]
-(** Type of a connection handle *)
+type connection_error =
+  | Authentication
+  | Connection
+  | Timeout
+  | OpenSSL
 
-val sync : _ h -> [`Sync] h
-val async : _ h -> [`Async] h
+val pp_connection_error :
+  Format.formatter -> connection_error -> unit
 
-val khpu :
-  host:string -> port:int -> username:string ->
-  ([`Sync] h, string) result
+type capability =
+  | OneTBLimit
+  | UseTLS
 
-val khpun :
-  host:string -> port:int -> username:string -> timeout_ms:int ->
-  ([`Sync] h, string) result
+val connect :
+  ?credentials:string * string ->
+  ?timeout:int ->
+  ?capability:capability ->
+  host:string -> port:int -> unit ->
+  (Unix.file_descr, connection_error) result
 
-val kclose : _ h -> unit
+val kclose : Unix.file_descr -> unit
 
-val k0 : _ h -> string -> (k, string) result
-val k1 : _ h -> string -> k -> (k, string) result
+val kread : Unix.file_descr -> k
+val k0 : Unix.file_descr -> string -> bool
+val k1 : Unix.file_descr -> string -> k -> bool
+val k2 : Unix.file_descr -> string -> k -> k -> bool
+val k3 : Unix.file_descr -> string -> k -> k -> k -> bool
+val kn : Unix.file_descr -> string -> k array -> bool
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

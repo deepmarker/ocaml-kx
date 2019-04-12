@@ -609,7 +609,7 @@ and pack = function
     xT (xD (pack k) (pack v))
 
 let rec unpack_atom k =
-  match ~- (k_objtyp k) with
+  match -(k_objtyp k) with
   | 1  -> (match k_g k with 0 -> Bool false | _ -> Bool true)
   | 2  -> Guid (k_u k)
   | 4  -> Byte (k_g k)
@@ -747,25 +747,58 @@ let serialize ?(mode = ~-1) k =
     | None -> invalid_arg "serialize: internal error"
     | Some bs -> Ok bs
 
-type 'a h = int constraint 'a = [<`Sync | `Async]
+external khp : string -> int -> int = "khp_stub"
+external khpu : string -> int -> string -> int = "khpu_stub"
+external khpun : string -> int -> string -> int -> int = "khpun_stub"
+external khpunc : string -> int -> string -> int -> int -> int = "khpunc_stub"
+external kclose : Unix.file_descr -> unit = "kclose_stub" [@@noalloc]
 
-let sync h = abs h
-let async h = -(abs h)
+type connection_error =
+  | Authentication
+  | Connection
+  | Timeout
+  | OpenSSL
 
-external khpu : string -> int -> string ->
-  ([`Sync] h, string) result = "khpu_stub"
-external khpun : string -> int -> string -> int ->
-  ([`Sync] h, string) result = "khpun_stub"
-external kclose : _ h -> unit = "kclose_stub" [@@noalloc]
+let pp_connection_error ppf = function
+  | Authentication -> Format.pp_print_string ppf "authentification error"
+  | Connection -> Format.pp_print_string ppf "connection error"
+  | Timeout -> Format.pp_print_string ppf "timeout error"
+  | OpenSSL -> Format.pp_print_string ppf "tls error"
 
-let khpu ~host ~port ~username =
-  khpu host port username
+type capability =
+  | OneTBLimit
+  | UseTLS
 
-let khpun ~host ~port ~username ~timeout_ms =
-  khpun host port username timeout_ms
+let int_of_capability = function
+  | OneTBLimit -> 1
+  | UseTLS -> 2
 
-external k0 : _ h -> string -> (k, string) result = "k0_stub"
-external k1 : _ h -> string -> k -> (k, string) result = "k1_stub"
+let wrap_result f =
+  match f () with
+  | i when i > 0 -> Ok (Obj.magic i : Unix.file_descr)
+  | 0 -> Error Authentication
+  | -1 -> Error Connection
+  | -2 -> Error Timeout
+  | -3 -> Error OpenSSL
+  | i -> failwith ("Unknown q error " ^ string_of_int i)
+
+let up u p = u ^ ":" ^ p
+
+let connect ?credentials ?timeout ?capability ~host ~port () =
+  match credentials, timeout, capability with
+  | None, None, None -> wrap_result (fun () -> khp host port)
+  | Some (u, p), None, None -> wrap_result (fun () -> khpu host port (up u p))
+  | Some (u, p), Some t, None -> wrap_result (fun () -> khpun host port (up u p) t)
+  | Some (u, p), Some t, Some c ->
+    wrap_result (fun () -> khpunc host port (up u p) t (int_of_capability c))
+  | _ -> invalid_arg "connect"
+
+external kread : Unix.file_descr -> k = "kread_stub"
+external k0 : Unix.file_descr -> string -> bool = "k0_stub" [@@noalloc]
+external k1 : Unix.file_descr -> string -> k -> bool = "k1_stub" [@@noalloc]
+external k2 : Unix.file_descr -> string -> k -> k -> bool = "k2_stub" [@@noalloc]
+external k3 : Unix.file_descr -> string -> k -> k -> k -> bool = "k3_stub" [@@noalloc]
+external kn : Unix.file_descr -> string -> k array ->  bool = "kn_stub" [@@noalloc]
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

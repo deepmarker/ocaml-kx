@@ -9,3 +9,12 @@
  (c_library_flags (-pthread))
  ; (flags (:standard -w -9-3))
  (libraries bigarray bigstring uuidm ptime))
+
+(library
+ (name        kx_async)
+ (public_name kx-async)
+ (modules Kx_async)
+ ; (preprocess (pps ppx_sexp_conv))
+ (synopsis "OCaml client for kdb+, for Jane Street's async")
+ ; (flags (:standard -w -9-3))
+ (libraries kx core async))
