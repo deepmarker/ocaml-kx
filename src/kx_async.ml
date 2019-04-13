@@ -17,20 +17,9 @@ let of_file_descr fd =
       do_read
   in
   let do_write () =
-    Pipe.iter_without_pushback ~continue_on_error:false from_client ~f:begin function
-      | msg, [||] ->
-        if not (Fd.syscall_exn ~nonblocking:true fd (fun fd -> Kx.k0 fd msg)) then
-          raise Exit
-      | msg, [|a|] ->
-        if not (Fd.syscall_exn ~nonblocking:true fd (fun fd -> Kx.k1 fd msg a)) then
-          raise Exit
-      | msg, [|a; b|] ->
-        if not (Fd.syscall_exn ~nonblocking:true fd (fun fd -> Kx.k2 fd msg a b)) then
-          raise Exit
-      | msg, [|a; b; c|] ->
-        if not (Fd.syscall_exn ~nonblocking:true fd (fun fd -> Kx.k3 fd msg a b c)) then
-          raise Exit
-      | _ -> invalid_arg "more than 3 arguments in not supported"
+    Pipe.iter_without_pushback ~continue_on_error:false from_client ~f:begin fun (msg, a) ->
+      if not (Fd.syscall_exn ~nonblocking:true fd (fun fd -> Kx.kn fd msg a)) then
+        raise Exit
     end in
   don't_wait_for begin
     Deferred.all_unit [
@@ -41,21 +30,23 @@ let of_file_descr fd =
       | Ok () -> ()
     ]
   end ;
-  return (client_read, client_write)
+  client_read, client_write
 
-let khpu ~host ~port ~username =
-  match Kx.khpu ~host ~port ~username with
+let connect ?credentials ?timeout ?capability ~host ~port () =
+  match Kx.connect ?credentials ?timeout ?capability ~host ~port () with
   | Error e -> Error e
   | Ok fd ->
     let fd = Fd.create (Socket `Active)
-        fd (Info.of_string "fd from Kx.khpu") in
+        fd (Info.of_string "fd from Kx.connect") in
     Ok (of_file_descr fd)
 
-let khpun ~host ~port ~username ~timeout_ms =
-  match Kx.khpun ~host ~port ~username ~timeout_ms with
-  | Error e -> Error e
+let with_connection ?credentials ?timeout ?capability ~host ~port f =
+  match Kx.connect ?credentials ?timeout ?capability ~host ~port () with
+  | Error e -> return (Error e)
   | Ok fd ->
     let fd = Fd.create (Socket `Active)
-        fd (Info.of_string "fd from Kx.khpun") in
-    Ok (of_file_descr fd)
-
+        fd (Info.of_string "fd from Kx.connect") in
+    let r, w = of_file_descr fd in
+    f r w >>| fun a ->
+    (try Kx.kclose (Fd.file_descr_exn fd) with _ -> ()) ;
+    Ok a

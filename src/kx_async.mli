@@ -3,10 +3,18 @@ open Kx
 
 (** Connect to kdb+ *)
 
-val khpu :
-  host:string -> port:int -> username:string ->
-  (k Pipe.Reader.t * (string * k array) Pipe.Writer.t, string) result Deferred.t
+val connect :
+  ?credentials:string * string ->
+  ?timeout:int ->
+  ?capability:capability ->
+  host:string -> port:int -> unit ->
+  (k Pipe.Reader.t * (string * k array) Pipe.Writer.t,
+   connection_error) result
 
-val khpun :
-  host:string -> port:int -> username:string -> timeout_ms:int ->
-  (k Pipe.Reader.t * (string * k array) Pipe.Writer.t, string) result Deferred.t
+val with_connection :
+  ?credentials:string * string ->
+  ?timeout:int ->
+  ?capability:capability ->
+  host:string -> port:int ->
+  (k Pipe.Reader.t -> (string * k array) Pipe.Writer.t -> 'a Deferred.t) ->
+  ('a, connection_error) result Deferred.t

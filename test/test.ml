@@ -94,28 +94,30 @@ let test_pack_unpack () =
   pack_unpack_vect () ;
   ()
 
-let finally f f_final =
-  try f () ; f_final ()  with exn -> f_final () ; raise exn
-
 let test_server () =
-  match khpu ~host:"localhost" ~port:5001 ~username:"vb" with
-  | Error msg -> fail msg
-  | Ok k ->
-    finally begin fun () ->
-      match k0 (async k) "6*7" with
-      | Error msg -> fail msg
-      | Ok res ->
-        let t = unpack res in
-        Format.printf "%a" pp t
-    end (fun () -> kclose k)
+  let open Async in
+  Kx_async.with_connection ~host:"localhost" ~port:5042 begin fun r w ->
+    Pipe.write w ("6*7", [||]) >>= fun () ->
+    Pipe.read r >>= function
+    | `Eof -> failwith "pipe returned EOF"
+    | `Ok v -> return v
+  end >>= function
+  | Error _ -> failwith "connection error"
+  | Ok v ->
+    check t "server" (Atom (Long 42L)) (Kx.unpack v) ;
+    Deferred.unit
 
-let trip = [
+let tests_kx = [
   test_case "bindings" `Quick bindings ;
   test_case "pack_unpack" `Quick test_pack_unpack ;
+]
+
+let tests_kx_async = Alcotest_async.[
   test_case "server" `Quick test_server ;
 ]
 
 let () =
   run "q" [
-    "trip", trip
+    "kx", tests_kx ;
+    "kx-async", tests_kx_async ;
   ]

@@ -156,13 +156,25 @@ val serialize : ?mode:int -> k -> (Bigstring.t, string) result
 
 (**/*)
 
-val khpu :
-  host:string -> port:int -> username:string ->
-  (Unix.file_descr, string) result
+type connection_error =
+  | Authentication
+  | Connection
+  | Timeout
+  | OpenSSL
 
-val khpun :
-  host:string -> port:int -> username:string -> timeout_ms:int ->
-  (Unix.file_descr, string) result
+val pp_connection_error :
+  Format.formatter -> connection_error -> unit
+
+type capability =
+  | OneTBLimit
+  | UseTLS
+
+val connect :
+  ?credentials:string * string ->
+  ?timeout:int ->
+  ?capability:capability ->
+  host:string -> port:int -> unit ->
+  (Unix.file_descr, connection_error) result
 
 val kclose : Unix.file_descr -> unit
 
@@ -171,6 +183,7 @@ val k0 : Unix.file_descr -> string -> bool
 val k1 : Unix.file_descr -> string -> k -> bool
 val k2 : Unix.file_descr -> string -> k -> k -> bool
 val k3 : Unix.file_descr -> string -> k -> k -> k -> bool
+val kn : Unix.file_descr -> string -> k array -> bool
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
