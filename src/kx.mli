@@ -120,12 +120,31 @@ and atom =
   | Symbol    of string
   | Timestamp of Ptime.t
   | Month     of int
-  | Date      of { year: int ; month: int ; day: int }
+  | Date      of { y: int ; m: int ; d: int }
   | Timespan  of Ptime.time * int
   | Minute    of int * int
   | Second    of int * int * int
   | Time      of Ptime.time * int
   | Datetime  of float
+
+module B : sig
+  val bool : bool -> t
+  val guid : Uuidm.t -> t
+  val byte : int -> t
+  val short : int -> t
+  val int : int32 -> t
+  val long : int64 -> t
+  val real : float -> t
+  val float : float -> t
+  val char : char -> t
+  val symbol : string -> t
+  val timestamp : Ptime.t -> t
+  val month : int -> t
+  val date : y:int -> m:int -> d:int -> t
+  val minute : hh:int -> mm:int -> t
+  val second : hh:int -> mm:int -> ss:int -> t
+  val time : Ptime.time -> ms:int -> t
+end
 
 val equal : t -> t -> bool
 

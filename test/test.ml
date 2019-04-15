@@ -15,8 +15,8 @@ let rec pp ppf = function
     Format.pp_print_char ppf a
   | Atom (Long a) ->
     Format.fprintf ppf "%Ld" a
-  | Atom (Date { year ; month ; day }) ->
-    Format.fprintf ppf "%d%d%d" year month day
+  | Atom (Date { y ; m ; d }) ->
+    Format.fprintf ppf "%d%d%d" y m d
   | Atom _ ->
     Format.pp_print_string ppf "Atom <abstract>"
   | Vector v -> begin
@@ -68,7 +68,7 @@ let pack_unpack_atom () =
   pack_unpack "symbol" (Atom (Symbol "")) ;
   pack_unpack "timestamp" (Atom (Timestamp Ptime.epoch)) ;
   pack_unpack "month" (Atom (Month 0)) ;
-  pack_unpack "date" (Atom (Date { year = 2017 ; month = 10 ; day = 26 })) ;
+  pack_unpack "date" (Atom (Date { y = 2017 ; m = 10 ; d = 26 })) ;
   pack_unpack "timespan" (Atom zero_timespan) ;
   pack_unpack "minute" (Atom (Minute (0, 0))) ;
   pack_unpack "second" (Atom (Second (0, 0, 0))) ;

@@ -362,7 +362,7 @@ and atom =
   | Symbol    of string
   | Timestamp of Ptime.t
   | Month     of int
-  | Date      of { year: int ; month: int ; day: int }
+  | Date      of { y: int ; m: int ; d: int }
   | Timespan  of Ptime.time * int
   | Minute    of int * int
   | Second    of int * int * int
@@ -384,6 +384,25 @@ let create_timespan ?(tz_offset=0) ~hh ~mm ~ss ~ns () =
   Timespan (((hh, mm, ss), tz_offset), ns)
 
 let zero_timespan = create_timespan ~hh:0 ~mm:0 ~ss:0 ~ns:0 ()
+
+module B = struct
+  let bool b = Atom (Bool b)
+  let guid g = Atom (Guid g)
+  let byte b = Atom (Byte b)
+  let short h = Atom (Short h)
+  let int i = Atom (Int i)
+  let long j = Atom (Long j)
+  let real r = Atom (Real r)
+  let float f = Atom (Float f)
+  let char c = Atom (Char c)
+  let symbol s = Atom (Symbol s)
+  let timestamp t = Atom (Timestamp t)
+  let month i = Atom (Month i)
+  let date ~y ~m ~d = Atom (Date { y; m; d })
+  let minute ~hh ~mm = Atom (Minute (hh, mm))
+  let second ~hh ~mm ~ss = Atom (Second (hh, mm, ss))
+  let time t ~ms = Atom (Time (t, ms))
+end
 
 let rec pack_atom = function
   | Bool b       -> kb b
@@ -412,7 +431,7 @@ let rec pack_atom = function
       ktimespan ts
     end
   | Month i -> kmonth (Int32.of_int i)
-  | Date { year; month; day } -> kd (Int32.of_int (ymd year month day))
+  | Date { y; m; d } -> kd (Int32.of_int (ymd y m d))
   | Minute (hh, mm) -> kminute (Int32.of_int (hh * 60 + mm))
   | Second (hh, mm, ss) -> ksecond (Int32.of_int (hh * 3600 + mm * 60 + ss))
   | Datetime f   -> kz f
@@ -637,10 +656,10 @@ let rec unpack_atom k =
   | 13 -> Month (Int32.to_int (k_i k))
   | 14 ->
     let date = dj (Int32.to_int (k_i k)) in
-    let year = date / 10_000 in
-    let month = (date mod 10_000) / 100 in
-    let day = (date mod 10_000) mod 100 in
-    Date { year ; month ; day }
+    let y = date / 10_000 in
+    let m = (date mod 10_000) / 100 in
+    let d = (date mod 10_000) mod 100 in
+    Date { y ; m ; d }
   | 16 ->
     let time = k_j k in
     let ns = Int64.(to_int (rem time 1_000_000_000L)) in
