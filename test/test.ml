@@ -10,32 +10,44 @@ let list_of_ba ?(f=fun a -> a) ba =
   !res
 
 let pp_sep ppf () = Format.fprintf ppf " "
-let pp ppf = function
+let rec pp ppf = function
   | Atom (Char a) ->
     Format.pp_print_char ppf a
   | Atom (Long a) ->
     Format.fprintf ppf "%Ld" a
   | Atom (Date { year ; month ; day }) ->
     Format.fprintf ppf "%d%d%d" year month day
+  | Atom _ ->
+    Format.pp_print_string ppf "Atom <abstract>"
   | Vector v -> begin
     match get_vector guid v with
     | Some v ->
-      Format.fprintf ppf "%a"
+      Format.fprintf ppf "`guid$(%a)"
         (Format.pp_print_list ~pp_sep Uuidm.pp) (guids_of_arr v)
     | None ->
       match get_vector real v with
       | Some v ->
-        Format.fprintf ppf "%a"
+        Format.fprintf ppf "`real$(%a)"
           Format.(pp_print_list ~pp_sep pp_print_float) (list_of_ba v)
       | None ->
         match get_vector Kx.float v with
         | Some v ->
-          Format.fprintf ppf "%a"
+          Format.fprintf ppf "`float$(%a)"
             Format.(pp_print_list ~pp_sep pp_print_float) (list_of_ba v)
         | None ->
-          Format.pp_print_string ppf "<t>"
+          match get_vector Kx.symbol v with
+          | Some syms ->
+            Format.fprintf ppf "`symbol$(%a)"
+              Format.(pp_print_list ~pp_sep pp_print_string) syms
+          | None ->
+            Format.pp_print_string ppf "Vector <abstract>"
   end
-  | _ -> Format.pp_print_string ppf "<t>"
+  | List vs ->
+    Format.fprintf ppf "(%a)" (Format.pp_print_list ~pp_sep pp) vs
+  | Dict (k, v) ->
+    Format.fprintf ppf "{ k:%a; v:%a }" pp k pp v
+  | Table (k, v) ->
+    Format.fprintf ppf "{| k:%a; v:%a |}" pp k pp v
 
 let t = testable pp Kx.equal
 
@@ -95,31 +107,35 @@ let test_pack_unpack () =
   ()
 
 let test_server () =
-  let open Async in
-  Kx_async.with_connection ~host:"localhost" ~port:5042 begin fun r w ->
-    Pipe.write w ("6*7", [||]) >>= fun () ->
-    (* Deferred.unit *)
-    Pipe.read r >>= function
-    | `Eof -> failwith "pipe returned EOF"
-    | `Ok v -> return v
-  end >>= function
-  | Error ce ->
-    failwith (Format.asprintf "%a" Kx.pp_connection_error ce)
-  | Ok v ->
-    check t "server" (Atom (Long 42L)) (Kx.unpack v) ;
-    Deferred.unit
+  Kx.with_connection
+    ~credentials:("discovery", "pass")
+    ~host:"localhost"
+    ~port:6001 begin fun fd ->
+    let k = Kx.kn_sync fd "`getservices" [|pack (Kx.vector (symbol_vect ["tickerplant"]));
+                                           Kx.kfalse|] in
+    Kx.unpack k
+  end |> function
+  | Ok (Table (k, v)) ->
+    check t "cols" (Vector (symbol_vect ["procname"; "proctype"; "hpup"; "attributes"])) k ;
+    check t "vals" (List [Vector (symbol_vect []);
+                          Vector (symbol_vect []);
+                          Vector (symbol_vect []);
+                          List []]) v ;
+    ()
+  | Ok _ -> assert false
+  | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg)
 
 let tests_kx = [
   test_case "bindings" `Quick bindings ;
   test_case "pack_unpack" `Quick test_pack_unpack ;
-]
-
-let tests_kx_async = Alcotest_async.[
   test_case "server" `Quick test_server ;
 ]
+
+(* let tests_kx_async = Alcotest_async.[
+ * ] *)
 
 let () =
   run "q" [
     "kx", tests_kx ;
-    "kx-async", tests_kx_async ;
+    (* "kx-async", tests_kx_async ; *)
   ]

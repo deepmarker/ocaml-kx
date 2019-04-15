@@ -439,6 +439,7 @@ CAMLprim value khpun_stub(value host, value port,
     return Val_int(khpun(String_val(host), Int_val(port),
                          String_val(username), Int_val(timeout)));
 }
+
 CAMLprim value khpunc_stub(value host, value port,
                            value username, value timeout, value capability) {
     return Val_int(khpunc(String_val(host),
@@ -465,18 +466,54 @@ CAMLprim value k0_stub(value fd, value msg) {
     K r = k(-Int_val(fd), String_val(msg), (K)NULL);
     return Val_bool(r->g);
 }
+
 CAMLprim value k1_stub(value fd, value msg, value a) {
     K r = k(-Int_val(fd), String_val(msg), K_val(a), (K)NULL);
     return Val_bool(r->g);
 }
+
 CAMLprim value k2_stub(value fd, value msg, value a, value b) {
     K r = k(-Int_val(fd), String_val(msg), K_val(a), K_val(b), (K)NULL);
     return Val_bool(r->g);
 }
+
 CAMLprim value k3_stub(value fd, value msg, value a, value b, value c) {
     K r = k(-Int_val(fd), String_val(msg), K_val(a), K_val(b), K_val(c), (K)NULL);
     return Val_bool(r->g);
 }
+
+CAMLprim value k0_sync_stub(value fd, value msg) {
+    CAMLparam2(fd, msg);
+    CAMLlocal1(ret);
+    K r = k(Int_val(fd), String_val(msg), (K)NULL);
+    ret = caml_alloc_K(r);
+    CAMLreturn(ret);
+}
+
+CAMLprim value k1_sync_stub(value fd, value msg, value a) {
+    CAMLparam3(fd, msg, a);
+    CAMLlocal1(ret);
+    K r = k(Int_val(fd), String_val(msg), K_val(a), (K)NULL);
+    ret = caml_alloc_K(r);
+    CAMLreturn(ret);
+}
+
+CAMLprim value k2_sync_stub(value fd, value msg, value a, value b) {
+    CAMLparam4(fd, msg, a, b);
+    CAMLlocal1(ret);
+    K r = k(Int_val(fd), String_val(msg), K_val(a), K_val(b), (K)NULL);
+    ret = caml_alloc_K(r);
+    CAMLreturn(ret);
+}
+
+CAMLprim value k3_sync_stub(value fd, value msg, value a, value b, value c) {
+    CAMLparam5(fd, msg, a, b, c);
+    CAMLlocal1(ret);
+    K r = k(Int_val(fd), String_val(msg), K_val(a), K_val(b), K_val(c), (K)NULL);
+    ret = caml_alloc_K(r);
+    CAMLreturn(ret);
+}
+
 CAMLprim value kn_stub(value fd, value msg, value a) {
     K r;
     switch (Wosize_val(a)) {
@@ -515,6 +552,49 @@ CAMLprim value kn_stub(value fd, value msg, value a) {
         break;
     }
     return Val_bool(r->g);
+}
+
+CAMLprim value kn_sync_stub(value fd, value msg, value a) {
+    CAMLparam3(fd, msg, a);
+    CAMLlocal1(ret);
+    K r;
+    switch (Wosize_val(a)) {
+    case 0:
+        r = k(Int_val(fd), String_val(msg), (K)NULL);
+        break;
+    case 1:
+        r = k(Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), (K)NULL);
+        break;
+    case 2:
+        r = k(Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), K_val(Field(a, 1)), (K)NULL);
+        break;
+    case 3:
+        r = k(Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), K_val(Field(a, 1)),
+              K_val(Field(a, 2)), (K)NULL);
+        break;
+    case 4:
+        r = k(Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), K_val(Field(a, 1)),
+              K_val(Field(a, 2)), K_val(Field(a, 3)), (K)NULL);
+        break;
+    case 5:
+        r = k(Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), K_val(Field(a, 1)),
+              K_val(Field(a, 2)), K_val(Field(a, 3)),
+              K_val(Field(a, 4)), (K)NULL);
+        break;
+    case 6:
+        r = k(Int_val(fd), String_val(msg),
+              K_val(Field(a, 0)), K_val(Field(a, 1)),
+              K_val(Field(a, 2)), K_val(Field(a, 3)),
+              K_val(Field(a, 4)), K_val(Field(a, 5)), (K)NULL);
+        break;
+    }
+    ret = caml_alloc_K(r);
+    CAMLreturn(ret);
 }
 
 CAMLprim value ymd_stub(value year, value month, value day) {

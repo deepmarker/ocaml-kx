@@ -707,19 +707,20 @@ and unpack_list k =
   !res
 
 and unpack_dict k =
-  Dict (unpack (kK k 0), unpack (kK k 1))
+  unpack (kK k 0), unpack (kK k 1)
 
-and unpack_table k =
-  let kk = k_k k in
-  Table (unpack (kK kk 0), unpack (kK k 1))
+and unpack_table k = unpack_dict (k_k k)
 
 and unpack k =
   match k_objtyp k with
   | 0            -> List (unpack_list k)
   | n when n < 0 -> Atom (unpack_atom k)
-  | 99           -> unpack_dict k
-  | 98           -> unpack_table k
+  | 99           -> let k, v = unpack_dict k in dict k v
+  | 98           -> let k, v = unpack_table k in table k v
   | _            -> Vector (unpack_vector k)
+
+let ktrue = pack (Atom (Bool true))
+let kfalse = pack (Atom (Bool false))
 
 (* Serialization *)
 
@@ -793,12 +794,26 @@ let connect ?credentials ?timeout ?capability ~host ~port () =
     wrap_result (fun () -> khpunc host port (up u p) t (int_of_capability c))
   | _ -> invalid_arg "connect"
 
+let with_connection ?credentials ?timeout ?capability ~host ~port f =
+  match connect ?credentials ?timeout ?capability ~host ~port () with
+  | Error e -> Error e
+  | Ok fd ->
+    let ret = f fd in
+    kclose fd ;
+    Ok ret
+
 external kread : Unix.file_descr -> k = "kread_stub"
 external k0 : Unix.file_descr -> string -> bool = "k0_stub" [@@noalloc]
 external k1 : Unix.file_descr -> string -> k -> bool = "k1_stub" [@@noalloc]
 external k2 : Unix.file_descr -> string -> k -> k -> bool = "k2_stub" [@@noalloc]
 external k3 : Unix.file_descr -> string -> k -> k -> k -> bool = "k3_stub" [@@noalloc]
-external kn : Unix.file_descr -> string -> k array ->  bool = "kn_stub" [@@noalloc]
+external kn : Unix.file_descr -> string -> k array -> bool = "kn_stub" [@@noalloc]
+
+external k0_sync : Unix.file_descr -> string -> k = "k0_sync_stub"
+external k1_sync : Unix.file_descr -> string -> k -> k = "k1_sync_stub"
+external k2_sync : Unix.file_descr -> string -> k -> k -> k = "k2_sync_stub"
+external k3_sync : Unix.file_descr -> string -> k -> k -> k -> k = "k3_sync_stub"
+external kn_sync : Unix.file_descr -> string -> k array -> k = "kn_sync_stub"
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

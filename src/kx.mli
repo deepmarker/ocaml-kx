@@ -140,6 +140,9 @@ val list : t list -> t
 val dict : t -> t -> t
 val table : t -> t -> t
 
+val ktrue : k
+val kfalse : k
+
 val pack : t -> k
 (** [pack t] packs [t] into a K object. *)
 
@@ -176,14 +179,28 @@ val connect :
   host:string -> port:int -> unit ->
   (Unix.file_descr, connection_error) result
 
+val with_connection :
+  ?credentials:string * string ->
+  ?timeout:int ->
+  ?capability:capability ->
+  host:string -> port:int -> (Unix.file_descr -> 'a) ->
+  ('a, connection_error) result
+
 val kclose : Unix.file_descr -> unit
 
 val kread : Unix.file_descr -> k
+
 val k0 : Unix.file_descr -> string -> bool
 val k1 : Unix.file_descr -> string -> k -> bool
 val k2 : Unix.file_descr -> string -> k -> k -> bool
 val k3 : Unix.file_descr -> string -> k -> k -> k -> bool
 val kn : Unix.file_descr -> string -> k array -> bool
+
+val k0_sync : Unix.file_descr -> string -> k
+val k1_sync : Unix.file_descr -> string -> k -> k
+val k2_sync : Unix.file_descr -> string -> k -> k -> k
+val k3_sync : Unix.file_descr -> string -> k -> k -> k -> k
+val kn_sync : Unix.file_descr -> string -> k array -> k
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
