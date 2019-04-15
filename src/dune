@@ -8,7 +8,7 @@
  (c_flags (-DKXVER=3 -gdwarf-2 -g3))
  (c_library_flags (-pthread))
  ; (flags (:standard -w -9-3))
- (libraries bigarray bigstring uuidm ptime))
+ (libraries bigarray bigstring uuidm ptime uri))
 
 (library
  (name        kx_async)

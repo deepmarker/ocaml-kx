@@ -31,16 +31,16 @@ let of_file_descr fd =
   end ;
   client_read, client_write
 
-let connect ?credentials ?timeout ?capability ~host ~port () =
-  match Kx.connect ?credentials ?timeout ?capability ~host ~port () with
+let connect ?timeout ?capability url =
+  match Kx.connect ?timeout ?capability url with
   | Error e -> Error e
   | Ok fd ->
     let fd = Fd.create (Socket `Active)
         fd (Info.of_string "fd from Kx.connect") in
     Ok (of_file_descr fd)
 
-let with_connection ?credentials ?timeout ?capability ~host ~port f =
-  match Kx.connect ?credentials ?timeout ?capability ~host ~port () with
+let with_connection ?timeout ?capability url ~f =
+  match Kx.connect ?timeout ?capability url with
   | Error e -> return (Error e)
   | Ok fd ->
     let fd = Fd.create (Socket `Active)

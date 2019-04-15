@@ -785,17 +785,28 @@ let wrap_result f =
 
 let up u p = u ^ ":" ^ p
 
-let connect ?credentials ?timeout ?capability ~host ~port () =
-  match credentials, timeout, capability with
-  | None, None, None -> wrap_result (fun () -> khp host port)
-  | Some (u, p), None, None -> wrap_result (fun () -> khpu host port (up u p))
-  | Some (u, p), Some t, None -> wrap_result (fun () -> khpun host port (up u p) t)
-  | Some (u, p), Some t, Some c ->
-    wrap_result (fun () -> khpunc host port (up u p) t (int_of_capability c))
-  | _ -> invalid_arg "connect"
+let connect ?timeout ?capability url =
+  let host = Uri.host_with_default ~default:"localhost" url in
+  let userinfo =
+    match Uri.user url, Uri.password url with
+    | Some u, Some p -> Some (u, p)
+    | _ -> None in
+  match Uri.port url with
+  | None -> invalid_arg "connect: port unspecified"
+  | Some port ->
+    match userinfo, timeout, capability with
+    | None, None, None -> wrap_result (fun () -> khp host port)
+    | Some (u, p), None, None -> wrap_result (fun () -> khpu host port (up u p))
+    | Some (u, p), Some t, None ->
+      let t = int_of_float (Ptime.Span.to_float_s t /. 1e3) in
+      wrap_result (fun () -> khpun host port (up u p) t)
+    | Some (u, p), Some t, Some c ->
+      let t = int_of_float (Ptime.Span.to_float_s t /. 1e3) in
+      wrap_result (fun () -> khpunc host port (up u p) t (int_of_capability c))
+    | _ -> invalid_arg "connect"
 
-let with_connection ?credentials ?timeout ?capability ~host ~port f =
-  match connect ?credentials ?timeout ?capability ~host ~port () with
+let with_connection ?timeout ?capability url ~f =
+  match connect ?timeout ?capability url with
   | Error e -> Error e
   | Ok fd ->
     let ret = f fd in

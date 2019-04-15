@@ -108,9 +108,8 @@ let test_pack_unpack () =
 
 let test_server () =
   Kx.with_connection
-    ~credentials:("discovery", "pass")
-    ~host:"localhost"
-    ~port:6001 begin fun fd ->
+    (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
+    ~f:begin fun fd ->
     let k = Kx.kn_sync fd "`getservices" [|pack (Kx.vector (symbol_vect ["tickerplant"]));
                                            Kx.kfalse|] in
     Kx.unpack k

@@ -173,17 +173,14 @@ type capability =
   | UseTLS
 
 val connect :
-  ?credentials:string * string ->
-  ?timeout:int ->
-  ?capability:capability ->
-  host:string -> port:int -> unit ->
+  ?timeout:Ptime.span ->
+  ?capability:capability -> Uri.t ->
   (Unix.file_descr, connection_error) result
 
 val with_connection :
-  ?credentials:string * string ->
-  ?timeout:int ->
+  ?timeout:Ptime.span ->
   ?capability:capability ->
-  host:string -> port:int -> (Unix.file_descr -> 'a) ->
+  Uri.t -> f:(Unix.file_descr -> 'a) ->
   ('a, connection_error) result
 
 val kclose : Unix.file_descr -> unit
