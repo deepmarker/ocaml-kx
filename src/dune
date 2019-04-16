@@ -5,8 +5,8 @@
  ; (preprocess (pps ppx_sexp_conv))
  (synopsis "OCaml client for kdb+")
  (c_names k_stubs c)
- (c_flags (-DKXVER=3 -gdwarf-2 -g3))
- (c_library_flags (-pthread))
+ (c_flags -DKXVER=3 -gdwarf-2 -g3)
+ (c_library_flags -lpthread)
  ; (flags (:standard -w -9-3))
  (libraries bigarray bigstring uuidm ptime uri))
 
@@ -17,4 +17,4 @@
  ; (preprocess (pps ppx_sexp_conv))
  (synopsis "OCaml client for kdb+, for Jane Street's async")
  ; (flags (:standard -w -9-3))
- (libraries kx core async))
+ (libraries kx core async logs-async))

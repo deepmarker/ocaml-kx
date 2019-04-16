@@ -175,6 +175,7 @@ module VectArray : sig
 end
 
 val equal : t -> t -> bool
+val pp : Format.formatter -> t -> unit
 
 val zero_timespan : atom
 val create_timespan :
@@ -196,13 +197,9 @@ val pack : t -> k
 val unpack : k -> t
 (** [unpack k] is the OCaml representation of [k], a K object. *)
 
-val bigstring_of_k : k -> Bigstring.t option
-(** [bigstring_of_k k] is [Some arr] iff [k] is a char vector. *)
-
 val of_bigstring : Bigstring.t -> (k, string) result
 val of_bigstring_exn : Bigstring.t -> k
-
-val serialize : ?mode:int -> k -> (Bigstring.t, string) result
+val to_bigstring : ?mode:int -> k -> Bigstring.t
 
 (**/*)
 

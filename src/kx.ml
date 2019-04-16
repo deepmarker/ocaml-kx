@@ -24,7 +24,7 @@ let guid_arr a =
 let guids_of_arr a =
   let len = Bigstring.length a in
   if len mod 16 <> 0 then
-    invalid_arg "guids_of_arr" ;
+    invalid_arg ("guids_of_arr: " ^  string_of_int len) ;
   let nb_guids =  len / 16 in
   let res = ref [] in
   for i = nb_guids - 1 downto 0 do
@@ -217,6 +217,37 @@ let vector_is kw v =
   | None -> false
   | Some _ -> true
 
+let pp_print_vector ppf v =
+  let pp_sep ppf () = Format.fprintf ppf " " in
+  let list_of_ba ?(f=fun a -> a) ba =
+    let len = Bigarray.Array1.dim ba in
+    let res = ref [] in
+    for i = len - 1 downto 0 do
+      res := f (Bigarray.Array1.unsafe_get ba i) :: !res
+    done ;
+    !res in
+  match get_vector guid v with
+  | Some v ->
+    Format.fprintf ppf "`guid$(%a)"
+      (Format.pp_print_list ~pp_sep Uuidm.pp) (guids_of_arr v)
+  | None ->
+    match get_vector real v with
+    | Some v ->
+      Format.fprintf ppf "`real$(%a)"
+        Format.(pp_print_list ~pp_sep pp_print_float) (list_of_ba v)
+    | None ->
+      match get_vector float v with
+      | Some v ->
+        Format.fprintf ppf "`float$(%a)"
+          Format.(pp_print_list ~pp_sep pp_print_float) (list_of_ba v)
+      | None ->
+        match get_vector symbol v with
+        | Some syms ->
+          Format.fprintf ppf "`symbol$(%a)"
+            Format.(pp_print_list ~pp_sep pp_print_string) syms
+        | None ->
+          Format.pp_print_string ppf "Vector <abstract>"
+
 external r0 : k -> unit = "r0_stub" [@@noalloc]
 
 (* Accessors *)
@@ -252,6 +283,7 @@ external kS_set : k -> int -> string -> unit = "kS_set_stub"
 external kG_bool : k -> uint8_arr = "kG_stub"
 external kG_char : k -> Bigstring.t = "kG_stub"
 external kG : k -> uint8_arr = "kG_stub"
+external kU : k -> Bigstring.t = "kU_stub"
 external kH : k -> int16_arr = "kH_stub"
 external kI : k -> int32_arr = "kI_stub"
 external kJ : k -> int64_arr = "kJ_stub"
@@ -270,6 +302,11 @@ let kG_char k =
 
 let kG k =
   let r = kG k in
+  Gc.finalise_last (fun () -> r0 k) r ;
+  r
+
+let kU k =
+  let r = kU k in
   Gc.finalise_last (fun () -> r0 k) r ;
   r
 
@@ -326,7 +363,7 @@ external kz : float -> k = "kz_stub"
 
 (* List constructors *)
 
-external ktn : int -> int64 -> k = "ktn_stub"
+external ktn : int -> int -> k = "ktn_stub"
 
 (* Dict/Table accessors *)
 
@@ -375,10 +412,47 @@ and atom =
   | Second    of Ptime.time
   | Datetime  of float
 
-let equal t1 t2 =
+let equal_atom a b = match a, b with
+  | Guid a, Guid b -> Uuidm.equal a b
+  | Timestamp a, Timestamp b -> Ptime.equal a b
+  | _ -> a = b
+
+let rec equal t1 t2 =
   match t1, t2 with
+  | Atom a, Atom b -> equal_atom a b
   | Vector v1, Vector v2 -> equal_vect v1 v2
-  | _ -> t1 = t2
+  | List a, List b ->
+    List.length a = List.length b &&
+    List.fold_left2 (fun a x y -> a && equal x y) true a b
+  | Dict (k, v), Dict (k2, v2) -> equal k v && equal k2 v2
+  | Table (k, v), Table(k2, v2) -> equal k v && equal k2 v2
+  | _ -> false
+
+let pp_print_atom ppf = function
+  | Bool b -> Format.pp_print_bool ppf b
+  | Guid b -> Uuidm.pp_string ppf b
+  | Byte g -> Format.pp_print_int ppf g
+  | Short h -> Format.pp_print_int ppf h
+  | Int i -> Format.fprintf ppf "%ld" i
+  | Long j -> Format.fprintf ppf "%Ld" j
+  | Real r -> Format.fprintf ppf "%g" r
+  | Float f -> Format.fprintf ppf "%g" f
+  | Char c -> Format.pp_print_char ppf c
+  | Symbol s -> Format.pp_print_string ppf s
+  | Timestamp t -> Ptime.pp_rfc3339 () ppf t
+  | _ -> Format.pp_print_string ppf "<abstract>"
+
+let rec pp ppf v =
+  let pp_sep ppf () = Format.fprintf ppf " " in
+  match v with
+  | Atom a -> pp_print_atom ppf a
+  | Vector v -> pp_print_vector ppf v
+  | List vs ->
+    Format.fprintf ppf "(%a)" (Format.pp_print_list ~pp_sep pp) vs
+  | Dict (k, v) ->
+    Format.fprintf ppf "{ k:%a; v:%a }" pp k pp v
+  | Table (k, v) ->
+    Format.fprintf ppf "{| k:%a; v:%a |}" pp k pp v
 
 let atom a = Atom a
 let vector v = Vector v
@@ -487,189 +561,189 @@ and pack = function
   | Dict (k, v) -> xD (pack k) (pack v)
   | Table (k, v) -> xT (xD (pack k) (pack v))
   | List ts ->
-    let len = Int64.of_int (List.length ts) in
+    let len = List.length ts in
     let k = ktn 0 len in
     List.iteri (fun i t -> kK_set k i (pack t)) ts ;
     k
   | Vector v when vector_is bool v -> begin
-    match get_vector bool v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw bool) len in
-      let arr = kG_bool k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector bool v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw bool) len in
+        let arr = kG_bool k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is guid v -> begin
-    match get_vector guid v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw guid) len in
-      let arr = kG_char k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector guid v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v / 16 in
+        let k = ktn (int_of_kw guid) len in
+        let arr = kU k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is byte v -> begin
-    match get_vector byte v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw byte) len in
-      let arr = kG k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector byte v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw byte) len in
+        let arr = kG k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is short v -> begin
-    match get_vector short v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw short) len in
-      let arr = kH k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector short v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw short) len in
+        let arr = kH k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is int v -> begin
-    match get_vector int v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw int) len in
-      let arr = kI k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector int v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw int) len in
+        let arr = kI k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is long v -> begin
-    match get_vector long v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw long) len in
-      let arr = kJ k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector long v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw long) len in
+        let arr = kJ k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is real v -> begin
-    match get_vector real v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw real) len in
-      let arr = kE k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector real v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw real) len in
+        let arr = kE k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is float v -> begin
-    match get_vector float v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw float) len in
-      let arr = kF k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector float v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw float) len in
+        let arr = kF k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is char v -> begin
-    match get_vector char v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw char) len in
-      let arr = kG_char k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector char v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw char) len in
+        let arr = kG_char k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is symbol v -> begin
-    match get_vector symbol v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (List.length v) in
-      let k = ktn (int_of_kw symbol) len in
-      List.iteri (kS_set k) v ;
-      k
-  end
+      match get_vector symbol v with
+      | None -> assert false
+      | Some v ->
+        let len = List.length v in
+        let k = ktn (int_of_kw symbol) len in
+        List.iteri (kS_set k) v ;
+        k
+    end
   | Vector v when vector_is timestamp v -> begin
-    match get_vector timestamp v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw timestamp) len in
-      let arr = kJ k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector timestamp v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw timestamp) len in
+        let arr = kJ k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is month v -> begin
-    match get_vector month v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw month) len in
-      let arr = kI k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector month v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw month) len in
+        let arr = kI k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is date v -> begin
-    match get_vector date v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw date) len in
-      let arr = kI k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector date v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw date) len in
+        let arr = kI k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is timespan v -> begin
-    match get_vector timespan v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw timespan) len in
-      let arr = kJ k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector timespan v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw timespan) len in
+        let arr = kJ k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is minute v -> begin
-    match get_vector minute v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw minute) len in
-      let arr = kI k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector minute v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw minute) len in
+        let arr = kI k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is second v -> begin
-    match get_vector second v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw second) len in
-      let arr = kI k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector second v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw second) len in
+        let arr = kI k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v when vector_is time v -> begin
-    match get_vector time v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw time) len in
-      let arr = kI k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector time v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw time) len in
+        let arr = kI k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
   | Vector v -> begin
-    match get_vector datetime v with
-    | None -> assert false
-    | Some v ->
-      let len = Int64.of_int (Bigarray.Array1.dim v) in
-      let k = ktn (int_of_kw datetime) len in
-      let arr = kF k in
-      Bigarray.Array1.blit v arr ;
-      k
-  end
+      match get_vector datetime v with
+      | None -> assert false
+      | Some v ->
+        let len = Bigarray.Array1.dim v in
+        let k = ktn (int_of_kw datetime) len in
+        let arr = kF k in
+        Bigarray.Array1.blit v arr ;
+        k
+    end
 
 let rec unpack_atom k =
   match -(k_objtyp k) with
@@ -735,7 +809,7 @@ let rec unpack_atom k =
 and unpack_vector k =
   match k_objtyp k with
   | 1  -> Vect.bool (kG_bool k)
-  | 2  -> Vect.guid (kG_char k)
+  | 2  -> Vect.guid (kU k)
   | 4  -> Vect.byte (kG k)
   | 5  -> Vect.short (kH k)
   | 6  -> Vect.int (kI k)
@@ -798,18 +872,13 @@ let of_bigstring_exn s =
   | Error msg -> invalid_arg msg
   | Ok s -> s
 
-let bigstring_of_k k =
-  match k_objtyp k with
-  | 10 -> Some (kG_char k)
-  | _ -> None
-
-let serialize ?(mode = ~-1) k =
+let to_bigstring ?(mode = ~-1) k =
   match b9 mode k with
-  | Error e -> Error e
+  | Error e -> failwith e
   | Ok r ->
-    match get_vector char (unpack_vector r) with
-    | None -> invalid_arg "serialize: internal error"
-    | Some bs -> Ok bs
+    match get_vector byte (unpack_vector r) with
+    | None -> assert false
+    | Some bs -> (Obj.magic bs : Bigstring.t)
 
 external khp : string -> int -> int = "khp_stub"
 external khpu : string -> int -> string -> int = "khpu_stub"

@@ -1,58 +1,13 @@
 open Kx
 open Alcotest
 
-let list_of_ba ?(f=fun a -> a) ba =
-  let len = Bigarray.Array1.dim ba in
-  let res = ref [] in
-  for i = len - 1 downto 0 do
-    res := f (Bigarray.Array1.unsafe_get ba i) :: !res
-  done ;
-  !res
-
-let pp_sep ppf () = Format.fprintf ppf " "
-let rec pp ppf = function
-  | Atom (Char a) ->
-    Format.pp_print_char ppf a
-  | Atom (Long a) ->
-    Format.fprintf ppf "%Ld" a
-  | Atom (Date (y, m, d)) ->
-    Format.fprintf ppf "%d%d%d" y m d
-  | Atom _ ->
-    Format.pp_print_string ppf "Atom <abstract>"
-  | Vector v -> begin
-    match get_vector guid v with
-    | Some v ->
-      Format.fprintf ppf "`guid$(%a)"
-        (Format.pp_print_list ~pp_sep Uuidm.pp) (guids_of_arr v)
-    | None ->
-      match get_vector real v with
-      | Some v ->
-        Format.fprintf ppf "`real$(%a)"
-          Format.(pp_print_list ~pp_sep pp_print_float) (list_of_ba v)
-      | None ->
-        match get_vector Kx.float v with
-        | Some v ->
-          Format.fprintf ppf "`float$(%a)"
-            Format.(pp_print_list ~pp_sep pp_print_float) (list_of_ba v)
-        | None ->
-          match get_vector Kx.symbol v with
-          | Some syms ->
-            Format.fprintf ppf "`symbol$(%a)"
-              Format.(pp_print_list ~pp_sep pp_print_string) syms
-          | None ->
-            Format.pp_print_string ppf "Vector <abstract>"
-  end
-  | List vs ->
-    Format.fprintf ppf "(%a)" (Format.pp_print_list ~pp_sep pp) vs
-  | Dict (k, v) ->
-    Format.fprintf ppf "{ k:%a; v:%a }" pp k pp v
-  | Table (k, v) ->
-    Format.fprintf ppf "{| k:%a; v:%a |}" pp k pp v
-
-let t = testable pp Kx.equal
+let t = testable Kx.pp Kx.equal
 
 let pack_unpack name v =
-  let vv = unpack (pack v) in
+  let vv = pack v in
+  let vv_serialized = to_bigstring vv in
+  let vv_parsed = of_bigstring_exn vv_serialized in
+  let vv = unpack vv_parsed in
   check t name v vv
 
 let pack_unpack_atom () =
@@ -97,6 +52,14 @@ let pack_unpack_vect () =
    * pack_unpack "vect datetime" (vector (float_vect (float64_arr [|0.;1.;nan;infinity;neg_infinity|]))) ; *)
   ()
 
+let pack_unpack_list () =
+  pack_unpack "empty" (Kx.List []) ;
+  pack_unpack "simple" (Kx.List [Atom.int 0l; Atom.float 1.]) ;
+  pack_unpack "vect" (Kx.List [VectArray.short [|0;1;2|];
+                               VectArray.timestamp [|Ptime.epoch; Ptime.epoch|]]) ;
+  pack_unpack "vect guid" (Kx.List [VectArray.guid [|Uuidm.nil; Uuidm.nil|]]) ;
+  ()
+
 let bindings () =
   check int "dj 0" 20000101 (dj 0) ;
   ()
@@ -104,6 +67,7 @@ let bindings () =
 let test_pack_unpack () =
   pack_unpack_atom () ;
   pack_unpack_vect () ;
+  pack_unpack_list () ;
   ()
 
 let test_server () =
@@ -127,7 +91,7 @@ let test_server () =
 let tests_kx = [
   test_case "bindings" `Quick bindings ;
   test_case "pack_unpack" `Quick test_pack_unpack ;
-  test_case "server" `Quick test_server ;
+  (* test_case "server" `Quick test_server ; *)
 ]
 
 (* let tests_kx_async = Alcotest_async.[

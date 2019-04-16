@@ -3,6 +3,9 @@ open Kx
 
 (** Connect to kdb+ *)
 
+exception NetworkError
+(** Raised when impossible to write to server *)
+
 val connect :
   ?timeout:Ptime.span ->
   ?capability:capability ->
