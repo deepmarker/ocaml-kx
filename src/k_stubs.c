@@ -490,22 +490,22 @@ CAMLprim value kread_stub(value fd) {
 
 CAMLprim value k0_stub(value fd, value msg) {
     K r = k(-Int_val(fd), String_val(msg), (K)NULL);
-    return Val_bool(r->g);
+    return Val_unit;
 }
 
 CAMLprim value k1_stub(value fd, value msg, value a) {
     K r = k(-Int_val(fd), String_val(msg), K_val(a), (K)NULL);
-    return Val_bool(r->g);
+    return Val_unit;
 }
 
 CAMLprim value k2_stub(value fd, value msg, value a, value b) {
     K r = k(-Int_val(fd), String_val(msg), K_val(a), K_val(b), (K)NULL);
-    return Val_bool(r->g);
+    return Val_unit;
 }
 
 CAMLprim value k3_stub(value fd, value msg, value a, value b, value c) {
     K r = k(-Int_val(fd), String_val(msg), K_val(a), K_val(b), K_val(c), (K)NULL);
-    return Val_bool(r->g);
+    return Val_unit;
 }
 
 CAMLprim value k0_sync_stub(value fd, value msg) {
@@ -598,8 +598,7 @@ CAMLprim value kn_stub(value fd, value msg, value a) {
     default:
         assert(0);
     }
-
-    return Val_bool(r->g);
+    return Val_unit;
 }
 
 CAMLprim value kn_sync_stub(value fd, value msg, value a) {

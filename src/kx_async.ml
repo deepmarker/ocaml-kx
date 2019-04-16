@@ -3,8 +3,6 @@ open Async
 
 let src = Logs.Src.create "kx.async"
 
-exception NetworkError
-
 let of_file_descr fd =
   let client_read, to_client = Pipe.create () in
   let from_client, client_write = Pipe.create () in
@@ -29,8 +27,7 @@ let of_file_descr fd =
           (Array.to_list a)
       end ;
       let a = Array.map ~f:Kx.pack a in
-      if not (Fd.syscall_exn ~nonblocking:true fd (fun fd -> Kx.kn fd msg a)) then
-        raise NetworkError
+      Fd.syscall_exn ~nonblocking:true fd (fun fd -> Kx.kn fd msg a)
     end in
   don't_wait_for begin
     Deferred.any_unit [

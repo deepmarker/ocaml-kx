@@ -231,11 +231,11 @@ val kclose : Unix.file_descr -> unit
 
 val kread : Unix.file_descr -> k
 
-val k0 : Unix.file_descr -> string -> bool
-val k1 : Unix.file_descr -> string -> k -> bool
-val k2 : Unix.file_descr -> string -> k -> k -> bool
-val k3 : Unix.file_descr -> string -> k -> k -> k -> bool
-val kn : Unix.file_descr -> string -> k array -> bool
+val k0 : Unix.file_descr -> string -> unit
+val k1 : Unix.file_descr -> string -> k -> unit
+val k2 : Unix.file_descr -> string -> k -> k -> unit
+val k3 : Unix.file_descr -> string -> k -> k -> k -> unit
+val kn : Unix.file_descr -> string -> k array -> unit
 
 val k0_sync : Unix.file_descr -> string -> k
 val k1_sync : Unix.file_descr -> string -> k -> k

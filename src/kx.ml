@@ -946,11 +946,11 @@ let with_connection ?timeout ?capability url ~f =
     Ok ret
 
 external kread : Unix.file_descr -> k = "kread_stub"
-external k0 : Unix.file_descr -> string -> bool = "k0_stub" [@@noalloc]
-external k1 : Unix.file_descr -> string -> k -> bool = "k1_stub" [@@noalloc]
-external k2 : Unix.file_descr -> string -> k -> k -> bool = "k2_stub" [@@noalloc]
-external k3 : Unix.file_descr -> string -> k -> k -> k -> bool = "k3_stub" [@@noalloc]
-external kn : Unix.file_descr -> string -> k array -> bool = "kn_stub" [@@noalloc]
+external k0 : Unix.file_descr -> string -> unit = "k0_stub" [@@noalloc]
+external k1 : Unix.file_descr -> string -> k -> unit = "k1_stub" [@@noalloc]
+external k2 : Unix.file_descr -> string -> k -> k -> unit = "k2_stub" [@@noalloc]
+external k3 : Unix.file_descr -> string -> k -> k -> k -> unit = "k3_stub" [@@noalloc]
+external kn : Unix.file_descr -> string -> k array -> unit = "kn_stub" [@@noalloc]
 
 external k0_sync : Unix.file_descr -> string -> k = "k0_sync_stub"
 external k1_sync : Unix.file_descr -> string -> k -> k = "k1_sync_stub"
