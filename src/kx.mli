@@ -38,16 +38,16 @@ type int64_arr   = (int64, Bigarray.int64_elt) storage
 type float32_arr = (float, Bigarray.float32_elt) storage
 type float64_arr = (float, Bigarray.float64_elt) storage
 
-val guid_arr : Uuidm.t list -> Bigstring.t
-val bool_arr : bool array -> uint8_arr
-val uint8_arr : int array -> uint8_arr
-val int16_arr : int array -> int16_arr
-val int32_arr : int32 array -> int32_arr
-val int64_arr : int64 array -> int64_arr
-val float32_arr : float array -> float32_arr
-val float64_arr : float array -> float64_arr
-val timestamp_arr : Ptime.t list -> int64_arr
+(* val bool_arr : bool array -> uint8_arr
+ * val uint8_arr : int array -> uint8_arr
+ * val int16_arr : int array -> int16_arr
+ * val int32_arr : int32 array -> int32_arr
+ * val int64_arr : int64 array -> int64_arr
+ * val float32_arr : float array -> float32_arr
+ * val float64_arr : float array -> float64_arr *)
 
+(* val timestamp_arr : Ptime.t array -> int64_arr *)
+(* val guid_arr : Uuidm.t list -> Bigstring.t *)
 val guids_of_arr : Bigstring.t -> Uuidm.t list
 
 type _ kw
@@ -77,29 +77,35 @@ val datetime  : float64_arr kw
 type vector
 (** Type of a vector. *)
 
-val bool_vect      : uint8_arr    -> vector
-val guid_vect      : Bigstring.t  -> vector
-val byte_vect      : uint8_arr    -> vector
-val short_vect     : int16_arr    -> vector
-val int_vect       : int32_arr    -> vector
-val long_vect      : int64_arr    -> vector
-val real_vect      : float32_arr  -> vector
-val float_vect     : float64_arr  -> vector
-val char_vect      : Bigstring.t  -> vector
-val symbol_vect    : string list -> vector
-val timestamp_vect : int64_arr    -> vector
-val month_vect     : int32_arr    -> vector
-val date_vect      : int32_arr    -> vector
-val timespan_vect  : int64_arr    -> vector
-val minute_vect    : int32_arr    -> vector
-val second_vect    : int32_arr    -> vector
-val time_vect      : int32_arr    -> vector
-val datetime_vect  : float64_arr  -> vector
+type time = { time: Ptime.time ; ms: int }
+type timespan = { time: Ptime.time ; ns: int }
+
 (** Vector constructors *)
+
+module Vect     : sig
+  val bool      : uint8_arr    -> vector
+  val guid      : Bigstring.t  -> vector
+  val byte      : uint8_arr    -> vector
+  val short     : int16_arr    -> vector
+  val int       : int32_arr    -> vector
+  val long      : int64_arr    -> vector
+  val real      : float32_arr  -> vector
+  val float     : float64_arr  -> vector
+  val char      : Bigstring.t  -> vector
+  val symbol    : string list  -> vector
+  val timestamp : int64_arr    -> vector
+  val month     : int32_arr    -> vector
+  val date      : int32_arr    -> vector
+  val time      : int32_arr    -> vector
+  val timespan  : int64_arr    -> vector
+  val minute    : int32_arr    -> vector
+  val second    : int32_arr    -> vector
+  val datetime  : float64_arr  -> vector
+end
 
 val get_vector : 'a kw -> vector -> 'a option
 (** [get_vector typ v] is the underlying storage of the vector
-   value. *)
+    value. *)
 
 type t =
   | Atom      of atom
@@ -120,30 +126,52 @@ and atom =
   | Symbol    of string
   | Timestamp of Ptime.t
   | Month     of int
-  | Date      of { y: int ; m: int ; d: int }
-  | Timespan  of Ptime.time * int
-  | Minute    of int * int
-  | Second    of int * int * int
-  | Time      of Ptime.time * int
+  | Date      of Ptime.date
+  | Time      of time
+  | Timespan  of timespan
+  | Minute    of Ptime.time
+  | Second    of Ptime.time
   | Datetime  of float
 
-module B : sig
-  val bool : bool -> t
-  val guid : Uuidm.t -> t
-  val byte : int -> t
-  val short : int -> t
-  val int : int32 -> t
-  val long : int64 -> t
-  val real : float -> t
-  val float : float -> t
-  val char : char -> t
-  val symbol : string -> t
-  val timestamp : Ptime.t -> t
-  val month : int -> t
-  val date : y:int -> m:int -> d:int -> t
-  val minute : hh:int -> mm:int -> t
-  val second : hh:int -> mm:int -> ss:int -> t
-  val time : Ptime.time -> ms:int -> t
+module Atom     : sig
+  val bool      : bool       -> t
+  val guid      : Uuidm.t    -> t
+  val byte      : int        -> t
+  val short     : int        -> t
+  val int       : int32      -> t
+  val long      : int64      -> t
+  val real      : float      -> t
+  val float     : float      -> t
+  val char      : char       -> t
+  val symbol    : string     -> t
+  val timestamp : Ptime.t    -> t
+  val month     : int        -> t
+  val date      : Ptime.date -> t
+  val minute    : Ptime.time -> t
+  val second    : Ptime.time -> t
+  val time      : time       -> t
+  val timespan  : timespan   -> t
+end
+
+module VectArray : sig
+  val bool      : bool array       -> t
+  val guid      : Uuidm.t array    -> t
+  val byte      : int array        -> t
+  val short     : int array        -> t
+  val int       : int32 array      -> t
+  val long      : int64 array      -> t
+  val real      : float array      -> t
+  val float     : float array      -> t
+  val char      : string           -> t
+  val symbol    : string array     -> t
+  val timestamp : Ptime.t array    -> t
+  val month     : int array        -> t
+  val date      : Ptime.date array -> t
+  val time      : time array       -> t
+  val timespan  : timespan array   -> t
+  val minute    : Ptime.time array -> t
+  val second    : Ptime.time array -> t
+  val datetime  : float array      -> t
 end
 
 val equal : t -> t -> bool

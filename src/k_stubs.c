@@ -253,13 +253,13 @@ CAMLprim value ktimestamp_stub (value j) {
 CAMLprim value kt_stub (value i) {
     CAMLparam1(i);
     CAMLlocal1(k);
-    k = caml_alloc_K(kt(Int32_val(i)));
+    k = caml_alloc_K(kt(Int_val(i)));
     CAMLreturn(k);
 }
 CAMLprim value kd_stub (value i) {
     CAMLparam1(i);
     CAMLlocal1(k);
-    k = caml_alloc_K(kd(Int32_val(i)));
+    k = caml_alloc_K(kd(Int_val(i)));
     CAMLreturn(k);
 }
 
@@ -267,7 +267,7 @@ CAMLprim value kmonth_stub(value i) {
     CAMLparam1(i);
     CAMLlocal1(kk);
     K k = ka(-KM);
-    k->i = Int32_val(i);
+    k->i = Int_val(i);
     kk = caml_alloc_K(k);
     CAMLreturn(kk);
 }
@@ -275,7 +275,7 @@ CAMLprim value kminute_stub(value i) {
     CAMLparam1(i);
     CAMLlocal1(kk);
     K k = ka(-KU);
-    k->i = Int32_val(i);
+    k->i = Int_val(i);
     kk = caml_alloc_K(k);
     CAMLreturn(kk);
 }
@@ -283,7 +283,7 @@ CAMLprim value ksecond_stub(value i) {
     CAMLparam1(i);
     CAMLlocal1(kk);
     K k = ka(-KV);
-    k->i = Int32_val(i);
+    k->i = Int_val(i);
     kk = caml_alloc_K(k);
     CAMLreturn(kk);
 }

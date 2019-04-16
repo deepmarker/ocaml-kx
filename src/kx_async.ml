@@ -17,6 +17,7 @@ let of_file_descr fd =
   in
   let do_write () =
     Pipe.iter_without_pushback ~continue_on_error:false from_client ~f:begin fun (msg, a) ->
+      let a = Array.map ~f:Kx.pack a in
       if not (Fd.syscall_exn ~nonblocking:true fd (fun fd -> Kx.kn fd msg a)) then
         raise Exit
     end in

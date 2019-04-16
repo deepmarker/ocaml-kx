@@ -15,8 +15,8 @@ type float32_arr = (float, Bigarray.float32_elt) storage
 type float64_arr = (float, Bigarray.float64_elt) storage
 
 let guid_arr a =
-  let buf = Bigstring.create (16 * List.length a) in
-  List.iteri begin fun i guid ->
+  let buf = Bigstring.create (16 * Array.length a) in
+  Array.iteri begin fun i guid ->
     Bigstring.blit_of_string (Uuidm.to_bytes guid) 0 buf (i * 16) 16
   end a ;
   buf
@@ -54,19 +54,12 @@ let int64_of_timestamp ts =
   Int64.(add (day_in_ns d) (div ps 1_000L))
 
 let timestamp_arr ts =
-  let len = List.length ts in
+  let len = Array.length ts in
   let buf = Bigarray.(Array1.create int64 c_layout len) in
-  List.iteri begin fun i t ->
+  Array.iteri begin fun i t ->
     Bigarray.Array1.unsafe_set buf i (int64_of_timestamp t)
   end ts ;
   buf
-
-let uint8_arr = Bigarray.(Array1.of_array int8_unsigned c_layout)
-let int16_arr = Bigarray.(Array1.of_array int16_signed c_layout)
-let int32_arr = Bigarray.(Array1.of_array int32 c_layout)
-let int64_arr = Bigarray.(Array1.of_array int64 c_layout)
-let float32_arr = Bigarray.(Array1.of_array float32 c_layout)
-let float64_arr = Bigarray.(Array1.of_array float64 c_layout)
 
 type _ kw =
   | Bool      : uint8_arr kw
@@ -192,24 +185,26 @@ let equal_vect (Vect (w1, a)) (Vect (w2, b)) =
       end
     | _ -> a = b
 
-let bool_vect v      = Vect (bool, v)
-let guid_vect v      = Vect (guid, v)
-let byte_vect v      = Vect (byte, v)
-let short_vect v     = Vect (short, v)
-let int_vect v       = Vect (int, v)
-let long_vect v      = Vect (long, v)
-let real_vect v      = Vect (real, v)
-let float_vect v     = Vect (float, v)
-let char_vect v      = Vect (char, v)
-let symbol_vect v    = Vect (symbol, v)
-let timestamp_vect v = Vect (timestamp, v)
-let month_vect v     = Vect (month, v)
-let date_vect v      = Vect (date, v)
-let timespan_vect v  = Vect (timespan, v)
-let minute_vect v    = Vect (minute, v)
-let second_vect v    = Vect (second, v)
-let time_vect v      = Vect (time, v)
-let datetime_vect v  = Vect (datetime, v)
+module Vect = struct
+  let bool       v = Vect (bool, v)
+  let guid       v = Vect (guid, v)
+  let byte       v = Vect (byte, v)
+  let short      v = Vect (short, v)
+  let int        v = Vect (int, v)
+  let long       v = Vect (long, v)
+  let real       v = Vect (real, v)
+  let float      v = Vect (float, v)
+  let char       v = Vect (char, v)
+  let symbol     v = Vect (symbol, v)
+  let timestamp  v = Vect (timestamp, v)
+  let month      v = Vect (month, v)
+  let date       v = Vect (date, v)
+  let timespan   v = Vect (timespan, v)
+  let minute     v = Vect (minute, v)
+  let second     v = Vect (second, v)
+  let time       v = Vect (time, v)
+  let datetime   v = Vect (datetime, v)
+end
 
 let get_vector :
   type a. a kw -> vector -> a option = fun a (Vect(b,x)) ->
@@ -255,41 +250,49 @@ external kS : k -> int -> string = "kS_stub"
 external kS_set : k -> int -> string -> unit = "kS_set_stub"
 
 external kG_bool : k -> uint8_arr = "kG_stub"
+external kG_char : k -> Bigstring.t = "kG_stub"
+external kG : k -> uint8_arr = "kG_stub"
+external kH : k -> int16_arr = "kH_stub"
+external kI : k -> int32_arr = "kI_stub"
+external kJ : k -> int64_arr = "kJ_stub"
+external kE : k -> float32_arr = "kE_stub"
+external kF : k -> float64_arr = "kF_stub"
+
 let kG_bool k =
   let r = kG_bool k in
   Gc.finalise_last (fun () -> r0 k) r ;
   r
-external kG_char : k -> Bigstring.t = "kG_stub"
+
 let kG_char k =
   let r = kG_char k in
   Gc.finalise_last (fun () -> r0 k) r ;
   r
-external kG : k -> uint8_arr = "kG_stub"
+
 let kG k =
   let r = kG k in
   Gc.finalise_last (fun () -> r0 k) r ;
   r
-external kH : k -> int16_arr = "kH_stub"
+
 let kH k =
   let r = kH k in
   Gc.finalise_last (fun () -> r0 k) r ;
   r
-external kI : k -> int32_arr = "kI_stub"
+
 let kI k =
   let r = kI k in
   Gc.finalise_last (fun () -> r0 k) r ;
   r
-external kJ : k -> int64_arr = "kJ_stub"
+
 let kJ k =
   let r = kJ k in
   Gc.finalise_last (fun () -> r0 k) r ;
   r
-external kE : k -> float32_arr = "kE_stub"
+
 let kE k =
   let r = kE k in
   Gc.finalise_last (fun () -> r0 k) r ;
   r
-external kF : k -> float64_arr = "kF_stub"
+
 let kF k =
   let r = kF k in
   Gc.finalise_last (fun () -> r0 k) r ;
@@ -311,11 +314,11 @@ external kf : float -> k = "kf_stub"
 
 external ks : string -> k = "ks_stub"
 
-external kt : int32 -> k = "kt_stub"
-external kd : int32 -> k = "kd_stub"
-external kmonth : int32 -> k = "kmonth_stub"
-external kminute : int32 -> k = "kminute_stub"
-external ksecond : int32 -> k = "ksecond_stub"
+external kt : int -> k = "kt_stub"
+external kd : int -> k = "kd_stub"
+external kmonth : int -> k = "kmonth_stub"
+external kminute : int -> k = "kminute_stub"
+external ksecond : int -> k = "ksecond_stub"
 
 external ktimestamp : int64 -> k = "ktimestamp_stub"
 external ktimespan : int64 -> k = "ktimespan_stub"
@@ -343,6 +346,9 @@ external xT : k -> k = "xT_stub"
 external ymd : int -> int -> int -> int = "ymd_stub" [@@noalloc]
 external dj : int -> int = "dj_stub" [@@noalloc]
 
+type time = { time: Ptime.time ; ms: int }
+type timespan = { time: Ptime.time ; ns: int }
+
 type t =
   | Atom      of atom
   | Vector    of vector
@@ -362,11 +368,11 @@ and atom =
   | Symbol    of string
   | Timestamp of Ptime.t
   | Month     of int
-  | Date      of { y: int ; m: int ; d: int }
-  | Timespan  of Ptime.time * int
-  | Minute    of int * int
-  | Second    of int * int * int
-  | Time      of Ptime.time * int
+  | Date      of Ptime.date
+  | Time      of time
+  | Timespan  of timespan
+  | Minute    of Ptime.time
+  | Second    of Ptime.time
   | Datetime  of float
 
 let equal t1 t2 =
@@ -381,11 +387,11 @@ let dict k v = Dict (k, v)
 let table k v = Table (k, v)
 
 let create_timespan ?(tz_offset=0) ~hh ~mm ~ss ~ns () =
-  Timespan (((hh, mm, ss), tz_offset), ns)
+  Timespan { time = ((hh, mm, ss), tz_offset) ; ns }
 
 let zero_timespan = create_timespan ~hh:0 ~mm:0 ~ss:0 ~ns:0 ()
 
-module B = struct
+module Atom = struct
   let bool b = Atom (Bool b)
   let guid g = Atom (Guid g)
   let byte b = Atom (Byte b)
@@ -398,10 +404,62 @@ module B = struct
   let symbol s = Atom (Symbol s)
   let timestamp t = Atom (Timestamp t)
   let month i = Atom (Month i)
-  let date ~y ~m ~d = Atom (Date { y; m; d })
-  let minute ~hh ~mm = Atom (Minute (hh, mm))
-  let second ~hh ~mm ~ss = Atom (Second (hh, mm, ss))
-  let time t ~ms = Atom (Time (t, ms))
+  let date d = Atom (Date d)
+  let minute d = Atom (Minute d)
+  let second d = Atom (Second d)
+  let time t = Atom (Time t)
+  let timespan t = Atom (Timespan t)
+end
+
+let uint8_arr = Bigarray.(Array1.of_array int8_unsigned c_layout)
+let int16_arr = Bigarray.(Array1.of_array int16_signed c_layout)
+let int32_arr = Bigarray.(Array1.of_array int32 c_layout)
+let int64_arr = Bigarray.(Array1.of_array int64 c_layout)
+let float32_arr = Bigarray.(Array1.of_array float32 c_layout)
+let float64_arr = Bigarray.(Array1.of_array float64 c_layout)
+
+let int_of_time { time = ((h, m, s), tz_offset); ms } =
+  (h - tz_offset) * 3600 + m * 60 + s * 1_000 + ms
+
+let int64_of_timespan { time = ((h, m, s), tz_offset) ; ns } =
+  let open Int64 in
+  add
+    (mul (of_int ((h - tz_offset) * 3600 + m * 60 + s)) 1_000_000_000L)
+    (of_int ns)
+
+let int_of_minute ((hh, mm, _), tz_offset) = (hh * 60 + mm + tz_offset / 60)
+let int_of_second ((hh, mm, ss), tz_offset) =
+  (hh * 3600 + mm * 60 + ss + tz_offset)
+
+module VectArray = struct
+  let guid gs = Vector (Vect.guid (guid_arr gs))
+  let bool bs =  Vector (Vect.bool (bool_arr bs))
+  let byte bs = Vector (Vect.byte (uint8_arr bs))
+  let short bs = Vector (Vect.short (int16_arr bs))
+  let int bs = Vector (Vect.int (int32_arr bs))
+  let long bs = Vector (Vect.long (int64_arr bs))
+  let real bs = Vector (Vect.real (float32_arr bs))
+  let float bs = Vector (Vect.float (float64_arr bs))
+  let char bs = Vector (Vect.char (Bigstring.of_string bs))
+  let symbol bs = Vector (Vect.symbol (Array.to_list bs))
+  let timestamp bs = Vector (Vect.timestamp (timestamp_arr bs))
+  let month bs = Vector (Vect.month (int32_arr (Array.map Int32.of_int bs)))
+  let date bs =
+    let a = Array.map (fun (y, m, d) -> Int32.of_int (ymd y m d)) bs in
+    Vector (Vect.date (int32_arr a))
+  let time bs =
+    let a = Array.map (fun t -> Int32.of_int (int_of_time t)) bs in
+    Vector (Vect.time (int32_arr a))
+  let timespan bs =
+    let a = Array.map int64_of_timespan bs in
+    Vector (Vect.timespan (int64_arr a))
+  let minute bs =
+    let a = Array.map (fun t -> Int32.of_int (int_of_minute t)) bs in
+    Vector (Vect.time (int32_arr a))
+  let second bs =
+    let a = Array.map (fun t -> Int32.of_int (int_of_second t)) bs in
+    Vector (Vect.time (int32_arr a))
+  let datetime bs = Vector (Vect.datetime (float64_arr bs))
 end
 
 let rec pack_atom = function
@@ -416,28 +474,23 @@ let rec pack_atom = function
   | Char c       -> kc c
   | Symbol s     -> ks s
   | Timestamp ts -> ktimestamp (int64_of_timestamp ts)
-  | Time (((h, m, s), tz_offset), ms) ->
-    let open Int32 in
-    let ts =
-      add
-        (mul (of_int ((h - tz_offset) * 3600 + m * 60 + s)) 1_000l)
-        (of_int ms) in
-    kt ts
-  | Timespan (((h, m, s), tz_offset), ns)  -> begin
-      let open Int64 in
-      let ts = add
-          (mul (of_int ((h - tz_offset) * 3600 + m * 60 + s)) 1_000_000_000L)
-          (of_int ns) in
-      ktimespan ts
-    end
-  | Month i -> kmonth (Int32.of_int i)
-  | Date { y; m; d } -> kd (Int32.of_int (ymd y m d))
-  | Minute (hh, mm) -> kminute (Int32.of_int (hh * 60 + mm))
-  | Second (hh, mm, ss) -> ksecond (Int32.of_int (hh * 3600 + mm * 60 + ss))
+  | Time t -> kt (int_of_time t)
+  | Timespan t -> ktimespan (int64_of_timespan t)
+  | Month i -> kmonth i
+  | Date (y, m, d) -> kd (ymd y m d)
+  | Minute t -> kminute (int_of_minute t)
+  | Second t -> ksecond (int_of_second t)
   | Datetime f   -> kz f
 
 and pack = function
   | Atom a -> pack_atom a
+  | Dict (k, v) -> xD (pack k) (pack v)
+  | Table (k, v) -> xT (xD (pack k) (pack v))
+  | List ts ->
+    let len = Int64.of_int (List.length ts) in
+    let k = ktn 0 len in
+    List.iteri (fun i t -> kK_set k i (pack t)) ts ;
+    k
   | Vector v when vector_is bool v -> begin
     match get_vector bool v with
     | None -> assert false
@@ -617,15 +670,6 @@ and pack = function
       Bigarray.Array1.blit v arr ;
       k
   end
-  | List ts ->
-    let len = Int64.of_int (List.length ts) in
-    let k = ktn 0 len in
-    List.iteri (fun i t -> kK_set k i (pack t)) ts ;
-    k
-  | Dict (k, v) ->
-    xD (pack k) (pack v)
-  | Table (k, v) ->
-    xT (xD (pack k) (pack v))
 
 let rec unpack_atom k =
   match -(k_objtyp k) with
@@ -659,7 +703,7 @@ let rec unpack_atom k =
     let y = date / 10_000 in
     let m = (date mod 10_000) / 100 in
     let d = (date mod 10_000) mod 100 in
-    Date { y ; m ; d }
+    Date (y, m, d)
   | 16 ->
     let time = k_j k in
     let ns = Int64.(to_int (rem time 1_000_000_000L)) in
@@ -667,16 +711,16 @@ let rec unpack_atom k =
     let hh = s / 3600 in
     let mm = (s / 60) mod 60 in
     let ss = s mod 60 in
-    Timespan (((hh, mm, ss), 0), ns)
+    Timespan { time = (hh, mm, ss), 0 ; ns }
   | 17 ->
     let nb_minutes = Int32.to_int (k_i k) in
-    Minute (nb_minutes / 60, nb_minutes mod 60)
+    Minute ((nb_minutes / 60, nb_minutes mod 60, 0), 0)
   | 18 ->
     let nb_seconds = Int32.to_int (k_i k) in
     let hh = nb_seconds / 3600 in
     let mm = (nb_seconds / 60) mod 60 in
     let ss = nb_seconds mod 60 in
-    Second (hh, mm, ss)
+    Second ((hh, mm, ss), 0)
   | 19 ->
     let time = Int32.to_int (k_i k) in
     let ms = time mod 1_000 in
@@ -684,36 +728,36 @@ let rec unpack_atom k =
     let hh = s / 3600 in
     let mm = (s / 60) mod 60 in
     let ss = s mod 60 in
-    Time (((hh, mm, ss), 0), ms)
+    Time { time = ((hh, mm, ss), 0); ms }
   | 15 -> Datetime (k_f k)
   | _  -> invalid_arg "unpack_atom: not an atom"
 
 and unpack_vector k =
   match k_objtyp k with
-  | 1  -> bool_vect (kG_bool k)
-  | 2  -> guid_vect (kG_char k)
-  | 4  -> byte_vect (kG k)
-  | 5  -> short_vect (kH k)
-  | 6  -> int_vect (kI k)
-  | 7  -> long_vect (kJ k)
-  | 8  -> real_vect (kE k)
-  | 9  -> float_vect (kF k)
-  | 10 -> char_vect (kG_char k)
+  | 1  -> Vect.bool (kG_bool k)
+  | 2  -> Vect.guid (kG_char k)
+  | 4  -> Vect.byte (kG k)
+  | 5  -> Vect.short (kH k)
+  | 6  -> Vect.int (kI k)
+  | 7  -> Vect.long (kJ k)
+  | 8  -> Vect.real (kE k)
+  | 9  -> Vect.float (kF k)
+  | 10 -> Vect.char (kG_char k)
   | 11 ->
     let len = Int64.to_int (k_length k) in
     let res = ref [] in
     for i = len - 1 downto 0 do
       res := kS k i :: !res
     done ;
-    symbol_vect (!res)
-  | 12 -> timestamp_vect (kJ k)
-  | 13 -> month_vect (kI k)
-  | 14 -> date_vect (kI k)
-  | 16 -> timespan_vect (kJ k)
-  | 17 -> minute_vect (kI k)
-  | 18 -> second_vect (kI k)
-  | 19 -> time_vect (kI k)
-  | 15 -> datetime_vect (kF k)
+    Vect.symbol (!res)
+  | 12 -> Vect.timestamp (kJ k)
+  | 13 -> Vect.month (kI k)
+  | 14 -> Vect.date (kI k)
+  | 16 -> Vect.timespan (kJ k)
+  | 17 -> Vect.minute (kI k)
+  | 18 -> Vect.second (kI k)
+  | 19 -> Vect.time (kI k)
+  | 15 -> Vect.datetime (kF k)
   | _  -> invalid_arg "unpack_vector: not a vector"
 
 and unpack_list k =
@@ -747,7 +791,7 @@ external b9 : int -> k -> (k, string) result = "b9_stub"
 external d9 : k -> (k, string) result = "d9_stub"
 
 let of_bigstring s =
-  d9 (pack (Vector (char_vect s)))
+  d9 (pack (Vector (Vect.char s)))
 
 let of_bigstring_exn s =
   match (of_bigstring s) with

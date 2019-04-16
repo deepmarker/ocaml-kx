@@ -15,7 +15,7 @@ let rec pp ppf = function
     Format.pp_print_char ppf a
   | Atom (Long a) ->
     Format.fprintf ppf "%Ld" a
-  | Atom (Date { y ; m ; d }) ->
+  | Atom (Date (y, m, d)) ->
     Format.fprintf ppf "%d%d%d" y m d
   | Atom _ ->
     Format.pp_print_string ppf "Atom <abstract>"
@@ -68,28 +68,28 @@ let pack_unpack_atom () =
   pack_unpack "symbol" (Atom (Symbol "")) ;
   pack_unpack "timestamp" (Atom (Timestamp Ptime.epoch)) ;
   pack_unpack "month" (Atom (Month 0)) ;
-  pack_unpack "date" (Atom (Date { y = 2017 ; m = 10 ; d = 26 })) ;
+  pack_unpack "date" (Atom (Date (2017, 10, 6))) ;
   pack_unpack "timespan" (Atom zero_timespan) ;
-  pack_unpack "minute" (Atom (Minute (0, 0))) ;
-  pack_unpack "second" (Atom (Second (0, 0, 0))) ;
+  pack_unpack "minute" (Atom (Minute ((0, 0, 0), 0))) ;
+  pack_unpack "second" (Atom (Second ((0, 0, 0),0))) ;
   pack_unpack "time" (Atom zero_timespan) ;
   pack_unpack "datetime" (Atom (Datetime 0.)) ;
   ()
 
 let pack_unpack_vect () =
-  pack_unpack "vect bool" (vector (bool_vect (bool_arr [|true; false|]))) ;
-  pack_unpack "vect guid" (vector (guid_vect (guid_arr [Uuidm.nil ; Uuidm.nil]))) ;
-  pack_unpack "vect byte" (vector (byte_vect (uint8_arr [|0;1;2|]))) ;
-  pack_unpack "vect short" (vector (short_vect (int16_arr [|0;1;2|]))) ;
-  pack_unpack "vect int" (vector (int_vect (int32_arr [|0l;1l;2l;Int32.max_int;Int32.min_int|]))) ;
-  pack_unpack "vect long" (vector (long_vect (int64_arr [|0L;1L;2L;Int64.max_int;Int64.min_int|]))) ;
-  pack_unpack "vect real" (vector (real_vect (float32_arr [|0.;1.;nan;infinity;neg_infinity|]))) ;
-  pack_unpack "vect float" (vector (float_vect (float64_arr [|0.;1.;nan;infinity;neg_infinity|]))) ;
-  pack_unpack "vect char" (vector (char_vect (Bigstring.of_string "bleh"))) ;
-  pack_unpack "vect symbol" (vector (symbol_vect ["machin"; "truc"; "chouette"])) ;
-  pack_unpack "vect timestamp" (vector (timestamp_vect (timestamp_arr [Ptime.epoch; Ptime.epoch]))) ;
-  pack_unpack "vect month" (vector (month_vect (int32_arr [|0l;1l;2l|]))) ;
-  pack_unpack "vect date" (vector (date_vect (int32_arr [|0l;1l;2l|]))) ;
+  pack_unpack "vect bool" (VectArray.bool [|true; false|]) ;
+  pack_unpack "vect guid" (VectArray.guid [|Uuidm.nil ; Uuidm.nil|]) ;
+  pack_unpack "vect byte" (VectArray.byte [|0;1;2|]) ;
+  pack_unpack "vect short" (VectArray.short [|0;1;2|]) ;
+  pack_unpack "vect int" (VectArray.int [|0l;1l;2l;Int32.max_int;Int32.min_int|]) ;
+  pack_unpack "vect long" (VectArray.long [|0L;1L;2L;Int64.max_int;Int64.min_int|]) ;
+  pack_unpack "vect real" (VectArray.real [|0.;1.;nan;infinity;neg_infinity|]) ;
+  pack_unpack "vect float" (VectArray.float [|0.;1.;nan;infinity;neg_infinity|]) ;
+  pack_unpack "vect char" (VectArray.char "bleh") ;
+  pack_unpack "vect symbol" (VectArray.symbol [|"machin"; "truc"; "chouette"|]) ;
+  pack_unpack "vect timestamp" (VectArray.timestamp [|Ptime.epoch; Ptime.epoch|]) ;
+  pack_unpack "vect month" (VectArray.month [|0;1;2|]) ;
+  pack_unpack "vect date" (VectArray.date [|(2019, 1, 1);(2019, 1, 2)|]) ;
   (* pack_unpack "vect timespan" (Atom zero_timespan) ;
    * pack_unpack "vect minute" (Atom (Minute (0, 0))) ;
    * pack_unpack "vect second" (Atom (Second (0, 0, 0))) ;
@@ -110,15 +110,15 @@ let test_server () =
   Kx.with_connection
     (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
     ~f:begin fun fd ->
-    let k = Kx.kn_sync fd "`getservices" [|pack (Kx.vector (symbol_vect ["tickerplant"]));
+    let k = Kx.kn_sync fd "`getservices" [|pack (Kx.vector (Vect.symbol ["tickerplant"]));
                                            Kx.kfalse|] in
     Kx.unpack k
   end |> function
   | Ok (Table (k, v)) ->
-    check t "cols" (Vector (symbol_vect ["procname"; "proctype"; "hpup"; "attributes"])) k ;
-    check t "vals" (List [Vector (symbol_vect []);
-                          Vector (symbol_vect []);
-                          Vector (symbol_vect []);
+    check t "cols"       (Vector (Vect.symbol ["procname"; "proctype"; "hpup"; "attributes"])) k ;
+    check t "vals" (List [Vector (Vect.symbol []);
+                          Vector (Vect.symbol []);
+                          Vector (Vect.symbol []);
                           List []]) v ;
     ()
   | Ok _ -> assert false
