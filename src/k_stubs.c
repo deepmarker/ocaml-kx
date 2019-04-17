@@ -20,7 +20,9 @@ static int compare_K(value a, value b) {
     return (aa == bb ? 0 : (aa < bb ? -1 : 1));
 }
 
+#include <stdio.h>
 static void finalize_K(value k) {
+    fprintf(stderr, "%p %d refcount %d\n", K_val(k), K_val(k)->t, K_val(k)->r);
     r0(K_val(k));
 }
 
@@ -100,8 +102,7 @@ CAMLprim value kK_stub (value k, value i) {
 }
 
 CAMLprim value kK_set_stub (value k, value i, value e) {
-    /* TODO: check if it's ok GC-wise */
-    kK(K_val(k))[Long_val(i)] = K_val(e);
+    kK(K_val(k))[Int_val(i)] = r1(K_val(e));
     return Val_unit;
 }
 
@@ -113,15 +114,14 @@ CAMLprim value kS_stub (value k, value i) {
 }
 
 CAMLprim value kS_set_stub (value k, value i, value s) {
-    kS(K_val(k))[Long_val(i)] = ss(String_val(s));
+    kS(K_val(k))[Int_val(i)] = ss(String_val(s));
     return Val_unit;
 }
 
 CAMLprim value kG_stub (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
-    K n = r1(K_val(k));
-    K_val(k) = n;
+    r1(K_val(k));
     ret = caml_ba_alloc_dims(CAML_BA_UINT8 | CAML_BA_C_LAYOUT,
                              1, kG(K_val(k)), K_val(k)->n);
     CAMLreturn(ret);
@@ -130,8 +130,7 @@ CAMLprim value kG_stub (value k) {
 CAMLprim value kU_stub (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
-    K n = r1(K_val(k));
-    K_val(k) = n;
+    r1(K_val(k));
     ret = caml_ba_alloc_dims(CAML_BA_UINT8 | CAML_BA_C_LAYOUT,
                              1, kU(K_val(k)), K_val(k)->n*16);
     CAMLreturn(ret);
@@ -140,8 +139,7 @@ CAMLprim value kU_stub (value k) {
 CAMLprim value kH_stub (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
-    K n = r1(K_val(k));
-    K_val(k) = n;
+    r1(K_val(k));
     ret = caml_ba_alloc_dims(CAML_BA_SINT16 | CAML_BA_C_LAYOUT,
                              1, kH(K_val(k)), K_val(k)->n);
     CAMLreturn(ret);
@@ -150,8 +148,7 @@ CAMLprim value kH_stub (value k) {
 CAMLprim value kI_stub (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
-    K n = r1(K_val(k));
-    K_val(k) = n;
+    r1(K_val(k));
     ret = caml_ba_alloc_dims(CAML_BA_INT32 | CAML_BA_C_LAYOUT,
                              1, kI(K_val(k)), K_val(k)->n);
     CAMLreturn(ret);
@@ -160,8 +157,7 @@ CAMLprim value kI_stub (value k) {
 CAMLprim value kJ_stub (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
-    K n = r1(K_val(k));
-    K_val(k) = n;
+    r1(K_val(k));
     ret = caml_ba_alloc_dims(CAML_BA_INT64 | CAML_BA_C_LAYOUT,
                              1, kJ(K_val(k)), K_val(k)->n);
     CAMLreturn(ret);
@@ -170,8 +166,7 @@ CAMLprim value kJ_stub (value k) {
 CAMLprim value kE_stub (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
-    K n = r1(K_val(k));
-    K_val(k) = n;
+    r1(K_val(k));
     ret = caml_ba_alloc_dims(CAML_BA_FLOAT32 | CAML_BA_C_LAYOUT,
                              1, kE(K_val(k)), K_val(k)->n);
     CAMLreturn(ret);
@@ -180,8 +175,7 @@ CAMLprim value kE_stub (value k) {
 CAMLprim value kF_stub (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
-    K n = r1(K_val(k));
-    K_val(k) = n;
+    r1(K_val(k));
     ret = caml_ba_alloc_dims(CAML_BA_FLOAT64 | CAML_BA_C_LAYOUT,
                              1, kF(K_val(k)), K_val(k)->n);
     CAMLreturn(ret);
@@ -439,6 +433,7 @@ CAMLprim value b9_stub (value mode, value k) {
     CAMLparam2(mode, k);
     CAMLlocal3(ret, errmsg, kk);
     K x = ee(b9(Int_val(mode), K_val(k)));
+    assert(x->t == 4);
     if (xt == -128) {
         ret = caml_alloc(1, 1);
         errmsg = caml_copy_string(x->s?x->s:"");
@@ -519,8 +514,7 @@ CAMLprim value k0_sync_stub(value fd, value msg) {
 CAMLprim value k1_sync_stub(value fd, value msg, value a) {
     CAMLparam3(fd, msg, a);
     CAMLlocal1(ret);
-    K n = r1(K_val(a));
-    K_val(a) = n;
+    r1(K_val(a));
     K r = k(Int_val(fd), String_val(msg), K_val(a), (K)NULL);
     ret = caml_alloc_K(r);
     CAMLreturn(ret);
@@ -529,10 +523,8 @@ CAMLprim value k1_sync_stub(value fd, value msg, value a) {
 CAMLprim value k2_sync_stub(value fd, value msg, value a, value b) {
     CAMLparam4(fd, msg, a, b);
     CAMLlocal1(ret);
-    K na = r1(K_val(a));
-    K nb = r1(K_val(b));
-    K_val(a) = na;
-    K_val(b) = nb;
+    r1(K_val(a));
+    r1(K_val(b));
     K r = k(Int_val(fd), String_val(msg), K_val(a), K_val(b), (K)NULL);
     ret = caml_alloc_K(r);
     CAMLreturn(ret);
@@ -541,12 +533,9 @@ CAMLprim value k2_sync_stub(value fd, value msg, value a, value b) {
 CAMLprim value k3_sync_stub(value fd, value msg, value a, value b, value c) {
     CAMLparam5(fd, msg, a, b, c);
     CAMLlocal1(ret);
-    K na = r1(K_val(a));
-    K nb = r1(K_val(b));
-    K nc = r1(K_val(c));
-    K_val(a) = na;
-    K_val(b) = nb;
-    K_val(c) = nc;
+    r1(K_val(a));
+    r1(K_val(b));
+    r1(K_val(c));
     K r = k(Int_val(fd), String_val(msg), K_val(a), K_val(b), K_val(c), (K)NULL);
     ret = caml_alloc_K(r);
     CAMLreturn(ret);
@@ -556,8 +545,7 @@ CAMLprim value kn_stub(value fd, value msg, value a) {
     K r, n;
 
     for(int i=0;i<Wosize_val(a);i++) {
-        n = r1(K_val(Field(a, i)));
-        K_val(Field(a, i)) = n;
+        r1(K_val(Field(a, i)));
     }
 
     switch (Wosize_val(a)) {

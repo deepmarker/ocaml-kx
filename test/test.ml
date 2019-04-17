@@ -5,9 +5,10 @@ let t = testable Kx.pp Kx.equal
 
 let pack_unpack name v =
   let vv = pack v in
-  let vv_serialized = to_bigstring vv in
-  let vv_parsed = of_bigstring_exn vv_serialized in
-  let vv = unpack vv_parsed in
+  (* let vv_serialized = to_bigstring vv in
+   * let vv_parsed = of_bigstring_exn vv_serialized in
+   * let vv = unpack vv_parsed in *)
+  let vv = unpack vv in
   check t name v vv
 
 let pack_unpack_atom () =
@@ -34,7 +35,7 @@ let pack_unpack_atom () =
 let pack_unpack_vect () =
   pack_unpack "vect bool" (VectArray.bool [|true; false|]) ;
   pack_unpack "vect guid" (VectArray.guid [|Uuidm.nil ; Uuidm.nil|]) ;
-  pack_unpack "vect byte" (VectArray.byte [|0;1;2|]) ;
+  pack_unpack "vect byte" (VectArray.byte (Bigstring.of_string "\x00\x01\x02")) ;
   pack_unpack "vect short" (VectArray.short [|0;1;2|]) ;
   pack_unpack "vect int" (VectArray.int [|0l;1l;2l;Int32.max_int;Int32.min_int|]) ;
   pack_unpack "vect long" (VectArray.long [|0L;1L;2L;Int64.max_int;Int64.min_int|]) ;
@@ -53,11 +54,12 @@ let pack_unpack_vect () =
   ()
 
 let pack_unpack_list () =
-  pack_unpack "empty" (Kx.List []) ;
-  pack_unpack "simple" (Kx.List [Atom.int 0l; Atom.float 1.]) ;
-  pack_unpack "vect" (Kx.List [VectArray.short [|0;1;2|];
-                               VectArray.timestamp [|Ptime.epoch; Ptime.epoch|]]) ;
-  pack_unpack "vect guid" (Kx.List [VectArray.guid [|Uuidm.nil; Uuidm.nil|]]) ;
+  (* pack_unpack "empty" (Kx.List []) ; *)
+  pack_unpack "simple" (Kx.List [Atom.bool false]) ;
+  (* pack_unpack "simple" (Kx.List [Atom.int 0l; Atom.float 1.]) ;
+   * pack_unpack "vect" (Kx.List [VectArray.short [|0;1;2|];
+   *                              VectArray.timestamp [|Ptime.epoch; Ptime.epoch|]]) ;
+   * pack_unpack "vect guid" (Kx.List [VectArray.guid [|Uuidm.nil; Uuidm.nil|]]) ; *)
   ()
 
 let bindings () =
@@ -65,10 +67,13 @@ let bindings () =
   ()
 
 let test_pack_unpack () =
-  pack_unpack_atom () ;
-  pack_unpack_vect () ;
-  pack_unpack_list () ;
-  ()
+  for i = 0 to 4000 do
+    if i mod 5 = 0 then Gc.compact () ;
+    (* pack_unpack_atom () ;
+     * pack_unpack_vect () ; *)
+    pack_unpack_list () ;
+    ()
+  done
 
 let test_server () =
   Kx.with_connection
@@ -98,6 +103,7 @@ let tests_kx = [
  * ] *)
 
 let () =
+  Kx.initialize () ;
   run "q" [
     "kx", tests_kx ;
     (* "kx-async", tests_kx_async ; *)

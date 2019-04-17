@@ -64,7 +64,7 @@ let timestamp_arr ts =
 type _ kw =
   | Bool      : uint8_arr kw
   | Guid      : Bigstring.t kw
-  | Byte      : uint8_arr kw
+  | Byte      : Bigstring.t kw
   | Short     : int16_arr kw
   | Int       : int32_arr kw
   | Long      : int64_arr kw
@@ -153,6 +153,7 @@ let equal_vect (Vect (w1, a)) (Vect (w2, b)) =
     match w1 with
     | Guid -> Bigstring.equal a b
     | Char -> Bigstring.equal a b
+    | Byte -> Bigstring.equal a b
     | Real ->
       let len_a = Bigarray.Array1.dim a in
       let len_b = Bigarray.Array1.dim a in
@@ -282,7 +283,7 @@ external kS_set : k -> int -> string -> unit = "kS_set_stub"
 
 external kG_bool : k -> uint8_arr = "kG_stub"
 external kG_char : k -> Bigstring.t = "kG_stub"
-external kG : k -> uint8_arr = "kG_stub"
+(* external kG : k -> uint8_arr = "kG_stub" *)
 external kU : k -> Bigstring.t = "kU_stub"
 external kH : k -> int16_arr = "kH_stub"
 external kI : k -> int32_arr = "kI_stub"
@@ -300,10 +301,10 @@ let kG_char k =
   Gc.finalise_last (fun () -> r0 k) r ;
   r
 
-let kG k =
-  let r = kG k in
-  Gc.finalise_last (fun () -> r0 k) r ;
-  r
+(* let kG k =
+ *   let r = kG k in
+ *   Gc.finalise_last (fun () -> r0 k) r ;
+ *   r *)
 
 let kU k =
   let r = kU k in
@@ -485,7 +486,7 @@ module Atom = struct
   let timespan t = Atom (Timespan t)
 end
 
-let uint8_arr = Bigarray.(Array1.of_array int8_unsigned c_layout)
+(* let uint8_arr = Bigarray.(Array1.of_array int8_unsigned c_layout) *)
 let int16_arr = Bigarray.(Array1.of_array int16_signed c_layout)
 let int32_arr = Bigarray.(Array1.of_array int32 c_layout)
 let int64_arr = Bigarray.(Array1.of_array int64 c_layout)
@@ -508,7 +509,7 @@ let int_of_second ((hh, mm, ss), tz_offset) =
 module VectArray = struct
   let guid gs = Vector (Vect.guid (guid_arr gs))
   let bool bs =  Vector (Vect.bool (bool_arr bs))
-  let byte bs = Vector (Vect.byte (uint8_arr bs))
+  let byte bs = Vector (Vect.byte bs)
   let short bs = Vector (Vect.short (int16_arr bs))
   let int bs = Vector (Vect.int (int32_arr bs))
   let long bs = Vector (Vect.long (int64_arr bs))
@@ -562,8 +563,9 @@ and pack = function
   | Table (k, v) -> xT (xD (pack k) (pack v))
   | List ts ->
     let len = List.length ts in
+    let ks = List.map pack ts in
     let k = ktn 0 len in
-    List.iteri (fun i t -> kK_set k i (pack t)) ts ;
+    List.iteri (fun i t -> kK_set k i t) ks ;
     k
   | Vector v when vector_is bool v -> begin
       match get_vector bool v with
@@ -591,7 +593,7 @@ and pack = function
       | Some v ->
         let len = Bigarray.Array1.dim v in
         let k = ktn (int_of_kw byte) len in
-        let arr = kG k in
+        let arr = kG_char k in
         Bigarray.Array1.blit v arr ;
         k
     end
@@ -810,7 +812,7 @@ and unpack_vector k =
   match k_objtyp k with
   | 1  -> Vect.bool (kG_bool k)
   | 2  -> Vect.guid (kU k)
-  | 4  -> Vect.byte (kG k)
+  | 4  -> Vect.byte (kG_char k)
   | 5  -> Vect.short (kH k)
   | 6  -> Vect.int (kI k)
   | 7  -> Vect.long (kJ k)
@@ -865,20 +867,20 @@ external b9 : int -> k -> (k, string) result = "b9_stub"
 external d9 : k -> (k, string) result = "d9_stub"
 
 let of_bigstring s =
-  d9 (pack (Vector (Vect.char s)))
+  d9 (pack (Vector (Vect.byte s)))
 
 let of_bigstring_exn s =
   match (of_bigstring s) with
   | Error msg -> invalid_arg msg
   | Ok s -> s
 
-let to_bigstring ?(mode = ~-1) k =
+let to_bigstring ?(mode = -1) k =
   match b9 mode k with
   | Error e -> failwith e
   | Ok r ->
     match get_vector byte (unpack_vector r) with
     | None -> assert false
-    | Some bs -> (Obj.magic bs : Bigstring.t)
+    | Some bs -> bs
 
 external khp : string -> int -> int = "khp_stub"
 external khpu : string -> int -> string -> int = "khpu_stub"
@@ -916,6 +918,8 @@ let wrap_result f =
   | i -> failwith ("Unknown q error " ^ string_of_int i)
 
 let up u p = u ^ ":" ^ p
+
+let initialize () = ignore (khp "" ~-1)
 
 let connect ?timeout ?capability url =
   let host = Uri.host_with_default ~default:"localhost" url in

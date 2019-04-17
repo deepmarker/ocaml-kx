@@ -57,7 +57,7 @@ type _ kw
 
 val bool      : uint8_arr kw
 val guid      : Bigstring.t kw
-val byte      : uint8_arr kw
+val byte      : Bigstring.t kw
 val short     : int16_arr kw
 val int       : int32_arr kw
 val long      : int64_arr kw
@@ -85,7 +85,7 @@ type timespan = { time: Ptime.time ; ns: int }
 module Vect     : sig
   val bool      : uint8_arr    -> vector
   val guid      : Bigstring.t  -> vector
-  val byte      : uint8_arr    -> vector
+  val byte      : Bigstring.t  -> vector
   val short     : int16_arr    -> vector
   val int       : int32_arr    -> vector
   val long      : int64_arr    -> vector
@@ -156,7 +156,7 @@ end
 module VectArray : sig
   val bool      : bool array       -> t
   val guid      : Uuidm.t array    -> t
-  val byte      : int array        -> t
+  val byte      : Bigstring.t      -> t
   val short     : int array        -> t
   val int       : int32 array      -> t
   val long      : int64 array      -> t
@@ -215,6 +215,8 @@ val pp_connection_error :
 type capability =
   | OneTBLimit
   | UseTLS
+
+val initialize : unit -> unit
 
 val connect :
   ?timeout:Ptime.span ->
