@@ -3,205 +3,78 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
+type time = { time : Ptime.time ; ms : int }
+type timespan = { time : Ptime.time ; ns : int }
+
 type k
-(** Type of K objects in memory *)
+type _ typ
+type _ w
 
-val k_objtyp : k -> int
-(** Type of K object *)
+val bool      : bool typ
+val guid      : Uuidm.t typ
+val byte      : char typ
+val short     : int typ
+val int       : int32 typ
+val long      : int64 typ
+val real      : float typ
+val float     : float typ
+val char      : char typ
+val sym       : string typ
+val timestamp : Ptime.t typ
+val month     : Ptime.date typ
+val date      : Ptime.date typ
+val timespan  : timespan typ
+val minute    : Ptime.time typ
+val second    : Ptime.time typ
+val time      : time typ
 
-val k_objattrs : k -> int
-(** Attributes of K object (0 = no attributes) *)
+val a : 'a typ -> 'a w
+val v : 'a typ -> 'a array w
+val s : char typ -> string w
 
-val k_refcount : k -> int
-(** Reference count of K object *)
+val list : k array w
+val t1 : 'a w -> 'a w
+val t2 : 'a w -> 'b w -> ('a * 'b) w
+val t3 : 'a w -> 'b w -> 'c w -> ('a * 'b * 'c) w
+val t4 : 'a w -> 'b w -> 'c w -> 'd w -> ('a * 'b * 'c * 'd) w
+val t5 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> ('a * 'b * 'c * 'd * 'e) w
+val t6 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> ('a * 'b * 'c * 'd * 'e * 'f) w
+val t7 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g) w
+val t8 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) w
+val t9 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> 'i w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) w
+val t10 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> 'i w -> 'j w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j) w
 
-val k_length : k -> int64
-(** Number of elements in a list *)
+val merge_tups : 'a w -> 'b w -> ('a * 'b) w
 
-val k_g : k -> int
-val k_h : k -> int
-val k_i : k -> int32
-val k_j : k -> int64
-val k_e : k -> float
-val k_f : k -> float
-val k_s : k -> string
+val dict : 'a w -> 'b w -> ('a * 'b) w
+val table : 'a w -> 'b w -> ('a * 'b) w
 
-val dj : int -> int
-val ymd : int -> int -> int -> int
+val conv : ('a -> 'b) -> ('b -> 'a) -> 'b w -> 'a w
 
-type ('a, 'b) storage = ('a, 'b, Bigarray.c_layout) Bigarray.Array1.t
+type t
 
-type uint8_arr   = (int, Bigarray.int8_unsigned_elt) storage
-type int16_arr   = (int, Bigarray.int16_signed_elt) storage
-type int32_arr   = (int32, Bigarray.int32_elt) storage
-type int64_arr   = (int64, Bigarray.int64_elt) storage
-type float32_arr = (float, Bigarray.float32_elt) storage
-type float64_arr = (float, Bigarray.float64_elt) storage
-
-(* val bool_arr : bool array -> uint8_arr
- * val uint8_arr : int array -> uint8_arr
- * val int16_arr : int array -> int16_arr
- * val int32_arr : int32 array -> int32_arr
- * val int64_arr : int64 array -> int64_arr
- * val float32_arr : float array -> float32_arr
- * val float64_arr : float array -> float64_arr *)
-
-(* val timestamp_arr : Ptime.t array -> int64_arr *)
-(* val guid_arr : Uuidm.t list -> Bigstring.t *)
-val guids_of_arr : Bigstring.t -> Uuidm.t list
-
-type _ kw
-(** Type witness for k types. *)
-
-(** Values for k-types type witnesses *)
-
-val bool      : uint8_arr kw
-val guid      : Bigstring.t kw
-val byte      : Bigstring.t kw
-val short     : int16_arr kw
-val int       : int32_arr kw
-val long      : int64_arr kw
-val real      : float32_arr kw
-val float     : float64_arr kw
-val char      : Bigstring.t kw
-val symbol    : string list kw
-val timestamp : int64_arr kw
-val month     : int32_arr kw
-val date      : int32_arr kw
-val timespan  : int64_arr kw
-val minute    : int32_arr kw
-val second    : int32_arr kw
-val time      : int32_arr kw
-val datetime  : float64_arr kw
-
-type vector
-(** Type of a vector. *)
-
-type time = { time: Ptime.time ; ms: int }
-type timespan = { time: Ptime.time ; ns: int }
-
-(** Vector constructors *)
-
-module Vect     : sig
-  val bool      : uint8_arr    -> vector
-  val guid      : Bigstring.t  -> vector
-  val byte      : Bigstring.t  -> vector
-  val short     : int16_arr    -> vector
-  val int       : int32_arr    -> vector
-  val long      : int64_arr    -> vector
-  val real      : float32_arr  -> vector
-  val float     : float64_arr  -> vector
-  val char      : Bigstring.t  -> vector
-  val symbol    : string list  -> vector
-  val timestamp : int64_arr    -> vector
-  val month     : int32_arr    -> vector
-  val date      : int32_arr    -> vector
-  val time      : int32_arr    -> vector
-  val timespan  : int64_arr    -> vector
-  val minute    : int32_arr    -> vector
-  val second    : int32_arr    -> vector
-  val datetime  : float64_arr  -> vector
-end
-
-val get_vector : 'a kw -> vector -> 'a option
-(** [get_vector typ v] is the underlying storage of the vector
-    value. *)
-
-type t =
-  | Atom      of atom
-  | Vector    of vector
-  | List      of t list
-  | Dict      of t * t
-  | Table     of t * t
-and atom =
-  | Bool      of bool
-  | Guid      of Uuidm.t
-  | Byte      of int
-  | Short     of int
-  | Int       of int32
-  | Long      of int64
-  | Real      of float
-  | Float     of float
-  | Char      of char
-  | Symbol    of string
-  | Timestamp of Ptime.t
-  | Month     of int
-  | Date      of Ptime.date
-  | Time      of time
-  | Timespan  of timespan
-  | Minute    of Ptime.time
-  | Second    of Ptime.time
-  | Datetime  of float
-
-module Atom     : sig
-  val bool      : bool       -> t
-  val guid      : Uuidm.t    -> t
-  val byte      : int        -> t
-  val short     : int        -> t
-  val int       : int32      -> t
-  val long      : int64      -> t
-  val real      : float      -> t
-  val float     : float      -> t
-  val char      : char       -> t
-  val symbol    : string     -> t
-  val timestamp : Ptime.t    -> t
-  val month     : int        -> t
-  val date      : Ptime.date -> t
-  val minute    : Ptime.time -> t
-  val second    : Ptime.time -> t
-  val time      : time       -> t
-  val timespan  : timespan   -> t
-end
-
-module VectArray : sig
-  val bool      : bool array       -> t
-  val guid      : Uuidm.t array    -> t
-  val byte      : Bigstring.t      -> t
-  val short     : int array        -> t
-  val int       : int32 array      -> t
-  val long      : int64 array      -> t
-  val real      : float array      -> t
-  val float     : float array      -> t
-  val char      : string           -> t
-  val symbol    : string array     -> t
-  val timestamp : Ptime.t array    -> t
-  val month     : int array        -> t
-  val date      : Ptime.date array -> t
-  val time      : time array       -> t
-  val timespan  : timespan array   -> t
-  val minute    : Ptime.time array -> t
-  val second    : Ptime.time array -> t
-  val datetime  : float array      -> t
-end
-
-val equal : t -> t -> bool
 val pp : Format.formatter -> t -> unit
 
-val zero_timespan : atom
-val create_timespan :
-  ?tz_offset:int -> hh:int -> mm:int ->
-  ss:int -> ns:int -> unit -> atom
+val equal_typ : t -> t -> bool
+(** [equal_typ a b] is [true] iff [a] is the same q type as [b]. *)
 
-val atom : atom -> t
-val vector : vector -> t
-val list : t list -> t
-val dict : t -> t -> t
-val table : t -> t -> t
+val equal : t -> t -> bool
+(** [equal_typ a b] is [true] iff [a] is the same q type and value as [b]. *)
 
-val ktrue : k
-val kfalse : k
+val construct : 'a w -> 'a -> t
+val destruct_k : 'a w -> k -> ('a, string) result
+val destruct : 'a w -> t -> ('a, string) result
 
-val pack : t -> k
-(** [pack t] packs [t] into a K object. *)
+val of_string : 'a w -> string -> (t, string) result
+val of_string_exn : 'a w -> string -> t
+val to_string : ?mode:int -> t -> string
 
-val unpack : k -> t
-(** [unpack k] is the OCaml representation of [k], a K object. *)
+(** Connection to q server *)
 
-val of_bigstring : Bigstring.t -> (k, string) result
-val of_bigstring_exn : Bigstring.t -> k
-val to_bigstring : ?mode:int -> k -> Bigstring.t
-
-(**/*)
+val init : unit -> unit
+(** [init ()] must be called before creating any q
+    value. Initialization is also done automatically when connecting to
+    a server. *)
 
 type connection_error =
   | Authentication
@@ -216,8 +89,6 @@ type capability =
   | OneTBLimit
   | UseTLS
 
-val initialize : unit -> unit
-
 val connect :
   ?timeout:Ptime.span ->
   ?capability:capability -> Uri.t ->
@@ -231,19 +102,24 @@ val with_connection :
 
 val kclose : Unix.file_descr -> unit
 
-val kread : Unix.file_descr -> k
+val kread : Unix.file_descr -> 'a w -> ('a, string) result
 
 val k0 : Unix.file_descr -> string -> unit
-val k1 : Unix.file_descr -> string -> k -> unit
-val k2 : Unix.file_descr -> string -> k -> k -> unit
-val k3 : Unix.file_descr -> string -> k -> k -> k -> unit
-val kn : Unix.file_descr -> string -> k array -> unit
+val k1 : Unix.file_descr -> string -> t -> unit
+val k2 : Unix.file_descr -> string -> t -> t -> unit
+val k3 : Unix.file_descr -> string -> t -> t -> t -> unit
+val kn : Unix.file_descr -> string -> t array -> unit
 
-val k0_sync : Unix.file_descr -> string -> k
-val k1_sync : Unix.file_descr -> string -> k -> k
-val k2_sync : Unix.file_descr -> string -> k -> k -> k
-val k3_sync : Unix.file_descr -> string -> k -> k -> k -> k
-val kn_sync : Unix.file_descr -> string -> k array -> k
+val k0_sync : Unix.file_descr -> string -> 'a w -> ('a, string) result
+val k1_sync : Unix.file_descr -> string -> 'a w -> t -> ('a, string) result
+val k2_sync : Unix.file_descr -> string -> 'a w -> t -> t -> ('a, string) result
+val k3_sync : Unix.file_descr -> string -> 'a w -> t -> t -> t -> ('a, string) result
+val kn_sync : Unix.file_descr -> string -> 'a w -> t array -> ('a, string) result
+
+(**/*)
+
+val int_of_month : Ptime.date -> int
+val month_of_int : int -> Ptime.date
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
