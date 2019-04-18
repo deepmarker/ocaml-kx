@@ -4,10 +4,12 @@ open Alcotest
 let t = testable Kx.pp Kx.equal
 
 let pack_unpack name v =
+  Printf.printf "pack\n%!" ;
   let vv = pack v in
   (* let vv_serialized = to_bigstring vv in
    * let vv_parsed = of_bigstring_exn vv_serialized in
    * let vv = unpack vv_parsed in *)
+  Printf.printf "unpack\n%!" ;
   let vv = unpack vv in
   check t name v vv
 
@@ -71,7 +73,7 @@ let test_pack_unpack () =
     if i mod 5 = 0 then Gc.compact () ;
     (* pack_unpack_atom () ;
      * pack_unpack_vect () ; *)
-    pack_unpack_list () ;
+    (* pack_unpack_list () ; *)
     ()
   done
 

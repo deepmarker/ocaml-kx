@@ -38,16 +38,6 @@ type int64_arr   = (int64, Bigarray.int64_elt) storage
 type float32_arr = (float, Bigarray.float32_elt) storage
 type float64_arr = (float, Bigarray.float64_elt) storage
 
-(* val bool_arr : bool array -> uint8_arr
- * val uint8_arr : int array -> uint8_arr
- * val int16_arr : int array -> int16_arr
- * val int32_arr : int32 array -> int32_arr
- * val int64_arr : int64 array -> int64_arr
- * val float32_arr : float array -> float32_arr
- * val float64_arr : float array -> float64_arr *)
-
-(* val timestamp_arr : Ptime.t array -> int64_arr *)
-(* val guid_arr : Uuidm.t list -> Bigstring.t *)
 val guids_of_arr : Bigstring.t -> Uuidm.t list
 
 type _ kw
@@ -113,6 +103,7 @@ type t =
   | List      of t list
   | Dict      of t * t
   | Table     of t * t
+
 and atom =
   | Bool      of bool
   | Guid      of Uuidm.t

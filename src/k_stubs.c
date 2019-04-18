@@ -22,7 +22,7 @@ static int compare_K(value a, value b) {
 
 #include <stdio.h>
 static void finalize_K(value k) {
-    fprintf(stderr, "%p %d refcount %d\n", K_val(k), K_val(k)->t, K_val(k)->r);
+    fprintf(stderr, "%p %d %d\n", K_val(k), K_val(k)->t, K_val(k)->r);
     r0(K_val(k));
 }
 
