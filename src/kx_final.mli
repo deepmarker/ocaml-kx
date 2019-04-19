@@ -1,24 +1,37 @@
-type ('ml, 'c) bv =
-  ('c, 'ml, Bigarray.c_layout) Bigarray.Array1.t
+type time = { time : Ptime.time ; ms : int }
+type timespan = { time : Ptime.time ; ns : int }
 
-type 'a atom
+module W : sig
+  type _ t
 
-type ('ml, 'c) vect
+  val bool : bool t
+  val guid : Uuidm.t t
+  val byte : char t
+  val short : int t
+  val int : int32 t
+  val long : int64 t
+  val real : float t
+  val float : float t
+  val char : char t
+  val sym : string t
+  val timestamp : Ptime.t t
+  val month : Ptime.date t
+  val date : Ptime.date t
+  val timespan : timespan t
+  val minute : Ptime.time t
+  val second : Ptime.time t
+  val time : time t
 
-type 'a list
-type ('a, 'b) dict
-type ('a, 'b) table
+  val nil : unit t
+  val cons : 'a t -> 'b t -> ('a * 'b) t
+  val dict : 'a t -> 'b t -> ('a * 'b) t
+  val table : 'a t -> 'b t -> ('a * 'b) t
 
-val bool : bool -> bool atom
+  val conv : ('a -> 'b t) -> ('b t -> 'a) -> 'a -> 'b t
+end
 
-val bool_vect :
-  (int, Bigarray.int8_unsigned_elt) bv ->
-  (int, Bigarray.int8_unsigned_elt) vect
+type k
+type _ t
 
-val list0 : unit list
-val list1 : 'a -> 'a list
-val list2 : 'a -> 'b -> ('a * 'b) list
-val list3 : 'a -> 'b -> 'a -> ('a * 'b * 'c) list
-
-val dict : 'a -> 'b -> ('a, 'b) dict
-val table : 'a -> 'b -> ('a, 'b) table
+val construct : 'a W.t -> 'a -> 'a t
+val destruct : 'a W.t -> k -> 'a option
