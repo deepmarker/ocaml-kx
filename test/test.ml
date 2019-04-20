@@ -1,53 +1,55 @@
+module Kx = Kx_final
 open Kx
 open Alcotest
 
-let t = testable Kx.pp Kx.equal
-
-let pack_unpack name v =
-  Printf.printf "pack\n%!" ;
-  let vv = pack v in
+let pack_unpack
+  : type a. string -> a W.t -> a -> unit = fun name w a ->
+  let v = construct w a in
   (* let vv_serialized = to_bigstring vv in
    * let vv_parsed = of_bigstring_exn vv_serialized in
    * let vv = unpack vv_parsed in *)
-  Printf.printf "unpack\n%!" ;
-  let vv = unpack vv in
-  check t name v vv
+  match destruct w (k v) with
+  | None -> failwith "pack_unpack"
+  | Some vv ->
+    let vvv = construct w vv in
+    check (testable Kx.pp Kx.equal) name v vvv
 
 let pack_unpack_atom () =
-  pack_unpack "bool" (Atom (Bool true)) ;
-  pack_unpack "guid" (Atom (Guid Uuidm.nil)) ;
-  pack_unpack "byte" (Atom (Byte 0)) ;
-  pack_unpack "short" (Atom (Short 0)) ;
-  pack_unpack "int" (Atom (Int 0l)) ;
-  pack_unpack "long" (Atom (Long 0L)) ;
-  pack_unpack "real" (Atom (Real 0.)) ;
-  pack_unpack "float" (Atom (Float 0.)) ;
-  pack_unpack "char" (Atom (Char '\x00')) ;
-  pack_unpack "symbol" (Atom (Symbol "")) ;
-  pack_unpack "timestamp" (Atom (Timestamp Ptime.epoch)) ;
-  pack_unpack "month" (Atom (Month 0)) ;
-  pack_unpack "date" (Atom (Date (2017, 10, 6))) ;
-  pack_unpack "timespan" (Atom zero_timespan) ;
-  pack_unpack "minute" (Atom (Minute ((0, 0, 0), 0))) ;
-  pack_unpack "second" (Atom (Second ((0, 0, 0),0))) ;
-  pack_unpack "time" (Atom zero_timespan) ;
-  pack_unpack "datetime" (Atom (Datetime 0.)) ;
+  let open W in
+  pack_unpack "bool" (atom bool) true ;
+  pack_unpack "guid" (atom guid) Uuidm.nil ;
+  pack_unpack "byte" (atom byte) '\x00' ;
+  pack_unpack "short" (atom short) 0 ;
+  pack_unpack "int" (atom int) 0l ;
+  pack_unpack "long" (atom long) 0L ;
+  pack_unpack "real" (atom real) 0. ;
+  pack_unpack "float" (atom float) 0. ;
+  pack_unpack "char" (atom char) '\x00' ;
+  pack_unpack "symbol" (atom sym) "" ;
+  pack_unpack "timestamp" (atom timestamp) Ptime.epoch ;
+  pack_unpack "month" (atom month) (2018, 04, 0) ;
+  pack_unpack "date" (atom date) (2017, 10, 6) ;
+  pack_unpack "timespan" (atom timespan) { time = (0, 0, 0), 0 ; ns = 0 } ;
+  pack_unpack "minute" (atom minute) ((0, 0, 0), 0) ;
+  pack_unpack "second" (atom second) ((0, 0, 0), 0) ;
+  pack_unpack "time" (atom time) { time = ((0, 0, 0), 0) ; ms = 0 };
   ()
 
 let pack_unpack_vect () =
-  pack_unpack "vect bool" (VectArray.bool [|true; false|]) ;
-  pack_unpack "vect guid" (VectArray.guid [|Uuidm.nil ; Uuidm.nil|]) ;
-  pack_unpack "vect byte" (VectArray.byte (Bigstring.of_string "\x00\x01\x02")) ;
-  pack_unpack "vect short" (VectArray.short [|0;1;2|]) ;
-  pack_unpack "vect int" (VectArray.int [|0l;1l;2l;Int32.max_int;Int32.min_int|]) ;
-  pack_unpack "vect long" (VectArray.long [|0L;1L;2L;Int64.max_int;Int64.min_int|]) ;
-  pack_unpack "vect real" (VectArray.real [|0.;1.;nan;infinity;neg_infinity|]) ;
-  pack_unpack "vect float" (VectArray.float [|0.;1.;nan;infinity;neg_infinity|]) ;
-  pack_unpack "vect char" (VectArray.char "bleh") ;
-  pack_unpack "vect symbol" (VectArray.symbol [|"machin"; "truc"; "chouette"|]) ;
-  pack_unpack "vect timestamp" (VectArray.timestamp [|Ptime.epoch; Ptime.epoch|]) ;
-  pack_unpack "vect month" (VectArray.month [|0;1;2|]) ;
-  pack_unpack "vect date" (VectArray.date [|(2019, 1, 1);(2019, 1, 2)|]) ;
+  let open W in
+  pack_unpack "vect bool" (vect bool) [|true; false|] ;
+  pack_unpack "vect guid" (vect guid) [|Uuidm.nil; Uuidm.nil|] ;
+  pack_unpack "vect byte" (string byte) "\x00\x01\x02" ;
+  pack_unpack "vect short" (vect short) [|0;1;2|] ;
+  pack_unpack "vect int" (vect int) [|0l;1l;2l;Int32.max_int;Int32.min_int|] ;
+  pack_unpack "vect long" (vect long) [|0L;1L;2L;Int64.max_int;Int64.min_int|] ;
+  pack_unpack "vect real" (vect real) [|0.;1.;nan;infinity;neg_infinity|] ;
+  pack_unpack "vect float" (vect float) [|0.;1.;nan;infinity;neg_infinity|] ;
+  pack_unpack "vect char" (string char) "bleh" ;
+  pack_unpack "vect symbol" (vect sym) [|"machin"; "truc"; "chouette"|] ;
+  pack_unpack "vect timestamp" (vect timestamp) [|Ptime.epoch; Ptime.epoch|] ;
+  pack_unpack "vect month" (vect month) [|2019, 1, 0 ; 2019, 2, 0|] ;
+  pack_unpack "vect date" (vect date) [|(2019, 1, 1);(2019, 1, 2)|] ;
   (* pack_unpack "vect timespan" (Atom zero_timespan) ;
    * pack_unpack "vect minute" (Atom (Minute (0, 0))) ;
    * pack_unpack "vect second" (Atom (Second (0, 0, 0))) ;
@@ -56,47 +58,48 @@ let pack_unpack_vect () =
   ()
 
 let pack_unpack_list () =
+  let open W in
   (* pack_unpack "empty" (Kx.List []) ; *)
-  pack_unpack "simple" (Kx.List [Atom.bool false]) ;
+  pack_unpack "simple" (cons (atom bool) nil) (true, ()) ;
   (* pack_unpack "simple" (Kx.List [Atom.int 0l; Atom.float 1.]) ;
    * pack_unpack "vect" (Kx.List [VectArray.short [|0;1;2|];
    *                              VectArray.timestamp [|Ptime.epoch; Ptime.epoch|]]) ;
    * pack_unpack "vect guid" (Kx.List [VectArray.guid [|Uuidm.nil; Uuidm.nil|]]) ; *)
   ()
 
-let bindings () =
-  check int "dj 0" 20000101 (dj 0) ;
-  ()
+(* let bindings () =
+ *   check int "dj 0" 20000101 (dj 0) ;
+ *   () *)
 
 let test_pack_unpack () =
-  for i = 0 to 4000 do
-    if i mod 5 = 0 then Gc.compact () ;
-    (* pack_unpack_atom () ;
-     * pack_unpack_vect () ; *)
-    (* pack_unpack_list () ; *)
+  for _ = 0 to 1000 do
+    pack_unpack_atom () ;
+    pack_unpack_vect () ;
+    (* if i mod 5 = 0 then Gc.compact () ; *)
+    pack_unpack_list () ;
     ()
   done
 
-let test_server () =
-  Kx.with_connection
-    (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
-    ~f:begin fun fd ->
-    let k = Kx.kn_sync fd "`getservices" [|pack (Kx.vector (Vect.symbol ["tickerplant"]));
-                                           Kx.kfalse|] in
-    Kx.unpack k
-  end |> function
-  | Ok (Table (k, v)) ->
-    check t "cols"       (Vector (Vect.symbol ["procname"; "proctype"; "hpup"; "attributes"])) k ;
-    check t "vals" (List [Vector (Vect.symbol []);
-                          Vector (Vect.symbol []);
-                          Vector (Vect.symbol []);
-                          List []]) v ;
-    ()
-  | Ok _ -> assert false
-  | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg)
+(* let test_server () =
+ *   Kx.with_connection
+ *     (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
+ *     ~f:begin fun fd ->
+ *     let k = Kx.kn_sync fd "`getservices" [|pack (Kx.vector (Vect.symbol ["tickerplant"]));
+ *                                            Kx.kfalse|] in
+ *     Kx.unpack k
+ *   end |> function
+ *   | Ok (Table (k, v)) ->
+ *     check t "cols"       (Vector (Vect.symbol ["procname"; "proctype"; "hpup"; "attributes"])) k ;
+ *     check t "vals" (List [Vector (Vect.symbol []);
+ *                           Vector (Vect.symbol []);
+ *                           Vector (Vect.symbol []);
+ *                           List []]) v ;
+ *     ()
+ *   | Ok _ -> assert false
+ *   | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg) *)
 
 let tests_kx = [
-  test_case "bindings" `Quick bindings ;
+  (* test_case "bindings" `Quick bindings ; *)
   test_case "pack_unpack" `Quick test_pack_unpack ;
   (* test_case "server" `Quick test_server ; *)
 ]
@@ -105,7 +108,7 @@ let tests_kx = [
  * ] *)
 
 let () =
-  Kx.initialize () ;
+  Kx.init () ;
   run "q" [
     "kx", tests_kx ;
     (* "kx-async", tests_kx_async ; *)

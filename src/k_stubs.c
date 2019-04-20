@@ -22,7 +22,7 @@ static int compare_K(value a, value b) {
 
 #include <stdio.h>
 static void finalize_K(value k) {
-    fprintf(stderr, "%p %d %d\n", K_val(k), K_val(k)->t, K_val(k)->r);
+    /* fprintf(stderr, "%p %d %d\n", K_val(k), K_val(k)->t, K_val(k)->r); */
     r0(K_val(k));
 }
 
@@ -44,9 +44,11 @@ static value caml_alloc_K (K a) {
 CAMLprim value k_objtyp (value k) { return Val_int(K_val(k)->t); }
 CAMLprim value k_objattrs (value k) { return Val_int(K_val(k)->u); }
 CAMLprim value k_refcount (value k) { return Val_int(K_val(k)->r); }
-CAMLprim value k_length (value k) { return caml_copy_int64(K_val(k)->n); }
+CAMLprim value k_length (value k) { return Val_int(K_val(k)->n); }
+CAMLprim value k_length64 (value k) { return caml_copy_int64(K_val(k)->n); }
 CAMLprim value k_g (value k) { return Val_int(K_val(k)->g); }
 CAMLprim value k_h (value k) { return Val_int(K_val(k)->h); }
+CAMLprim value k_i_int (value k) { return Val_int(K_val(k)->i); }
 CAMLprim value k_i (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
@@ -96,7 +98,7 @@ CAMLprim value k_u (value k) {
 CAMLprim value kK_stub (value k, value i) {
     CAMLparam2(k, i);
     CAMLlocal1(ret);
-    ret = caml_alloc_K(kK(K_val(k))[Long_val(i)]);
+    ret = caml_alloc_K(kK(r1(K_val(k)))[Long_val(i)]);
     CAMLreturn(ret);
 }
 
@@ -138,6 +140,14 @@ CAMLprim value kH_stub (value k) {
     CAMLlocal1(ret);
     ret = caml_ba_alloc_dims(CAML_BA_SINT16 | CAML_BA_C_LAYOUT,
                              1, kH(K_val(k)), K_val(k)->n);
+    CAMLreturn(ret);
+}
+
+CAMLprim value kI_int_stub (value k) {
+    CAMLparam1(k);
+    CAMLlocal1(ret);
+    ret = caml_ba_alloc_dims(CAML_BA_CAML_INT | CAML_BA_C_LAYOUT,
+                             1, kI(K_val(k)), K_val(k)->n);
     CAMLreturn(ret);
 }
 
