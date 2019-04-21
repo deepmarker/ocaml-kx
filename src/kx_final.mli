@@ -22,17 +22,22 @@ val minute    : Ptime.time typ
 val second    : Ptime.time typ
 val time      : time typ
 
-val atom : 'a typ -> 'a w
-val vect : 'a typ -> 'a array w
-val string : char typ -> string w
+val a : 'a typ -> 'a w
+val v : 'a typ -> 'a array w
+val s : char typ -> string w
 
 val nil : unit w
-val cons : 'a w -> 'b w -> ('a * 'b) w
-val tup1 : 'a w -> ('a * unit) w
-val tup2 : 'a w -> 'b w -> ('a * 'b * unit) w
-val tup3 : 'a w -> 'b w -> 'c w -> ('a * 'b * 'c * unit) w
-val tup4 : 'a w -> 'b w -> 'c w -> 'd w -> ('a * 'b * 'c * 'd * unit) w
-val tup5 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> ('a * 'b * 'c * 'd * 'e * unit) w
+val t1 : 'a w -> 'a w
+val t2 : 'a w -> 'b w -> ('a * 'b) w
+val t3 : 'a w -> 'b w -> 'c w -> ('a * 'b * 'c) w
+val t4 : 'a w -> 'b w -> 'c w -> 'd w -> ('a * 'b * 'c * 'd) w
+val t5 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> ('a * 'b * 'c * 'd * 'e) w
+val t6 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> ('a * 'b * 'c * 'd * 'e * 'f) w
+val t7 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g) w
+val t8 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) w
+val t9 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> 'i w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) w
+val t10 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> 'i w -> 'j w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j) w
+
 val merge_tups : 'a w -> 'b w -> ('a * 'b) w
 
 val dict : 'a w -> 'b w -> ('a * 'b) w
@@ -46,7 +51,7 @@ val pp : Format.formatter -> t -> unit
 val equal : t -> t -> bool
 
 val construct : 'a w -> 'a -> t
-val destruct : 'a w -> t -> 'a option
+val destruct : 'a w -> t -> ('a, string) result
 
 (** Connection to q server *)
 
@@ -81,7 +86,7 @@ val with_connection :
 
 val kclose : Unix.file_descr -> unit
 
-val kread : Unix.file_descr -> 'a w -> 'a option
+val kread : Unix.file_descr -> 'a w -> ('a, string) result
 
 val k0 : Unix.file_descr -> string -> unit
 val k1 : Unix.file_descr -> string -> t -> unit
@@ -89,8 +94,8 @@ val k2 : Unix.file_descr -> string -> t -> t -> unit
 val k3 : Unix.file_descr -> string -> t -> t -> t -> unit
 val kn : Unix.file_descr -> string -> t array -> unit
 
-val k0_sync : Unix.file_descr -> string -> 'a w -> 'a option
-val k1_sync : Unix.file_descr -> string -> 'a w -> t -> 'a option
-val k2_sync : Unix.file_descr -> string -> 'a w -> t -> t -> 'a option
-val k3_sync : Unix.file_descr -> string -> 'a w -> t -> t -> t -> 'a option
-val kn_sync : Unix.file_descr -> string -> 'a w -> t array -> 'a option
+val k0_sync : Unix.file_descr -> string -> 'a w -> ('a, string) result
+val k1_sync : Unix.file_descr -> string -> 'a w -> t -> ('a, string) result
+val k2_sync : Unix.file_descr -> string -> 'a w -> t -> t -> ('a, string) result
+val k3_sync : Unix.file_descr -> string -> 'a w -> t -> t -> t -> ('a, string) result
+val kn_sync : Unix.file_descr -> string -> 'a w -> t array -> ('a, string) result

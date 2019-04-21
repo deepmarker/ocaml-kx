@@ -82,7 +82,7 @@ CAMLprim value k_s (value k) {
 CAMLprim value k_k (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
-    ret = caml_alloc_K(K_val(k)->k);
+    ret = caml_alloc_K(r1(K_val(k)->k));
     CAMLreturn(ret);
 }
 
@@ -342,21 +342,31 @@ CAMLprim value ktn_stub (value t, value len) {
 CAMLprim value xD_stub (value keys, value values) {
     CAMLparam2(keys, values);
     CAMLlocal1(k);
-    k = caml_alloc_K(xD(K_val(keys), K_val(values)));
+    k = caml_alloc_K(xD(r1(K_val(keys)), r1(K_val(values))));
     CAMLreturn(k);
 }
 
 CAMLprim value xT_stub (value dict) {
     CAMLparam1(dict);
-    CAMLlocal1(k);
-    k = caml_alloc_K(xT(K_val(dict)));
-    CAMLreturn(k);
+    CAMLlocal3(ret, msg, k);
+    K kk = ee(xT(r1(K_val(dict))));
+    if (kk->t == -128) {
+        ret = caml_alloc(1, 1);
+        msg = caml_copy_string(kk->s?kk->s:"");
+        Store_field(ret, 0, msg);
+    }
+    else {
+        ret = caml_alloc(1, 0);
+        k = caml_alloc_K(kk);
+        Store_field(ret, 0, k);
+    }
+    CAMLreturn(ret);
 }
 
 CAMLprim value ktd_stub (value kt) {
     CAMLparam1(kt);
     CAMLlocal1(k);
-    k = caml_alloc_K(ktd(K_val(kt)));
+    k = caml_alloc_K(ktd(r1(K_val(kt))));
     CAMLreturn(k);
 }
 
