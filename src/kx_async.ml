@@ -1,5 +1,6 @@
 open Core
 open Async
+module Kx = Kx_final
 
 let src = Logs.Src.create "kx.async"
 
@@ -26,7 +27,6 @@ let of_file_descr fd =
           (Format.pp_print_list ~pp_sep Kx.pp)
           (Array.to_list a)
       end ;
-      let a = Array.map ~f:Kx.pack a in
       Fd.syscall_exn ~nonblocking:true fd (fun fd -> Kx.kn fd msg a)
     end in
   don't_wait_for begin

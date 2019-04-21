@@ -18,9 +18,9 @@
  (c_library_flags -lpthread)
  (libraries bigarray bigstring uuidm ptime uri))
 
-; (library
-;  (name        kx_async)
-;  (public_name kx-async)
-;  (modules Kx_async)
-;  (synopsis "OCaml client for kdb+, for Jane Street's async")
-;  (libraries kx core async logs-async))
+(library
+ (name        kx_async)
+ (public_name kx-async)
+ (modules Kx_async)
+ (synopsis "OCaml client for kdb+, for Jane Street's async")
+ (libraries kx-final core async logs-async))

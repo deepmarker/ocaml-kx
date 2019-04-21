@@ -14,81 +14,114 @@ type fv = (float, Bigarray.float64_elt)     bv
 type time = { time : Ptime.time ; ms : int }
 type timespan = { time : Ptime.time ; ns : int}
 
-module W = struct
-  type _ typ =
-    | Boolean : bool typ
-    | Guid : Uuidm.t typ
-    | Byte : char typ
-    | Short : int typ
-    | Int : int32 typ
-    | Long : int64 typ
-    | Real : float typ
-    | Float : float typ
-    | Char : char typ
-    | Symbol : string typ
-    | Timestamp : Ptime.t typ
-    | Month : Ptime.date typ
-    | Date : Ptime.date typ
-    | Timespan : timespan typ
-    | Minute : Ptime.time typ
-    | Second : Ptime.time typ
-    | Time : time typ
+type _ typ =
+  | Boolean : bool typ
+  | Guid : Uuidm.t typ
+  | Byte : char typ
+  | Short : int typ
+  | Int : int32 typ
+  | Long : int64 typ
+  | Real : float typ
+  | Float : float typ
+  | Char : char typ
+  | Symbol : string typ
+  | Timestamp : Ptime.t typ
+  | Month : Ptime.date typ
+  | Date : Ptime.date typ
+  | Timespan : timespan typ
+  | Minute : Ptime.time typ
+  | Second : Ptime.time typ
+  | Time : time typ
 
-  (* OCaml type of a K object. *)
-  type _ t =
-    | Atom : 'a typ -> 'a t
-    | Vect : 'a typ -> 'a array t
-    | String : char typ -> string t
-    | Nil : unit t
-    | Cons : 'a t * 'b t -> ('a * 'b) t
-    | Dict : 'a t * 'b t -> ('a * 'b) t
-    | Table : 'a t * 'b t -> ('a * 'b) t
-    | Conv : ('a -> 'b t) * ('b t -> 'a) * 'a -> 'b t
+type (_, _) eq = Eq : ('a, 'a) eq
 
-  let equal = Pervasives.(=)
-  let pp ppf _ = Format.pp_print_string ppf "<abstract>"
+let eq : type a b. a typ -> b typ -> (a, b) eq option = fun a b ->
+  match a, b with
+  | Boolean, Boolean -> Some Eq
+  | Guid, Guid -> Some Eq
+  | Byte, Byte -> Some Eq
+  | Short, Short -> Some Eq
+  | Int, Int -> Some Eq
+  | Long, Long -> Some Eq
+  | Real, Real -> Some Eq
+  | Float, Float -> Some Eq
+  | Char, Char -> Some Eq
+  | Symbol, Symbol -> Some Eq
+  | Timestamp, Timestamp -> Some Eq
+  | Month, Month -> Some Eq
+  | Date, Date -> Some Eq
+  | Timespan, Timespan -> Some Eq
+  | Minute, Minute -> Some Eq
+  | Second, Second -> Some Eq
+  | Time, Time -> Some Eq
+  | _ -> None
 
-  let bool      = Boolean
-  let guid      = Guid
-  let byte      = Byte
-  let short     = Short
-  let int       = Int
-  let long      = Long
-  let real      = Real
-  let float     = Float
-  let char      = Char
-  let sym       = Symbol
-  let timestamp = Timestamp
-  let month     = Month
-  let date      = Date
-  let timespan  = Timespan
-  let minute    = Minute
-  let second    = Second
-  let time      = Time
+(* OCaml type of a K object. *)
+type _ w =
+  | Atom : 'a typ -> 'a w
+  | Vect : 'a typ -> 'a array w
+  | String : char typ -> string w
+  | Nil : unit w
+  | Cons : 'a w * 'b w -> ('a * 'b) w
+  | Dict : 'a w * 'b w -> ('a * 'b) w
+  | Table : 'a w * 'b w -> ('a * 'b) w
+  | Conv : ('a -> 'b) * ('b -> 'a) * 'b w -> 'a w
 
-  let atom a = Atom a
-  let vect a = Vect a
-  let string a = String a
+let rec equal : type a b. a w -> b w -> bool = fun a b ->
+  match a, b with
+  | Atom a, Atom b -> eq a b <> None
+  | Vect a, Vect b -> eq a b <> None
+  | String a, String b -> eq a b <> None
+  | Nil, Nil -> true
+  | Cons (a, b), Cons (c, d) -> equal a c && equal b d
+  | Dict (a, b), Dict (c, d) -> equal a c && equal b d
+  | Table (a, b), Table (c, d) -> equal a c && equal b d
+  | Conv (_, _, a), Conv (_, _, b) -> equal a b
+  | _ -> false
 
-  let nil = Nil
-  let cons a b = Cons (a, b)
-  let dict k v = Dict (k, v)
-  let table k v = Table (k, v)
+let pp ppf _ = Format.pp_print_string ppf "<abstract>"
 
-  let conv project inject a =
-    Conv (project, inject, a)
-end
+let bool      = Boolean
+let guid      = Guid
+let byte      = Byte
+let short     = Short
+let int       = Int
+let long      = Long
+let real      = Real
+let float     = Float
+let char      = Char
+let sym       = Symbol
+let timestamp = Timestamp
+let month     = Month
+let date      = Date
+let timespan  = Timespan
+let minute    = Minute
+let second    = Second
+let time      = Time
+
+let atom a = Atom a
+let vect a = Vect a
+let string a = String a
+
+let nil = Nil
+let cons a b = Cons (a, b)
+
+let tup1 a = Cons (a, Nil)
+let tup2 a b = Cons (a, cons b nil)
+
+let dict k v = Dict (k, v)
+let table k v = Table (k, v)
+
+let conv project inject a =
+  Conv (project, inject, a)
 
 type k
 (* OCaml handler to a K object *)
 
-type _ t = K : 'a W.t * k -> 'a t
+type t = K : 'a w * k -> t
 
-let equal (K (w1, _)) (K (w2, _)) = W.equal w1 w2
-let pp ppf (K (w, _)) = W.pp ppf w
-
-let w (K (w, _)) = w
-let k (K (_, k)) = k
+let equal (K (w1, _)) (K (w2, _)) = equal w1 w2
+let pp ppf (K (w, _)) = pp ppf w
 
 (* Accessors *)
 
@@ -171,30 +204,7 @@ external ktn : int -> int -> k = "ktn_stub" (* [ktn type length] *)
 external xD : k -> k -> k = "xD_stub"
 external xT : k -> k = "xT_stub"
 
-(* Communication with kdb+ *)
-
-external khp : string -> int -> int = "khp_stub"
-(* external khpu : string -> int -> string -> int = "khpu_stub"
- * external khpun : string -> int -> string -> int -> int = "khpun_stub"
- * external khpunc : string -> int -> string -> int -> int -> int = "khpunc_stub"
- * external kclose : Unix.file_descr -> unit = "kclose_stub" [@@noalloc]
- * 
- * external kread : Unix.file_descr -> k = "kread_stub"
- * external k0 : Unix.file_descr -> string -> unit = "k0_stub" [@@noalloc]
- * external k1 : Unix.file_descr -> string -> k -> unit = "k1_stub" [@@noalloc]
- * external k2 : Unix.file_descr -> string -> k -> k -> unit = "k2_stub" [@@noalloc]
- * external k3 : Unix.file_descr -> string -> k -> k -> k -> unit = "k3_stub" [@@noalloc]
- * external kn : Unix.file_descr -> string -> k array -> unit = "kn_stub" [@@noalloc]
- * 
- * external k0_sync : Unix.file_descr -> string -> k = "k0_sync_stub"
- * external k1_sync : Unix.file_descr -> string -> k -> k = "k1_sync_stub"
- * external k2_sync : Unix.file_descr -> string -> k -> k -> k = "k2_sync_stub"
- * external k3_sync : Unix.file_descr -> string -> k -> k -> k -> k = "k3_sync_stub"
- * external kn_sync : Unix.file_descr -> string -> k array -> k = "kn_sync_stub" *)
-
 (* Utilities *)
-
-let init () = ignore (khp "" ~-1)
 
 external ymd : int -> int -> int -> int = "ymd_stub" [@@noalloc]
 external dj : int -> int = "dj_stub" [@@noalloc]
@@ -295,7 +305,7 @@ let guids a =
   end
 
 let rec construct_list :
-  type a. k list -> a W.t -> a -> k list = fun ks w a ->
+  type a. k list -> a w -> a -> k list = fun ks w a ->
   match w with
   | Nil -> ks
   | Cons (hw, tw) ->
@@ -304,7 +314,7 @@ let rec construct_list :
     construct_list (k :: ks) tw t
   | _ -> assert false
 
-and construct : type a. a W.t -> a -> a t = fun w a ->
+and construct : type a. a w -> a -> t = fun w a ->
   match w with
   | Nil -> K (w, ktn 0 0)
   | Cons _ ->
@@ -326,7 +336,7 @@ and construct : type a. a W.t -> a -> a t = fun w a ->
     let K (_, k'') = construct v y in
     K (w, xT (xD k' k''))
 
-  | Conv (project, _, v) -> construct (project v) a
+  | Conv (project, _, v) -> construct v (project a)
   | Atom Boolean -> K (w, kb a)
   | Atom Byte -> K (w, kg a)
   | Atom Short -> K (w, kh a)
@@ -454,7 +464,7 @@ and construct : type a. a W.t -> a -> a t = fun w a ->
 
   | String _ -> assert false
 
-let rec depack_list : type a. a W.t -> int -> k -> a option = fun w i k ->
+let rec depack_list : type a. a w -> int -> k -> a option = fun w i k ->
   match w with
   | Nil -> Some ()
   | Cons (h, t) -> begin
@@ -466,17 +476,17 @@ let rec depack_list : type a. a W.t -> int -> k -> a option = fun w i k ->
     end
   | _ -> assert false
 
-and destruct : type a. a W.t -> k -> a option = fun w k ->
+and destruct : type a. a w -> k -> a option = fun w k ->
   match w with
   | Nil -> Some ()
   | Cons _ when k_objtyp k = 0 -> depack_list w 0 k
 
   | Table _ when k_objtyp k = 98 -> destruct w (k_k k)
   | Dict (kw, vw) when k_objtyp k = 99 -> begin
-    match destruct kw (kK k 0), destruct vw (kK k 1) with
+      match destruct kw (kK k 0), destruct vw (kK k 1) with
       | Some a, Some b -> Some (a, b)
       | _ -> None
-  end
+    end
 
   | Atom Boolean when k_objtyp k = -1 -> Some (k_g k <> 0)
   | Atom Guid when k_objtyp k = -2 -> Some (k_u k)
@@ -587,3 +597,99 @@ and destruct : type a. a W.t -> k -> a option = fun w k ->
 
   | _ -> None
 
+(* Communication with kdb+ *)
+
+external khp : string -> int -> int = "khp_stub"
+external khpu : string -> int -> string -> int = "khpu_stub"
+external khpun : string -> int -> string -> int -> int = "khpun_stub"
+external khpunc : string -> int -> string -> int -> int -> int = "khpunc_stub"
+external kclose : Unix.file_descr -> unit = "kclose_stub" [@@noalloc]
+
+external kread : Unix.file_descr -> k = "kread_stub"
+external k0 : Unix.file_descr -> string -> unit = "k0_stub" [@@noalloc]
+external k1 : Unix.file_descr -> string -> k -> unit = "k1_stub" [@@noalloc]
+external k2 : Unix.file_descr -> string -> k -> k -> unit = "k2_stub" [@@noalloc]
+external k3 : Unix.file_descr -> string -> k -> k -> k -> unit = "k3_stub" [@@noalloc]
+external kn : Unix.file_descr -> string -> k array -> unit = "kn_stub" [@@noalloc]
+
+external k0_sync : Unix.file_descr -> string -> k = "k0_sync_stub"
+external k1_sync : Unix.file_descr -> string -> k -> k = "k1_sync_stub"
+external k2_sync : Unix.file_descr -> string -> k -> k -> k = "k2_sync_stub"
+external k3_sync : Unix.file_descr -> string -> k -> k -> k -> k = "k3_sync_stub"
+external kn_sync : Unix.file_descr -> string -> k array -> k = "kn_sync_stub"
+
+let kread fd w = destruct w (kread fd)
+
+let k1 fd f (K (_, a)) = k1 fd f a
+let k2 fd f (K (_, a)) (K (_, b)) = k2 fd f a b
+let k3 fd f (K (_, a)) (K (_, b)) (K (_, c)) = k3 fd f a b c
+let kn fd f a = kn fd f (Array.map (function K (_, k) -> k) a)
+
+let k0_sync fd f w = destruct w (k0_sync fd f)
+let k1_sync fd f w (K (_, a)) = destruct w (k1_sync fd f a)
+let k2_sync fd f w (K (_, a)) (K (_, b)) = destruct w (k2_sync fd f a b)
+let k3_sync fd f w (K (_, a)) (K (_, b)) (K (_, c)) = destruct w (k3_sync fd f a b c)
+let kn_sync fd f w a = destruct w (kn_sync fd f (Array.map (function K (_, k) -> k) a))
+
+type connection_error =
+  | Authentication
+  | Connection
+  | Timeout
+  | OpenSSL
+
+let pp_connection_error ppf = function
+  | Authentication -> Format.pp_print_string ppf "authentification error"
+  | Connection -> Format.pp_print_string ppf "connection error"
+  | Timeout -> Format.pp_print_string ppf "timeout error"
+  | OpenSSL -> Format.pp_print_string ppf "tls error"
+
+type capability =
+  | OneTBLimit
+  | UseTLS
+
+let int_of_capability = function
+  | OneTBLimit -> 1
+  | UseTLS -> 2
+
+let wrap_result f =
+  match f () with
+  | i when i > 0 -> Ok (Obj.magic i : Unix.file_descr)
+  | 0 -> Error Authentication
+  | -1 -> Error Connection
+  | -2 -> Error Timeout
+  | -3 -> Error OpenSSL
+  | i -> failwith ("Unknown q error " ^ string_of_int i)
+
+let up u p = u ^ ":" ^ p
+
+let init () = ignore (khp "" ~-1)
+
+let connect ?timeout ?capability url =
+  let host = Uri.host_with_default ~default:"localhost" url in
+  let userinfo =
+    match Uri.user url, Uri.password url with
+    | Some u, Some p -> Some (u, p)
+    | _ -> None in
+  match Uri.port url with
+  | None -> invalid_arg "connect: port unspecified"
+  | Some port ->
+    match userinfo, timeout, capability with
+    | None, None, None -> wrap_result (fun () -> khp host port)
+    | Some (u, p), None, None -> wrap_result (fun () -> khpu host port (up u p))
+    | Some (u, p), Some t, None ->
+      let t = int_of_float (Ptime.Span.to_float_s t /. 1e3) in
+      wrap_result (fun () -> khpun host port (up u p) t)
+    | Some (u, p), Some t, Some c ->
+      let t = int_of_float (Ptime.Span.to_float_s t /. 1e3) in
+      wrap_result (fun () -> khpunc host port (up u p) t (int_of_capability c))
+    | _ -> invalid_arg "connect"
+
+let with_connection ?timeout ?capability url ~f =
+  match connect ?timeout ?capability url with
+  | Error e -> Error e
+  | Ok fd ->
+    let ret = f fd in
+    kclose fd ;
+    Ok ret
+
+let destruct w (K (_, k)) = destruct w k

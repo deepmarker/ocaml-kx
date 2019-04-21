@@ -3,19 +3,19 @@ open Kx
 open Alcotest
 
 let pack_unpack
-  : type a. string -> a W.t -> a -> unit = fun name w a ->
+  : type a. string -> a w -> a -> unit = fun name w a ->
   let v = construct w a in
   (* let vv_serialized = to_bigstring vv in
    * let vv_parsed = of_bigstring_exn vv_serialized in
    * let vv = unpack vv_parsed in *)
-  match destruct w (k v) with
+  match destruct w v with
   | None -> failwith "pack_unpack"
   | Some vv ->
     let vvv = construct w vv in
     check (testable Kx.pp Kx.equal) name v vvv
 
 let pack_unpack_atom () =
-  let open W in
+  let open Kx_final in
   pack_unpack "bool" (atom bool) true ;
   pack_unpack "guid" (atom guid) Uuidm.nil ;
   pack_unpack "byte" (atom byte) '\x00' ;
@@ -36,7 +36,7 @@ let pack_unpack_atom () =
   ()
 
 let pack_unpack_vect () =
-  let open W in
+  let open Kx_final in
   pack_unpack "vect bool" (vect bool) [|true; false|] ;
   pack_unpack "vect guid" (vect guid) [|Uuidm.nil; Uuidm.nil|] ;
   pack_unpack "vect byte" (string byte) "\x00\x01\x02" ;
@@ -58,13 +58,17 @@ let pack_unpack_vect () =
   ()
 
 let pack_unpack_list () =
-  let open W in
-  (* pack_unpack "empty" (Kx.List []) ; *)
+  let open Kx_final in
+  pack_unpack "empty" nil () ;
   pack_unpack "simple" (cons (atom bool) nil) (true, ()) ;
-  (* pack_unpack "simple" (Kx.List [Atom.int 0l; Atom.float 1.]) ;
-   * pack_unpack "vect" (Kx.List [VectArray.short [|0;1;2|];
-   *                              VectArray.timestamp [|Ptime.epoch; Ptime.epoch|]]) ;
-   * pack_unpack "vect guid" (Kx.List [VectArray.guid [|Uuidm.nil; Uuidm.nil|]]) ; *)
+  pack_unpack "simple2"
+    (cons (atom int) (cons (atom float) nil)) (0l, (0., ())) ;
+  pack_unpack "vect"
+    (cons (vect short) (cons (vect timestamp) nil))
+    ([|1; 2; 3|], ([|Ptime.epoch; Ptime.epoch|], ())) ;
+  pack_unpack "vect guid"
+    (cons (vect guid) nil)
+    ([|Uuidm.nil; Uuidm.nil|], ()) ;
   ()
 
 (* let bindings () =
@@ -80,28 +84,33 @@ let test_pack_unpack () =
     ()
   done
 
-(* let test_server () =
- *   Kx.with_connection
- *     (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
- *     ~f:begin fun fd ->
- *     let k = Kx.kn_sync fd "`getservices" [|pack (Kx.vector (Vect.symbol ["tickerplant"]));
- *                                            Kx.kfalse|] in
- *     Kx.unpack k
- *   end |> function
- *   | Ok (Table (k, v)) ->
- *     check t "cols"       (Vector (Vect.symbol ["procname"; "proctype"; "hpup"; "attributes"])) k ;
- *     check t "vals" (List [Vector (Vect.symbol []);
- *                           Vector (Vect.symbol []);
- *                           Vector (Vect.symbol []);
- *                           List []]) v ;
- *     ()
- *   | Ok _ -> assert false
- *   | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg) *)
+let test_server () =
+  let open Kx in
+  let k = vect sym in
+  let v = cons (vect sym) (cons (vect sym) (cons (vect sym))) in
+  let retwit = table k v in
+  with_connection
+    (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
+    ~f:begin fun fd ->
+      kn_sync fd
+        ".servers.SERVERS" retwit
+        [|construct (vect sym) [|"tickerplant"|] ;
+          construct (atom bool) false |]
+    end |> function
+  | Ok (Some _a) ->
+    (* check t "cols"       (Vector (Vect.symbol ["procname"; "proctype"; "hpup"; "attributes"])) k ;
+     * check t "vals" (List [Vector (Vect.symbol []);
+     *                       Vector (Vect.symbol []);
+     *                       Vector (Vect.symbol []);
+     *                       List []]) v ; *)
+    ()
+  | Ok _ -> assert false
+  | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg)
 
 let tests_kx = [
   (* test_case "bindings" `Quick bindings ; *)
   test_case "pack_unpack" `Quick test_pack_unpack ;
-  (* test_case "server" `Quick test_server ; *)
+  test_case "server" `Quick test_server ;
 ]
 
 (* let tests_kx_async = Alcotest_async.[
