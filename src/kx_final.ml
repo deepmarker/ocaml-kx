@@ -430,11 +430,11 @@ let timestamp_of_int64 = function
     | None -> invalid_arg "timestamp_of_int64"
     | Some ts -> ts
 
-let int_of_month (y, m, _) = (y - 2000) * 12 + m
+let int_of_month (y, m, _) = (y - 2000) * 12 + (pred m)
 let month_of_int m =
   let y = m / 12 in
   let rem_m = m mod 12 in
-  2000 + y, rem_m, 0
+  2000 + y, succ rem_m, 0
 
 let int_of_minute ((hh, mm, _), tz_offset) = (hh * 60 + mm + tz_offset / 60)
 
@@ -637,7 +637,7 @@ and construct : type a. a w -> a -> t = fun w a ->
   | String _ -> assert false
 
 let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fun w k i ->
-  Printf.eprintf "destruct_list %d\n%!" i ;
+  (* Printf.eprintf "destruct_list %d\n%!" i ; *)
   match w with
   | Tup a -> begin
       match destruct a (kK k i) with
@@ -654,7 +654,7 @@ let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fu
   | _ -> assert false
 
 and destruct : type a. a w -> k -> (a, string) result = fun w k ->
-  Printf.eprintf "destruct\n%!" ;
+  (* Printf.eprintf "destruct\n%!" ; *)
   match w with
   | _ when k_objtyp k = -128 -> Error (k_s k)
   | List when k_objtyp k = 0 ->

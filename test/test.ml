@@ -5,9 +5,9 @@ open Alcotest
 let pack_unpack
   : type a. string -> a w -> a -> unit = fun name w a ->
   let v = construct w a in
-  (* let v_serialized = to_string v in
-   * let vv_parsed = of_string_exn w v_serialized in
-   * check (testable Kx.pp Kx.equal) name v vv_parsed ; *)
+  let v_serialized = to_string v in
+  let vv_parsed = of_string_exn w v_serialized in
+  check (testable Kx.pp Kx.equal) name v vv_parsed ;
   match destruct w v with
   | Error msg -> failwith msg
   | Ok vv ->
@@ -27,7 +27,9 @@ let pack_unpack_atom () =
   pack_unpack "char" (a char) '\x00' ;
   pack_unpack "symbol" (a sym) "" ;
   pack_unpack "timestamp" (a timestamp) Ptime.epoch ;
-  pack_unpack "month" (a month) (2018, 04, 0) ;
+  pack_unpack "month" (a month) (2018, 4, 0) ;
+  pack_unpack "month" (a month) (2019, 1, 0) ;
+  pack_unpack "month" (a month) (2019, 2, 0) ;
   pack_unpack "date" (a date) (2017, 10, 6) ;
   pack_unpack "timespan" (a timespan) { time = (0, 0, 0), 0 ; ns = 0 } ;
   pack_unpack "minute" (a minute) ((0, 0, 0), 0) ;
@@ -49,12 +51,11 @@ let pack_unpack_vect () =
   pack_unpack "vect symbol" (v sym) [|"machin"; "truc"; "chouette"|] ;
   pack_unpack "vect timestamp" (v timestamp) [|Ptime.epoch; Ptime.epoch|] ;
   pack_unpack "vect month" (v month) [|2019, 1, 0 ; 2019, 2, 0|] ;
-  pack_unpack "vect date" (v date) [|(2019, 1, 1);(2019, 1, 2)|] ;
-  (* pack_unpack "vect timespan" (Atom zero_timespan) ;
-   * pack_unpack "vect minute" (Atom (Minute (0, 0))) ;
-   * pack_unpack "vect second" (Atom (Second (0, 0, 0))) ;
-   * pack_unpack "vect time" (Atom zero_timespan) ;
-   * pack_unpack "vect datetime" (vector (float_vect (float64_arr [|0.;1.;nan;infinity;neg_infinity|]))) ; *)
+  pack_unpack "vect date" (v date) [|2019, 1, 1; 2019, 1, 2|] ;
+  pack_unpack "vect timespan" (v timespan) [||] ;
+  pack_unpack "vect minute" (v minute) [||] ;
+  pack_unpack "vect second" (v second) [||] ;
+  pack_unpack "vect time" (v time) [||] ;
   ()
 
 let pack_unpack_list () =
@@ -115,9 +116,11 @@ let do_n_times n m f () =
 let hu = do_n_times 100 10
 
 let utilities () =
-  check int "month1" 0 (int_of_month (2000, 0, 0)) ;
-  check int "month2" 5 (int_of_month (2000, 5, 0)) ;
-  check int "month3" 13 (int_of_month (2001, 1, 0)) ;
+  check int "month1" 0 (int_of_month (2000, 1, 0)) ;
+  check int "month2" 4 (int_of_month (2000, 5, 0)) ;
+  check int "month3" 12 (int_of_month (2001, 1, 0)) ;
+  check int "month4" 228 (int_of_month (2019, 1, 0)) ;
+  check int "month5" 229 (int_of_month (2019, 2, 0)) ;
   for _ = 0 to 1000 do
     let i = Random.int 1000 in
     let j = int_of_month (month_of_int i) in
