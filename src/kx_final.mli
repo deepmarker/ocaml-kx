@@ -1,6 +1,7 @@
 type time = { time : Ptime.time ; ms : int }
 type timespan = { time : Ptime.time ; ns : int }
 
+type k
 type _ typ
 type _ w
 
@@ -26,7 +27,7 @@ val a : 'a typ -> 'a w
 val v : 'a typ -> 'a array w
 val s : char typ -> string w
 
-val nil : unit w
+val list : k array w
 val t1 : 'a w -> 'a w
 val t2 : 'a w -> 'b w -> ('a * 'b) w
 val t3 : 'a w -> 'b w -> 'c w -> ('a * 'b * 'c) w
@@ -51,6 +52,7 @@ val pp : Format.formatter -> t -> unit
 val equal : t -> t -> bool
 
 val construct : 'a w -> 'a -> t
+val destruct_k : 'a w -> k -> ('a, string) result
 val destruct : 'a w -> t -> ('a, string) result
 
 (** Connection to q server *)

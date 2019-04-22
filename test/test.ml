@@ -59,7 +59,7 @@ let pack_unpack_vect () =
 
 let pack_unpack_list () =
   let open Kx in
-  pack_unpack "empty" nil () ;
+  pack_unpack "empty" list [||] ;
   pack_unpack "simple" (t1 (a bool)) true ;
   pack_unpack "simple2" (t2 (a int) (a float)) (0l, 0.) ;
   pack_unpack "vect"
@@ -73,7 +73,7 @@ let pack_unpack_list () =
 
 let pack_unpack_dict () =
   let open Kx in
-  pack_unpack "empty" (dict nil nil) ((), ());
+  pack_unpack "empty" (dict list list) ([||], [||]);
   ()
 
 let pack_unpack_table () =
@@ -89,17 +89,13 @@ let pack_unpack_conv () =
     ((1, 2, 3), false, true) ;
   ()
 
-(* let bindings () =
- *   check int "dj 0" 20000101 (dj 0) ;
- *   () *)
-
 let test_server () =
   let open Kx in
   let key = v sym in
   let values = t9
       (v sym) (v sym) (v sym)
       (v int) (v int) (v timestamp)
-      (v timestamp) (v timestamp) nil in
+      (v timestamp) (v timestamp) list in
   let retwit = table key values in
   with_connection
     (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
@@ -125,7 +121,6 @@ let do_n_times n m f () =
 let hu = do_n_times 100 10
 
 let tests_kx = [
-  (* test_case "bindings" `Quick bindings ; *)
   test_case "atom" `Quick (hu pack_unpack_atom) ;
   test_case "vect" `Quick (hu pack_unpack_vect) ;
   test_case "list" `Quick (hu pack_unpack_list) ;

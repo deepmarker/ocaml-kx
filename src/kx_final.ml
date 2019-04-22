@@ -75,23 +75,28 @@ let eq : type a b. a typ -> b typ -> (a, b) eq option = fun a b ->
   | Time, Time -> Some Eq
   | _ -> None
 
+type k
+(* OCaml handler to a K object *)
+
 (* OCaml type of a K object. *)
 type _ w =
   | Atom : 'a typ -> 'a w
   | Vect : 'a typ -> 'a array w
   | String : char typ -> string w
-  | Nil : unit w
+  | List : k array w
   | Tup : 'a w -> 'a w
   | Tups : 'a w * 'b w -> ('a * 'b) w
   | Dict : 'a w * 'b w -> ('a * 'b) w
   | Table : 'a w * 'b w -> ('a * 'b) w
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b w -> 'a w
 
+type t = K : 'a w * k -> t
+
 let rec int_of_w : type a. a w -> int = function
   | Atom a -> -(int_of_typ a)
   | Vect a -> int_of_typ a
   | String a -> int_of_typ a
-  | Nil -> 0
+  | List -> 0
   | Tup _ -> 0
   | Tups _ -> 0
   | Dict _ -> 99
@@ -103,7 +108,7 @@ let rec equal : type a b. a w -> b w -> bool = fun a b ->
   | Atom a, Atom b -> eq a b <> None
   | Vect a, Vect b -> eq a b <> None
   | String a, String b -> eq a b <> None
-  | Nil, Nil -> true
+  | List, List -> true
   | Tup a, Tup b -> equal a b
   | Tups (a, b), Tups (c, d) -> equal a c && equal b d
   | Dict (a, b), Dict (c, d) -> equal a c && equal b d
@@ -138,7 +143,7 @@ let a a = Atom a
 let v a = Vect a
 let s a = String a
 
-let nil = Nil
+let list = List
 
 let t1 a = Tup a
 let t2 a b = Tups (Tup a, Tup b)
@@ -194,11 +199,6 @@ let merge_tups a b = Tups (a, b)
 
 let dict k v = Dict (k, v)
 let table k v = Table (k, v)
-
-type k
-(* OCaml handler to a K object *)
-
-type t = K : 'a w * k -> t
 
 let equal (K (w1, _)) (K (w2, _)) = equal w1 w2
 let pp ppf (K (w, _)) = pp ppf w
@@ -402,7 +402,7 @@ let rec construct_list :
 
 and construct : type a. a w -> a -> t = fun w a ->
   match w with
-  | Nil -> K (w, ktn 0 0)
+  | List -> K (w, ktn 0 0)
   | Tup w ->
     let k = ktn 0 1 in
     let K (_, k') = (construct w a) in
@@ -580,7 +580,8 @@ and destruct : type a. a w -> k -> (a, string) result = fun w k ->
   (* Printf.eprintf "destruct\n%!" ; *)
   match w with
   | _ when k_objtyp k = -128 -> Error (k_s k)
-  | Nil -> Ok ()
+  | List when k_objtyp k = 0 ->
+    Ok (Array.init (k_length k) (kK k))
   | Conv (_, inject, w) -> begin
       match destruct w k with
       | Error e -> Error e
@@ -705,6 +706,8 @@ and destruct : type a. a w -> k -> (a, string) result = fun w k ->
     let buf = kII k in
     Ok (Array.init len (fun i -> time_of_int (Bigarray.Array1.get buf i)))
 
+  | List ->
+    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
   | Atom _ ->
     Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
   | Vect _ ->
@@ -754,7 +757,8 @@ let k2_sync fd f w (K (_, a)) (K (_, b)) = destruct w (k2_sync fd f a b)
 let k3_sync fd f w (K (_, a)) (K (_, b)) (K (_, c)) = destruct w (k3_sync fd f a b c)
 let kn_sync fd f w a = destruct w (kn_sync fd f (Array.map (function K (_, k) -> k) a))
 
-let destruct w (K (_, k)) = destruct w k
+let destruct_k = destruct
+let destruct w (K (_, k)) = destruct_k w k
 
 type connection_error =
   | Authentication
