@@ -81,6 +81,14 @@ let pack_unpack_table () =
   pack_unpack "empty" (table (v sym) (v long)) ([|"a"|], [|1L|]);
   ()
 
+let pack_unpack_conv () =
+  let open Kx in
+  pack_unpack "bool3" (t3 (a bool) (a bool) (a bool)) (true, false, true) ;
+  pack_unpack "boolnested"
+    (t3 (t3 (a short) (a short) (a short)) (a bool) (a bool))
+    ((1, 2, 3), false, true) ;
+  ()
+
 (* let bindings () =
  *   check int "dj 0" 20000101 (dj 0) ;
  *   () *)
@@ -90,8 +98,8 @@ let test_server () =
   let key = v sym in
   let values = t9
       (v sym) (v sym) (v sym)
-      (v long) (v long) (v timestamp)
-      (v timestamp) (v timestamp) (dict nil nil) in
+      (v int) (v int) (v timestamp)
+      (v timestamp) (v timestamp) nil in
   let retwit = table key values in
   with_connection
     (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
@@ -123,6 +131,7 @@ let tests_kx = [
   test_case "list" `Quick (hu pack_unpack_list) ;
   test_case "dict" `Quick (hu pack_unpack_dict) ;
   test_case "table" `Quick (hu pack_unpack_table) ;
+  test_case "conv" `Quick (hu pack_unpack_conv) ;
   test_case "server" `Quick test_server ;
 ]
 

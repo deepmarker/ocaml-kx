@@ -33,6 +33,25 @@ type _ typ =
   | Second : Ptime.time typ
   | Time : time typ
 
+let int_of_typ : type a. a typ -> int = function
+  | Boolean -> 1
+  | Guid -> 2
+  | Byte -> 3
+  | Short -> 5
+  | Int -> 6
+  | Long -> 7
+  | Real -> 8
+  | Float -> 9
+  | Char -> 10
+  | Symbol -> 11
+  | Timestamp -> 12
+  | Month -> 13
+  | Date -> 14
+  | Timespan -> 15
+  | Minute -> 17
+  | Second -> 18
+  | Time -> 19
+
 type (_, _) eq = Eq : ('a, 'a) eq
 
 let eq : type a b. a typ -> b typ -> (a, b) eq option = fun a b ->
@@ -67,6 +86,17 @@ type _ w =
   | Dict : 'a w * 'b w -> ('a * 'b) w
   | Table : 'a w * 'b w -> ('a * 'b) w
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b w -> 'a w
+
+let rec int_of_w : type a. a w -> int = function
+  | Atom a -> -(int_of_typ a)
+  | Vect a -> int_of_typ a
+  | String a -> int_of_typ a
+  | Nil -> 0
+  | Tup _ -> 0
+  | Tups _ -> 0
+  | Dict _ -> 99
+  | Table _ -> 98
+  | Conv (_, _, a) -> int_of_w a
 
 let rec equal : type a b. a w -> b w -> bool = fun a b ->
   match a, b with
@@ -116,49 +146,49 @@ let t3 a b c =
   conv
     (fun (a, b, c) -> (a, (b, c)))
     (fun (a, (b, c)) -> (a, b, c))
-    (Tups (a, (Tups (Tup b, Tup c))))
+    (Tups (Tup a, (Tups (Tup b, Tup c))))
 
 let t4 a b c d =
   conv
     (fun (a, b, c, d) -> (a, (b, (c, d))))
     (fun (a, (b, (c, d))) -> (a, b, c, d))
-    (Tups (a, (Tups (b, (Tups (Tup c, Tup d))))))
+    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tup d))))))
 
 let t5 a b c d e =
   conv
     (fun (a, b, c, d, e) -> (a, (b, (c, (d, e)))))
     (fun (a, (b, (c, (d, e)))) -> (a, b, c, d, e))
-    (Tups (a, (Tups (b, (Tups (c, Tups (Tup d, Tup e)))))))
+    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tup e)))))))
 
 let t6 a b c d e f =
   conv
     (fun (a, b, c, d, e, f) -> (a, (b, (c, (d, (e, f))))))
     (fun (a, (b, (c, (d, (e, f))))) -> (a, b, c, d, e, f))
-    (Tups (a, (Tups (b, (Tups (c, Tups (d, Tups (Tup e, Tup f))))))))
+    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tups (Tup e, Tup f))))))))
 
 let t7 a b c d e f g =
   conv
     (fun (a, b, c, d, e, f, g) -> (a, (b, (c, (d, (e, (f, g)))))))
     (fun (a, (b, (c, (d, (e, (f, g)))))) -> (a, b, c, d, e, f, g))
-    (Tups (a, (Tups (b, (Tups (c, Tups (d, Tups (e, Tups (Tup f, Tup g)))))))))
+    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tups (Tup e, Tups (Tup f, Tup g)))))))))
 
 let t8 a b c d e f g h =
   conv
     (fun (a, b, c, d, e, f, g, h) -> (a, (b, (c, (d, (e, (f, (g, h))))))))
     (fun (a, (b, (c, (d, (e, (f, (g, h))))))) -> (a, b, c, d, e, f, g, h))
-    (Tups (a, (Tups (b, (Tups (c, Tups (d, Tups (e, Tups (f, Tups (Tup g, Tup h))))))))))
+    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tups (Tup e, Tups (Tup f, Tups (Tup g, Tup h))))))))))
 
 let t9 a b c d e f g h i =
   conv
     (fun (a, b, c, d, e, f, g, h, i) -> (a, (b, (c, (d, (e, (f, (g, (h, i)))))))))
     (fun (a, (b, (c, (d, (e, (f, (g, (h, i)))))))) -> (a, b, c, d, e, f, g, h, i))
-    (Tups (a, (Tups (b, (Tups (c, Tups (d, Tups (e, Tups (f, Tups (g, Tups (Tup h, Tup i)))))))))))
+    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tups (Tup e, Tups (Tup f, Tups (Tup g, Tups (Tup h, Tup i)))))))))))
 
 let t10 a b c d e f g h i j =
   conv
     (fun (a, b, c, d, e, f, g, h, i, j) -> (a, (b, (c, (d, (e, (f, (g, (h, (i, j))))))))))
     (fun (a, (b, (c, (d, (e, (f, (g, (h, (i, j))))))))) -> (a, b, c, d, e, f, g, h, i, j))
-    (Tups (a, (Tups (b, (Tups (c, Tups (d, Tups (e, Tups (f, Tups (g, Tups (h, Tups (Tup i, Tup j))))))))))))
+    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tups (Tup e, Tups (Tup f, Tups (Tup g, Tups (Tup h, Tups (Tup i, Tup j))))))))))))
 
 let merge_tups a b = Tups (a, b)
 
@@ -301,23 +331,27 @@ let day_in_ns d =
 
 (* J pu(J u){return 1000000LL*(u-10957LL*86400000LL);} // kdb+
    timestamp from unix, use ktj(Kj,n) to create timestamp from n *)
-let int64_of_timestamp ts =
-  let span_since_kxepoch =
-    Ptime.(Span.sub (to_span ts) kx_epoch_span) in
-  let d, ps = Ptime.Span.to_d_ps span_since_kxepoch in
-  Int64.(add (day_in_ns d) (div ps 1_000L))
+let int64_of_timestamp = function
+  | ts when Ptime.(equal ts min) -> Int64.min_int
+  | ts ->
+    let span_since_kxepoch =
+      Ptime.(Span.sub (to_span ts) kx_epoch_span) in
+    let d, ps = Ptime.Span.to_d_ps span_since_kxepoch in
+    Int64.(add (day_in_ns d) (div ps 1_000L))
 
-let timestamp_of_int64 nanos_since_kxepoch =
-  let one_day_in_ns = day_in_ns 1 in
-  let days_since_kxepoch =
-    Int64.(to_int (div nanos_since_kxepoch one_day_in_ns)) in
-  let remaining_ps =
-    Int64.(mul (rem nanos_since_kxepoch one_day_in_ns) 1_000L) in
-  let span =
-    Ptime.Span.v (days_since_kxepoch, remaining_ps) in
-  match Ptime.add_span kx_epoch span with
-  | None -> invalid_arg "timestamp_of_int64"
-  | Some ts -> ts
+let timestamp_of_int64 = function
+  | i when Int64.(equal i min_int) -> Ptime.min
+  | nanos_since_kxepoch ->
+    let one_day_in_ns = day_in_ns 1 in
+    let days_since_kxepoch =
+      Int64.(to_int (div nanos_since_kxepoch one_day_in_ns)) in
+    let remaining_ps =
+      Int64.(mul (rem nanos_since_kxepoch one_day_in_ns) 1_000L) in
+    let span =
+      Ptime.Span.v (days_since_kxepoch, remaining_ps) in
+    match Ptime.add_span kx_epoch span with
+    | None -> invalid_arg "timestamp_of_int64"
+    | Some ts -> ts
 
 let int_of_month (y, m, _) = (y - 2000) * 12 + m
 let month_of_int m =
@@ -525,18 +559,18 @@ and construct : type a. a w -> a -> t = fun w a ->
 
   | String _ -> assert false
 
-let rec destruct_list : type a. a w -> int -> k -> (a * int, string) result = fun w i k ->
+let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fun w k i ->
   (* Printf.eprintf "destruct_list %d\n%!" i ; *)
   match w with
   | Tup a -> begin
-      match destruct a k with
+      match destruct a (kK k i) with
       | Error e -> Error e
       | Ok a -> Ok (a, succ i)
     end
   | Tups (h, t) -> begin
-      match destruct_list h i (kK k i) with
+      match destruct_list h k i with
       | Error msg -> Error msg
-      | Ok (v, i) -> match destruct_list t i (kK k i) with
+      | Ok (v, i) -> match destruct_list t k i with
         | Error e -> Error e
         | Ok (vv, i) -> Ok ((v, vv), i)
     end
@@ -547,9 +581,14 @@ and destruct : type a. a w -> k -> (a, string) result = fun w k ->
   match w with
   | _ when k_objtyp k = -128 -> Error (k_s k)
   | Nil -> Ok ()
+  | Conv (_, inject, w) -> begin
+      match destruct w k with
+      | Error e -> Error e
+      | Ok v -> Ok (inject v)
+    end
   | Tup w when k_objtyp k = 0 -> destruct w (kK k 0)
   | Tups _ when k_objtyp k = 0 ->
-    (match destruct_list w 0 k with Error e -> Error e | Ok (v, _) -> Ok v)
+    (match destruct_list w k 0 with Error e -> Error e | Ok (v, _) -> Ok v)
   | Table (key, values) when k_objtyp k = 98 ->
     destruct (Dict (key, values)) (k_k k)
   | Dict (kw, vw) when k_objtyp k = 99 -> begin
@@ -666,14 +705,20 @@ and destruct : type a. a w -> k -> (a, string) result = fun w k ->
     let buf = kII k in
     Ok (Array.init len (fun i -> time_of_int (Bigarray.Array1.get buf i)))
 
-  | Atom _ -> Error ("unknown atom " ^ string_of_int (k_objtyp k))
-  | Vect _ -> Error "vect"
-  | String _ -> Error "string"
-  | Tup _ -> Error "tup"
-  | Tups _ -> Error "tups"
-  | Dict _ -> Error "dict"
-  | Table _ -> Error ("table " ^ string_of_int (k_objtyp k))
-  | Conv _ -> Error "got a conv!"
+  | Atom _ ->
+    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
+  | Vect _ ->
+    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
+  | String _ ->
+    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
+  | Tup _ ->
+    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
+  | Tups _ ->
+    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
+  | Dict _ ->
+    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
+  | Table _ ->
+    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
 
 (* Communication with kdb+ *)
 
