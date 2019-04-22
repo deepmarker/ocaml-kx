@@ -49,11 +49,20 @@ val conv : ('a -> 'b) -> ('b -> 'a) -> 'b w -> 'a w
 type t
 
 val pp : Format.formatter -> t -> unit
+
+val equal_typ : t -> t -> bool
+(** [equal_typ a b] is [true] iff [a] is the same q type as [b]. *)
+
 val equal : t -> t -> bool
+(** [equal_typ a b] is [true] iff [a] is the same q type and value as [b]. *)
 
 val construct : 'a w -> 'a -> t
 val destruct_k : 'a w -> k -> ('a, string) result
 val destruct : 'a w -> t -> ('a, string) result
+
+val of_string : 'a w -> string -> (t, string) result
+val of_string_exn : 'a w -> string -> t
+val to_string : ?mode:int -> t -> string
 
 (** Connection to q server *)
 

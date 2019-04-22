@@ -5,9 +5,9 @@ open Alcotest
 let pack_unpack
   : type a. string -> a w -> a -> unit = fun name w a ->
   let v = construct w a in
-  (* let vv_serialized = to_bigstring vv in
-   * let vv_parsed = of_bigstring_exn vv_serialized in
-   * let vv = unpack vv_parsed in *)
+  let v_serialized = to_string v in
+  let vv_parsed = of_string_exn w v_serialized in
+  check (testable Kx.pp Kx.equal) name v vv_parsed ;
   match destruct w v with
   | Error msg -> failwith msg
   | Ok vv ->
@@ -103,13 +103,7 @@ let test_server () =
       k0_sync fd
         ".servers.SERVERS" retwit
     end |> function
-  | Ok (Ok _a) ->
-    (* check t "cols"       (Vector (Vect.symbol ["procname"; "proctype"; "hpup"; "attributes"])) k ;
-     * check t "vals" (List [Vector (Vect.symbol []);
-     *                       Vector (Vect.symbol []);
-     *                       Vector (Vect.symbol []);
-     *                       List []]) v ; *)
-    ()
+  | Ok (Ok _a) -> ()
   | Ok (Error msg) -> failwith msg
   | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg)
 

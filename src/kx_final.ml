@@ -54,7 +54,7 @@ let int_of_typ : type a. a typ -> int = function
 
 type (_, _) eq = Eq : ('a, 'a) eq
 
-let eq : type a b. a typ -> b typ -> (a, b) eq option = fun a b ->
+let eq_typ : type a b. a typ -> b typ -> (a, b) eq option = fun a b ->
   match a, b with
   | Boolean, Boolean -> Some Eq
   | Guid, Guid -> Some Eq
@@ -74,6 +74,48 @@ let eq : type a b. a typ -> b typ -> (a, b) eq option = fun a b ->
   | Second, Second -> Some Eq
   | Time, Time -> Some Eq
   | _ -> None
+
+let eq_typ_val : type a b. a typ -> b typ -> a -> b -> (a, b) eq option = fun a b x y ->
+  match a, b with
+  | Boolean, Boolean when x = y -> Some Eq
+  | Guid, Guid when Uuidm.equal x y -> Some Eq
+  | Byte, Byte when x = y -> Some Eq
+  | Short, Short when x = y -> Some Eq
+  | Int, Int when Int32.equal x y -> Some Eq
+  | Long, Long when Int64.equal x y -> Some Eq
+  | Real, Real when Float.equal x y -> Some Eq
+  | Float, Float when Float.equal x y -> Some Eq
+  | Char, Char when x = y -> Some Eq
+  | Symbol, Symbol when String.equal x y -> Some Eq
+  | Timestamp, Timestamp when Ptime.equal x y -> Some Eq
+  | Month, Month when x = y -> Some Eq
+  | Date, Date when x = y -> Some Eq
+  | Timespan, Timespan when x = y -> Some Eq
+  | Minute, Minute when x = y -> Some Eq
+  | Second, Second when x = y -> Some Eq
+  | Time, Time when x = y -> Some Eq
+  | _ -> None
+
+(* let eq2 : type a b. a typ -> b typ -> a -> b -> bool = fun at bt a b ->
+ *   match at, bt with
+ *   | Boolean, Boolean -> a = b
+ *   | Guid, Guid -> Uuidm.equal a b
+ *   | Byte, Byte -> a = b
+ *   | Short, Short -> a = b
+ *   | Int, Int -> Int32.equal a b
+ *   | Long, Long -> Int64.equal a b
+ *   | Real, Real -> Float.equal a b
+ *   | Float, Float -> Float.equal a b
+ *   | Char, Char -> a = b
+ *   | Symbol, Symbol -> String.equal a b
+ *   | Timestamp, Timestamp -> Ptime.equal a b
+ *   | Month, Month -> a = b
+ *   | Date, Date -> a = b
+ *   | Timespan, Timespan -> a = b
+ *   | Minute, Minute -> a = b
+ *   | Second, Second -> a = b
+ *   | Time, Time -> a = b
+ *   | _ -> false *)
 
 type k
 (* OCaml handler to a K object *)
@@ -105,15 +147,42 @@ let rec int_of_w : type a. a w -> int = function
 
 let rec equal : type a b. a w -> b w -> bool = fun a b ->
   match a, b with
-  | Atom a, Atom b -> eq a b <> None
-  | Vect a, Vect b -> eq a b <> None
-  | String a, String b -> eq a b <> None
+  | Atom a, Atom b -> eq_typ a b <> None
+  | Vect a, Vect b -> eq_typ a b <> None
+  | String a, String b -> eq_typ a b <> None
   | List, List -> true
   | Tup a, Tup b -> equal a b
   | Tups (a, b), Tups (c, d) -> equal a c && equal b d
   | Dict (a, b), Dict (c, d) -> equal a c && equal b d
   | Table (a, b), Table (c, d) -> equal a c && equal b d
   | Conv (_, _, a), Conv (_, _, b) -> equal a b
+  | _ -> false
+
+let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
+  match a, b with
+  | Atom a, Atom b -> eq_typ_val a b x y  <> None
+  | Vect a, Vect b ->
+    let xx = Array.to_list x in
+    let yy = Array.to_list y in
+    List.fold_left2
+      (fun acc x y -> acc && eq_typ_val a b x y <> None) true xx yy
+  | String _, String _ -> String.equal x y
+  | List, List -> true
+  | Tup a, Tup b -> equal_typ_val a b x y
+  | Tups (a, b), Tups (c, d) ->
+    let x1, x2 = x in
+    let y1, y2 = y in
+    equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2
+  | Dict (a, b), Dict (c, d) ->
+    let x1, x2 = x in
+    let y1, y2 = y in
+    equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2
+  | Table (a, b), Table (c, d) ->
+    let x1, x2 = x in
+    let y1, y2 = y in
+    equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2
+  | Conv (p1, _, a), Conv (p2, _, b) ->
+    equal_typ_val a b (p1 x) (p2 y)
   | _ -> false
 
 let pp ppf _ = Format.pp_print_string ppf "<abstract>"
@@ -200,7 +269,6 @@ let merge_tups a b = Tups (a, b)
 let dict k v = Dict (k, v)
 let table k v = Table (k, v)
 
-let equal (K (w1, _)) (K (w2, _)) = equal w1 w2
 let pp ppf (K (w, _)) = pp ppf w
 
 (* Accessors *)
@@ -759,6 +827,37 @@ let kn_sync fd f w a = destruct w (kn_sync fd f (Array.map (function K (_, k) ->
 
 let destruct_k = destruct
 let destruct w (K (_, k)) = destruct_k w k
+
+let equal_typ (K (w1, _)) (K (w2, _)) = equal w1 w2
+let equal (K (w1, a)) (K (w2, b)) =
+  match destruct_k w1 a, destruct_k w2 b with
+  | Ok aa, Ok bb -> equal_typ_val w1 w2 aa bb
+  | _ -> false
+
+(* Serialization *)
+
+external b9 : int -> k -> (k, string) result = "b9_stub"
+external d9 : k -> (k, string) result = "d9_stub"
+
+let of_string :
+  type a. a w -> string -> (t, string) result = fun w bs ->
+  let K (_, k) = construct (s byte) bs in
+  match d9 k with
+  | Error e -> Error e
+  | Ok a -> Ok (K (w, a))
+
+let of_string_exn w s =
+  match (of_string w s) with
+  | Error msg -> invalid_arg msg
+  | Ok s -> s
+
+let to_string ?(mode = -1) (K (_, k)) =
+  match b9 mode k with
+  | Error e -> failwith e
+  | Ok k ->
+    match destruct_k (s byte) k with
+    | Error msg -> invalid_arg msg
+    | Ok s -> s
 
 type connection_error =
   | Authentication
