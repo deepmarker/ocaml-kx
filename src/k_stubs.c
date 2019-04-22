@@ -22,7 +22,7 @@ static int compare_K(value a, value b) {
 
 #include <stdio.h>
 static void finalize_K(value k) {
-    /* fprintf(stderr, "%p %d %d\n", K_val(k), K_val(k)->t, K_val(k)->r); */
+    fprintf(stderr, "%p %d %d\n", K_val(k), K_val(k)->t, K_val(k)->r);
     r0(K_val(k));
 }
 
@@ -82,7 +82,7 @@ CAMLprim value k_s (value k) {
 CAMLprim value k_k (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
-    ret = caml_alloc_K(r1(K_val(k)->k));
+    ret = caml_alloc_K(K_val(k)->k);
     CAMLreturn(ret);
 }
 
@@ -98,12 +98,12 @@ CAMLprim value k_u (value k) {
 CAMLprim value kK_stub (value k, value i) {
     CAMLparam2(k, i);
     CAMLlocal1(ret);
-    ret = caml_alloc_K(kK(r1(K_val(k)))[Long_val(i)]);
+    ret = caml_alloc_K(r1(kK(r1(K_val(k)))[Long_val(i)]));
     CAMLreturn(ret);
 }
 
 CAMLprim value kK_set_stub (value k, value i, value e) {
-    kK(K_val(k))[Int_val(i)] = r1(K_val(e));
+    kK(K_val(k))[Int_val(i)] = K_val(e);
     return Val_unit;
 }
 

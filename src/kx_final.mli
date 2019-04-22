@@ -110,3 +110,8 @@ val k1_sync : Unix.file_descr -> string -> 'a w -> t -> ('a, string) result
 val k2_sync : Unix.file_descr -> string -> 'a w -> t -> t -> ('a, string) result
 val k3_sync : Unix.file_descr -> string -> 'a w -> t -> t -> t -> ('a, string) result
 val kn_sync : Unix.file_descr -> string -> 'a w -> t array -> ('a, string) result
+
+(**/*)
+
+val int_of_month : Ptime.date -> int
+val month_of_int : int -> Ptime.date

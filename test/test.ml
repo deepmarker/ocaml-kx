@@ -5,9 +5,9 @@ open Alcotest
 let pack_unpack
   : type a. string -> a w -> a -> unit = fun name w a ->
   let v = construct w a in
-  let v_serialized = to_string v in
-  let vv_parsed = of_string_exn w v_serialized in
-  check (testable Kx.pp Kx.equal) name v vv_parsed ;
+  (* let v_serialized = to_string v in
+   * let vv_parsed = of_string_exn w v_serialized in
+   * check (testable Kx.pp Kx.equal) name v vv_parsed ; *)
   match destruct w v with
   | Error msg -> failwith msg
   | Ok vv ->
@@ -114,14 +114,25 @@ let do_n_times n m f () =
   done
 let hu = do_n_times 100 10
 
+let utilities () =
+  check int "month1" 0 (int_of_month (2000, 0, 0)) ;
+  check int "month2" 5 (int_of_month (2000, 5, 0)) ;
+  check int "month3" 13 (int_of_month (2001, 1, 0)) ;
+  for _ = 0 to 1000 do
+    let i = Random.int 1000 in
+    let j = int_of_month (month_of_int i) in
+    check int "month" i j
+  done
+
 let tests_kx = [
+  test_case "utilities" `Quick (utilities) ;
   test_case "atom" `Quick (hu pack_unpack_atom) ;
   test_case "vect" `Quick (hu pack_unpack_vect) ;
   test_case "list" `Quick (hu pack_unpack_list) ;
   test_case "dict" `Quick (hu pack_unpack_dict) ;
   test_case "table" `Quick (hu pack_unpack_table) ;
   test_case "conv" `Quick (hu pack_unpack_conv) ;
-  test_case "server" `Quick test_server ;
+  (* test_case "server" `Quick test_server ; *)
 ]
 
 (* let tests_kx_async = Alcotest_async.[

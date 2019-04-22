@@ -185,7 +185,11 @@ let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
     equal_typ_val a b (p1 x) (p2 y)
   | _ -> false
 
-let pp ppf _ = Format.pp_print_string ppf "<abstract>"
+let pp : type a. Format.formatter -> a w -> unit = fun ppf -> function
+  | Atom t -> Format.pp_print_int ppf  (- (int_of_typ t))
+  | Vect t -> Format.pp_print_int ppf  (int_of_typ t)
+  | List -> Format.pp_print_int ppf 0
+  | _ -> Format.pp_print_string ppf "<abstract>"
 
 let bool      = Boolean
 let guid      = Guid
@@ -269,15 +273,20 @@ let merge_tups a b = Tups (a, b)
 let dict k v = Dict (k, v)
 let table k v = Table (k, v)
 
-let pp ppf (K (w, _)) = pp ppf w
-
 (* Accessors *)
 
 external k_objtyp : k -> int = "k_objtyp" [@@noalloc]
-(* external k_objattrs : k -> int = "k_objattrs" [@@noalloc]
- * external k_refcount : k -> int = "k_refcount" [@@noalloc] *)
+external k_objattrs : k -> int = "k_objattrs" [@@noalloc]
+external k_refcount : k -> int = "k_refcount" [@@noalloc]
 external k_length : k -> int = "k_length" [@@noalloc]
 (* external k_length64 : k -> int64 = "k_length64" *)
+
+let pp_print_k ppf k =
+  Format.fprintf ppf "<kobj t=%d a=%d r=%d l=%d>"
+    (k_objtyp k) (k_objattrs k) (k_refcount k) (k_length k)
+
+let pp ppf (K (w, k)) =
+  Format.fprintf ppf "%a %a" pp w pp_print_k k
 
 external k_g : k -> int = "k_g" [@@noalloc]
 external k_h : k -> int = "k_h" [@@noalloc]
@@ -471,9 +480,9 @@ let rec construct_list :
 and construct : type a. a w -> a -> t = fun w a ->
   match w with
   | List -> K (w, ktn 0 0)
-  | Tup w ->
+  | Tup ww ->
     let k = ktn 0 1 in
-    let K (_, k') = (construct w a) in
+    let K (_, k') = construct ww a in
     kK_set k 0 k' ;
     K (w, k)
 
@@ -628,7 +637,7 @@ and construct : type a. a w -> a -> t = fun w a ->
   | String _ -> assert false
 
 let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fun w k i ->
-  (* Printf.eprintf "destruct_list %d\n%!" i ; *)
+  Printf.eprintf "destruct_list %d\n%!" i ;
   match w with
   | Tup a -> begin
       match destruct a (kK k i) with
@@ -645,7 +654,7 @@ let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fu
   | _ -> assert false
 
 and destruct : type a. a w -> k -> (a, string) result = fun w k ->
-  (* Printf.eprintf "destruct\n%!" ; *)
+  Printf.eprintf "destruct\n%!" ;
   match w with
   | _ when k_objtyp k = -128 -> Error (k_s k)
   | List when k_objtyp k = 0 ->
@@ -832,7 +841,9 @@ let equal_typ (K (w1, _)) (K (w2, _)) = equal w1 w2
 let equal (K (w1, a)) (K (w2, b)) =
   match destruct_k w1 a, destruct_k w2 b with
   | Ok aa, Ok bb -> equal_typ_val w1 w2 aa bb
-  | _ -> false
+  | Error e, Ok _ -> failwith ("first failed: " ^ e)
+  | Ok _, Error e -> failwith ("second failed: " ^ e)
+  | Error e, Error f -> failwith ("both failed: " ^ e ^ ", " ^ f)
 
 (* Serialization *)
 
