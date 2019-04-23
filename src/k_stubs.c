@@ -20,9 +20,9 @@ static int compare_K(value a, value b) {
     return (aa == bb ? 0 : (aa < bb ? -1 : 1));
 }
 
-#include <stdio.h>
+/* #include <stdio.h> */
 static void finalize_K(value k) {
-    fprintf(stderr, "%p %d %d\n", K_val(k), K_val(k)->t, K_val(k)->r);
+    /* fprintf(stderr, "%p %d %d\n", K_val(k), K_val(k)->t, K_val(k)->r); */
     r0(K_val(k));
 }
 
@@ -606,7 +606,6 @@ CAMLprim value ymd_stub(value year, value month, value day) {
 CAMLprim value dj_stub(value i) {
     return Val_int(dj(Int_val(i)));
 }
-
 
 /*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

@@ -103,31 +103,8 @@ let eq_typ_val : type a b. a typ -> b typ -> a -> b -> (a, b) eq option = fun a 
   | Time, Time when x = y -> Some Eq
   | _ -> None
 
-(* let eq2 : type a b. a typ -> b typ -> a -> b -> bool = fun at bt a b ->
- *   match at, bt with
- *   | Boolean, Boolean -> a = b
- *   | Guid, Guid -> Uuidm.equal a b
- *   | Byte, Byte -> a = b
- *   | Short, Short -> a = b
- *   | Int, Int -> Int32.equal a b
- *   | Long, Long -> Int64.equal a b
- *   | Real, Real -> Float.equal a b
- *   | Float, Float -> Float.equal a b
- *   | Char, Char -> a = b
- *   | Symbol, Symbol -> String.equal a b
- *   | Timestamp, Timestamp -> Ptime.equal a b
- *   | Month, Month -> a = b
- *   | Date, Date -> a = b
- *   | Timespan, Timespan -> a = b
- *   | Minute, Minute -> a = b
- *   | Second, Second -> a = b
- *   | Time, Time -> a = b
- *   | _ -> false *)
-
 type k
-(* OCaml handler to a K object *)
 
-(* OCaml type of a K object. *)
 type _ w =
   | Atom : 'a typ -> 'a w
   | Vect : 'a typ -> 'a array w
@@ -292,7 +269,6 @@ external k_objtyp : k -> int = "k_objtyp" [@@noalloc]
 external k_objattrs : k -> int = "k_objattrs" [@@noalloc]
 external k_refcount : k -> int = "k_refcount" [@@noalloc]
 external k_length : k -> int = "k_length" [@@noalloc]
-(* external k_length64 : k -> int64 = "k_length64" *)
 
 let pp_print_k ppf k =
   Format.fprintf ppf "<kobj t=%d a=%d r=%d l=%d>"
@@ -418,8 +394,6 @@ let kx_epoch, kx_epoch_span =
 let day_in_ns d =
   Int64.(mul (of_int (d * 24 * 3600)) 1_000_000_000L)
 
-(* J pu(J u){return 1000000LL*(u-10957LL*86400000LL);} // kdb+
-   timestamp from unix, use ktj(Kj,n) to create timestamp from n *)
 let int64_of_timestamp = function
   | ts when Ptime.(equal ts min) -> Int64.min_int
   | ts ->
@@ -650,7 +624,6 @@ and construct : type a. a w -> a -> t = fun w a ->
   | String _ -> assert false
 
 let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fun w k i ->
-  (* Printf.eprintf "destruct_list %d\n%!" i ; *)
   match w with
   | Tup a -> begin
       match destruct a (kK k i) with
@@ -667,7 +640,6 @@ let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fu
   | _ -> assert false
 
 and destruct : type a. a w -> k -> (a, string) result = fun w k ->
-  (* Printf.eprintf "destruct\n%!" ; *)
   match w with
   | _ when k_objtyp k = -128 -> Error (k_s k)
   | List when k_objtyp k = 0 ->
