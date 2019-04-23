@@ -1,4 +1,3 @@
-module Kx = Kx_final
 open Kx
 open Alcotest
 
@@ -17,7 +16,7 @@ let pack_unpack
     check (testable Kx.pp Kx.equal) (name ^ "_destruct") v vvv
 
 let pack_unpack_atom () =
-  let open Kx_final in
+  let open Kx in
   pack_unpack "bool" (a bool) true ;
   pack_unpack "guid" (a guid) Uuidm.nil ;
   pack_unpack "byte" (a byte) '\x00' ;
@@ -40,7 +39,7 @@ let pack_unpack_atom () =
   ()
 
 let pack_unpack_vect () =
-  let open Kx_final in
+  let open Kx in
   pack_unpack "vect bool" (v bool) [|true; false|] ;
   pack_unpack "vect guid" (v guid) [|Uuidm.nil; Uuidm.nil|] ;
   pack_unpack "vect byte" (s byte) "\x00\x01\x02" ;

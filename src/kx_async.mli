@@ -1,5 +1,5 @@
 open Async_kernel
-open Kx_final
+open Kx
 
 val connect :
   ?timeout:Ptime.span ->

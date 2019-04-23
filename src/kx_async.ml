@@ -1,6 +1,5 @@
 open Core
 open Async
-module Kx = Kx_final
 
 let src = Logs.Src.create "kx.async"
 
