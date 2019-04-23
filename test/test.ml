@@ -7,12 +7,14 @@ let pack_unpack
   let v = construct w a in
   let v_serialized = to_string v in
   let vv_parsed = of_string_exn w v_serialized in
-  check (testable Kx.pp Kx.equal) name v vv_parsed ;
+  let vv_serialized = to_string vv_parsed in
+  check string (name ^ "_serial") v_serialized vv_serialized ;
+  check (testable Kx.pp Kx.equal) (name ^ "_parse") v vv_parsed ;
   match destruct w v with
   | Error msg -> failwith msg
   | Ok vv ->
     let vvv = construct w vv in
-    check (testable Kx.pp Kx.equal) name v vvv
+    check (testable Kx.pp Kx.equal) (name ^ "_destruct") v vvv
 
 let pack_unpack_atom () =
   let open Kx_final in
@@ -135,7 +137,7 @@ let tests_kx = [
   test_case "dict" `Quick (hu pack_unpack_dict) ;
   test_case "table" `Quick (hu pack_unpack_table) ;
   test_case "conv" `Quick (hu pack_unpack_conv) ;
-  (* test_case "server" `Quick test_server ; *)
+  test_case "server" `Quick test_server ;
 ]
 
 (* let tests_kx_async = Alcotest_async.[

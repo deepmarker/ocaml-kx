@@ -103,7 +103,7 @@ CAMLprim value kK_stub (value k, value i) {
 }
 
 CAMLprim value kK_set_stub (value k, value i, value e) {
-    kK(K_val(k))[Int_val(i)] = K_val(e);
+    kK(K_val(k))[Int_val(i)] = r1(K_val(e));
     return Val_unit;
 }
 
@@ -140,14 +140,6 @@ CAMLprim value kH_stub (value k) {
     CAMLlocal1(ret);
     ret = caml_ba_alloc_dims(CAML_BA_SINT16 | CAML_BA_C_LAYOUT,
                              1, kH(K_val(k)), K_val(k)->n);
-    CAMLreturn(ret);
-}
-
-CAMLprim value kI_int_stub (value k) {
-    CAMLparam1(k);
-    CAMLlocal1(ret);
-    ret = caml_ba_alloc_dims(CAML_BA_CAML_INT | CAML_BA_C_LAYOUT,
-                             1, kI(K_val(k)), K_val(k)->n);
     CAMLreturn(ret);
 }
 

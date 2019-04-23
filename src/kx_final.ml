@@ -1,15 +1,13 @@
-(* Type of bigarrays. *)
+open Bigarray
 
-type ('ml, 'c) bv =
-  ('ml, 'c, Bigarray.c_layout) Bigarray.Array1.t
+type ('ml, 'c) bv = ('ml, 'c, c_layout) Array1.t
 
-type gv = (int, Bigarray.int8_unsigned_elt) bv
-type hv = (int, Bigarray.int16_signed_elt)  bv
-type iv_int = (int, Bigarray.int_elt)       bv
-type iv = (int32, Bigarray.int32_elt)       bv
-type jv = (int64, Bigarray.int64_elt)       bv
-type ev = (float, Bigarray.float32_elt)     bv
-type fv = (float, Bigarray.float64_elt)     bv
+type gv = (int, int8_unsigned_elt) bv
+type hv = (int, int16_signed_elt)  bv
+type iv = (int32, int32_elt)       bv
+type jv = (int64, int64_elt)       bv
+type ev = (float, float32_elt)     bv
+type fv = (float, float64_elt)     bv
 
 type time = { time : Ptime.time ; ms : int }
 type timespan = { time : Ptime.time ; ns : int}
@@ -88,7 +86,11 @@ let eq_typ_val : type a b. a typ -> b typ -> a -> b -> (a, b) eq option = fun a 
   | Char, Char when x = y -> Some Eq
   | Symbol, Symbol when String.equal x y -> Some Eq
   | Timestamp, Timestamp when Ptime.equal x y -> Some Eq
-  | Month, Month when x = y -> Some Eq
+  | Month, Month ->
+    let a, b, c = x in
+    let d, e, f = y in
+    Printf.eprintf "%d %d %d | %d %d %d\n%!" a b c d e f ;
+    if x = y then Some Eq else None
   | Date, Date when x = y -> Some Eq
   | Timespan, Timespan when x = y -> Some Eq
   | Minute, Minute when x = y -> Some Eq
@@ -161,11 +163,16 @@ let rec equal : type a b. a w -> b w -> bool = fun a b ->
 let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
   match a, b with
   | Atom a, Atom b -> eq_typ_val a b x y  <> None
-  | Vect a, Vect b ->
-    let xx = Array.to_list x in
-    let yy = Array.to_list y in
-    List.fold_left2
-      (fun acc x y -> acc && eq_typ_val a b x y <> None) true xx yy
+  | Vect a, Vect b -> begin
+      match Array.length x, Array.length y with
+      | a, b when a <> b -> false
+      | len, _ ->
+        let ret = ref true in
+        for i = 0 to len - 1 do
+          ret := !ret && eq_typ_val a b x.(i) y.(i) <> None
+        done ;
+        !ret
+    end
   | String _, String _ -> String.equal x y
   | List, List -> true
   | Tup a, Tup b -> equal_typ_val a b x y
@@ -185,10 +192,11 @@ let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
     equal_typ_val a b (p1 x) (p2 y)
   | _ -> false
 
-let pp : type a. Format.formatter -> a w -> unit = fun ppf -> function
+let rec pp : type a. Format.formatter -> a w -> unit = fun ppf -> function
   | Atom t -> Format.pp_print_int ppf  (- (int_of_typ t))
   | Vect t -> Format.pp_print_int ppf  (int_of_typ t)
   | List -> Format.pp_print_int ppf 0
+  | Conv (_, _, w) -> Format.fprintf ppf "Conv %a" pp w
   | _ -> Format.pp_print_string ppf "<abstract>"
 
 let bool      = Boolean
@@ -317,7 +325,6 @@ external kG_char : k -> Bigstring.t = "kG_stub"
 external kG : k -> gv = "kG_stub"
 external kU : k -> Bigstring.t = "kU_stub"
 external kH : k -> hv = "kH_stub"
-external kII : k -> iv_int = "kI_int_stub"
 external kI : k -> iv = "kI_stub"
 external kJ : k -> jv = "kJ_stub"
 external kE : k -> ev = "kE_stub"
@@ -507,8 +514,9 @@ and construct : type a. a w -> a -> t = fun w a ->
       | Error msg -> invalid_arg msg
       | Ok k ->  K (w, k)
     end
-
-  | Conv (project, _, v) -> construct v (project a)
+  | Conv (project, _, ww) ->
+    let K (_, a) = construct ww (project a) in
+    K (w, a)
   | Atom Boolean -> K (w, kb a)
   | Atom Byte -> K (w, kg a)
   | Atom Short -> K (w, kh a)
@@ -530,8 +538,8 @@ and construct : type a. a w -> a -> t = fun w a ->
   | Vect Boolean ->
     let k = ktn 1 (Array.length a) in
     Array.iteri begin fun i -> function
-      | false -> Bigarray.Array1.set (kG k) i 0
-      | true -> Bigarray.Array1.set (kG k) i 1
+      | false -> Array1.set (kG k) i 0
+      | true -> Array1.set (kG k) i 1
     end a ;
     K (w, k)
 
@@ -563,27 +571,27 @@ and construct : type a. a w -> a -> t = fun w a ->
 
   | Vect Short ->
     let k = ktn 5 (Array.length a) in
-    Array.iteri (Bigarray.Array1.set (kH k)) a ;
+    Array.iteri (Array1.set (kH k)) a ;
     K (w, k)
 
   | Vect Int ->
     let k = ktn 6 (Array.length a) in
-    Array.iteri (Bigarray.Array1.set (kI k)) a ;
+    Array.iteri (Array1.set (kI k)) a ;
     K (w, k)
 
   | Vect Long ->
     let k = ktn 7 (Array.length a) in
-    Array.iteri (Bigarray.Array1.set (kJ k)) a ;
+    Array.iteri (Array1.set (kJ k)) a ;
     K (w, k)
 
   | Vect Real ->
     let k = ktn 8 (Array.length a) in
-    Array.iteri (Bigarray.Array1.set (kE k)) a ;
+    Array.iteri (Array1.set (kE k)) a ;
     K (w, k)
 
   | Vect Float ->
     let k = ktn 9 (Array.length a) in
-    Array.iteri (Bigarray.Array1.set (kF k)) a ;
+    Array.iteri (Array1.set (kF k)) a ;
     K (w, k)
 
   | Vect Symbol ->
@@ -601,37 +609,37 @@ and construct : type a. a w -> a -> t = fun w a ->
 
   | Vect Timestamp ->
     let k = ktn 12 (Array.length a) in
-    Array.iteri (fun i a -> Bigarray.Array1.set (kJ k) i (int64_of_timestamp a)) a ;
+    Array.iteri (fun i a -> Array1.set (kJ k) i (int64_of_timestamp a)) a ;
     K (w, k)
 
   | Vect Month ->
     let k = ktn 13 (Array.length a) in
-    Array.iteri (fun i a -> Bigarray.Array1.set (kII k) i (int_of_month a)) a ;
+    Array.iteri (fun i a -> Array1.set (kI k) i (Int32.of_int @@ int_of_month a)) a ;
     K (w, k)
 
   | Vect Date ->
     let k = ktn 14 (Array.length a) in
-    Array.iteri (fun i (y,m,d) -> Bigarray.Array1.set (kII k) i (ymd y m d)) a ;
+    Array.iteri (fun i (y,m,d) -> Array1.set (kI k) i (Int32.of_int @@ ymd y m d)) a ;
     K (w, k)
 
   | Vect Timespan ->
     let k = ktn 16 (Array.length a) in
-    Array.iteri (fun i { time ; ns } -> Bigarray.Array1.set (kJ k) i (int64_of_timespan time ns)) a ;
+    Array.iteri (fun i { time ; ns } -> Array1.set (kJ k) i (int64_of_timespan time ns)) a ;
     K (w, k)
 
   | Vect Minute ->
     let k = ktn 17 (Array.length a) in
-    Array.iteri (fun i a -> Bigarray.Array1.set (kII k) i (int_of_minute a)) a ;
+    Array.iteri (fun i a -> Array1.set (kI k) i (Int32.of_int @@ int_of_minute a)) a ;
     K (w, k)
 
   | Vect Second ->
     let k = ktn 18 (Array.length a) in
-    Array.iteri (fun i a -> Bigarray.Array1.set (kII k) i (int_of_second a)) a ;
+    Array.iteri (fun i a -> Array1.set (kI k) i (Int32.of_int @@ int_of_second a)) a ;
     K (w, k)
 
   | Vect Time ->
     let k = ktn 19 (Array.length a) in
-    Array.iteri (fun i { time ; ms } -> Bigarray.Array1.set (kII k) i (int_of_time time ms)) a ;
+    Array.iteri (fun i { time ; ms } -> Array1.set (kI k) i (Int32.of_int @@ int_of_time time ms)) a ;
     K (w, k)
 
   | String _ -> assert false
@@ -713,27 +721,27 @@ and destruct : type a. a w -> k -> (a, string) result = fun w k ->
   | Vect Short when k_objtyp k = 5 ->
     let len = k_length k in
     let buf = kH k in
-    Ok (Array.init len (Bigarray.Array1.get buf))
+    Ok (Array.init len (Array1.get buf))
 
   | Vect Int when k_objtyp k = 6 ->
     let len = k_length k in
     let buf = kI k in
-    Ok (Array.init len (Bigarray.Array1.get buf))
+    Ok (Array.init len (Array1.get buf))
 
   | Vect Long when k_objtyp k = 7 ->
     let len = k_length k in
     let buf = kJ k in
-    Ok (Array.init len (Bigarray.Array1.get buf))
+    Ok (Array.init len (Array1.get buf))
 
   | Vect Real when k_objtyp k = 8 ->
     let len = k_length k in
     let buf = kE k in
-    Ok (Array.init len (Bigarray.Array1.get buf))
+    Ok (Array.init len (Array1.get buf))
 
   | Vect Float when k_objtyp k = 9 ->
     let len = k_length k in
     let buf = kF k in
-    Ok (Array.init len (Bigarray.Array1.get buf))
+    Ok (Array.init len (Array1.get buf))
 
   | Vect Char when k_objtyp k = 10 ->
     let len = k_length k in
@@ -751,37 +759,37 @@ and destruct : type a. a w -> k -> (a, string) result = fun w k ->
   | Vect Timestamp when k_objtyp k = 12 ->
     let len = k_length k in
     let buf = kJ k in
-    Ok (Array.init len (fun i -> timestamp_of_int64 (Bigarray.Array1.get buf i)))
+    Ok (Array.init len (fun i -> timestamp_of_int64 (Array1.get buf i)))
 
   | Vect Month when k_objtyp k = 13 ->
     let len = k_length k in
-    let buf = kII k in
-    Ok (Array.init len (fun i -> month_of_int (Bigarray.Array1.get buf i)))
+    let buf = kI k in
+    Ok (Array.init len (fun i -> month_of_int (Int32.to_int @@ Array1.get buf i)))
 
   | Vect Date when k_objtyp k = 14 ->
     let len = k_length k in
-    let buf = kII k in
-    Ok (Array.init len (fun i -> date_of_int (Bigarray.Array1.get buf i)))
+    let buf = kI k in
+    Ok (Array.init len (fun i -> date_of_int (Int32.to_int @@ Array1.get buf i)))
 
   | Vect Timespan when k_objtyp k = 16 ->
     let len = k_length k in
     let buf = kJ k in
-    Ok (Array.init len (fun i -> timespan_of_int64 (Bigarray.Array1.get buf i)))
+    Ok (Array.init len (fun i -> timespan_of_int64 (Array1.get buf i)))
 
   | Vect Minute when k_objtyp k = 17 ->
     let len = k_length k in
-    let buf = kII k in
-    Ok (Array.init len (fun i -> minute_of_int (Bigarray.Array1.get buf i)))
+    let buf = kI k in
+    Ok (Array.init len (fun i -> minute_of_int (Int32.to_int @@ Array1.get buf i)))
 
   | Vect Second when k_objtyp k = 18 ->
     let len = k_length k in
-    let buf = kII k in
-    Ok (Array.init len (fun i -> second_of_int (Bigarray.Array1.get buf i)))
+    let buf = kI k in
+    Ok (Array.init len (fun i -> second_of_int (Int32.to_int @@ Array1.get buf i)))
 
   | Vect Time when k_objtyp k = 19 ->
     let len = k_length k in
-    let buf = kII k in
-    Ok (Array.init len (fun i -> time_of_int (Bigarray.Array1.get buf i)))
+    let buf = kI k in
+    Ok (Array.init len (fun i -> time_of_int (Int32.to_int @@ Array1.get buf i)))
 
   | List ->
     Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
