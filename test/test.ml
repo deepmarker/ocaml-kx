@@ -4,6 +4,7 @@ open Alcotest
 let pack_unpack
   : type a. string -> a w -> a -> unit = fun name w a ->
   let v = construct w a in
+  let _ = Format.asprintf "%a" Kx.pp v in
   let v_serialized = to_string v in
   let vv_parsed = of_string_exn w v_serialized in
   let vv_serialized = to_string vv_parsed in

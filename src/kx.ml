@@ -15,7 +15,7 @@ type ev = (float, float32_elt)     bv
 type fv = (float, float64_elt)     bv
 
 type time = { time : Ptime.time ; ms : int }
-type timespan = { time : Ptime.time ; ns : int}
+type timespan = { time : Ptime.time ; ns : int }
 
 type _ typ =
   | Boolean : bool typ
@@ -91,11 +91,7 @@ let eq_typ_val : type a b. a typ -> b typ -> a -> b -> (a, b) eq option = fun a 
   | Char, Char when x = y -> Some Eq
   | Symbol, Symbol when String.equal x y -> Some Eq
   | Timestamp, Timestamp when Ptime.equal x y -> Some Eq
-  | Month, Month ->
-    let a, b, c = x in
-    let d, e, f = y in
-    Printf.eprintf "%d %d %d | %d %d %d\n%!" a b c d e f ;
-    if x = y then Some Eq else None
+  | Month, Month -> if x = y then Some Eq else None
   | Date, Date when x = y -> Some Eq
   | Timespan, Timespan when x = y -> Some Eq
   | Minute, Minute when x = y -> Some Eq
@@ -174,12 +170,7 @@ let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
     equal_typ_val a b (p1 x) (p2 y)
   | _ -> false
 
-let rec pp : type a. Format.formatter -> a w -> unit = fun ppf -> function
-  | Atom t -> Format.pp_print_int ppf  (- (int_of_typ t))
-  | Vect t -> Format.pp_print_int ppf  (int_of_typ t)
-  | List -> Format.pp_print_int ppf 0
-  | Conv (_, _, w) -> Format.fprintf ppf "Conv %a" pp w
-  | _ -> Format.pp_print_string ppf "<abstract>"
+let pp ppf v = Format.pp_print_int ppf (int_of_w v)
 
 let bool      = Boolean
 let guid      = Guid
@@ -269,13 +260,6 @@ external k_objtyp : k -> int = "k_objtyp" [@@noalloc]
 external k_objattrs : k -> int = "k_objattrs" [@@noalloc]
 external k_refcount : k -> int = "k_refcount" [@@noalloc]
 external k_length : k -> int = "k_length" [@@noalloc]
-
-let pp_print_k ppf k =
-  Format.fprintf ppf "<kobj t=%d a=%d r=%d l=%d>"
-    (k_objtyp k) (k_objattrs k) (k_refcount k) (k_length k)
-
-let pp ppf (K (w, k)) =
-  Format.fprintf ppf "%a %a" pp w pp_print_k k
 
 external k_g : k -> int = "k_g" [@@noalloc]
 external k_h : k -> int = "k_h" [@@noalloc]
@@ -450,6 +434,57 @@ let guids a =
     | None -> assert false
     | Some v -> v
   end
+
+let pp_print_ba pp ppf ba =
+  let len = Array1.dim ba in
+  for i = 0 to len - 1 do
+    Format.fprintf ppf "%a " pp (Array1.get ba i)
+  done
+
+let rec pp_print_k ppf k =
+  match k_objtyp k with
+  (* | i when i >= 0 -> begin
+   *     for i = 0 to k_length k - 1 do
+   *       pp_print_k ppf (kK k i)
+   *     done
+   *   end *)
+  | 1 -> pp_print_ba (fun ppf a -> Format.pp_print_bool ppf (a = 0)) ppf (kG k)
+  | 2 -> pp_print_ba (fun ppf a -> Format.pp_print_bool ppf (a = 0)) ppf (kU k)
+  | -1 -> Format.pp_print_bool ppf (k_g k <> 0)
+  | -2 -> Format.fprintf ppf "%a" Uuidm.pp (k_u k)
+  | -3 -> Format.fprintf ppf "0x%x" (k_g k)
+  | -5 -> Format.pp_print_int ppf (k_h k)
+  | -6 -> Format.fprintf ppf "%ld" (k_i k)
+  | -7 -> Format.fprintf ppf "%Ld" (k_j k)
+  | -8 -> Format.pp_print_float ppf (k_e k)
+  | -9 -> Format.pp_print_float ppf (k_f k)
+  | -10 -> Format.pp_print_char ppf (Char.chr (k_g k))
+  | -11 -> Format.pp_print_string ppf ("`" ^ k_s k)
+  | -12 -> Format.fprintf ppf "%a" Ptime.pp (timestamp_of_int64 (k_j k))
+  | -13 ->
+    let y, m, _ = month_of_int (k_ii k) in
+    Format.fprintf ppf "%d.%dm" y m
+  | -14 ->
+    let y, m, d = month_of_int (k_ii k) in
+    Format.fprintf ppf "%d.%d.%d" y m d
+  | -15 ->
+    let { time = ((hh, mm, ss), _) ; ns } = timespan_of_int64 (k_j k) in
+    Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ns
+  | -17 ->
+    let (hh, mm, _), _ = minute_of_int (k_ii k) in
+    Format.fprintf ppf "%d:%d" hh mm
+  | -18 ->
+    let (hh, mm, ss), _ = second_of_int (k_ii k) in
+    Format.fprintf ppf "%d:%d:%d" hh mm ss
+  | -19 ->
+    let { time = ((hh, mm, ss), _) ; ms } = time_of_int (k_ii k) in
+    Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ms
+  | _ ->
+    Format.fprintf ppf "<kobj t=%d a=%d r=%d l=%d>"
+      (k_objtyp k) (k_objattrs k) (k_refcount k) (k_length k)
+
+let pp ppf (K (w, k)) =
+  Format.fprintf ppf "%a %a" pp w pp_print_k k
 
 let rec construct_list :
   type a. k list -> a w -> a -> k list = fun ks w a ->
@@ -641,7 +676,6 @@ let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fu
 
 and destruct : type a. a w -> k -> (a, string) result = fun w k ->
   match w with
-  | _ when k_objtyp k = -128 -> Error (k_s k)
   | List when k_objtyp k = 0 ->
     Ok (Array.init (k_length k) (kK k))
   | Conv (_, inject, w) -> begin
