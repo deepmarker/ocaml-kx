@@ -106,6 +106,7 @@ type _ w =
   | Vect : 'a typ -> 'a array w
   | String : char typ -> string w
   | Compound : 'a typ -> 'a array array w
+  | CompoundS : char typ -> string array w
   | List : k array w
   | Tup : 'a w -> 'a w
   | Tups : 'a w * 'b w -> ('a * 'b) w
@@ -120,6 +121,7 @@ let rec int_of_w : type a. a w -> int = function
   | Vect a -> int_of_typ a
   | String a -> int_of_typ a
   | Compound _ -> 0
+  | CompoundS _ -> 0
   | List -> 0
   | Tup _ -> 0
   | Tups _ -> 0
@@ -165,6 +167,16 @@ let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
         done ;
         !ret
     end
+  | CompoundS a, CompoundS b -> begin
+      match Array.length x, Array.length y with
+      | a, b when a <> b -> false
+      | len, _ ->
+        let ret = ref true in
+        for i = 0 to len - 1 do
+          ret := !ret && equal_typ_val (String a) (String b) x.(i) y.(i)
+        done ;
+        !ret
+    end
   | Tup a, Tup b -> equal_typ_val a b x y
   | Tups (a, b), Tups (c, d) ->
     let x1, x2 = x in
@@ -206,6 +218,7 @@ let conv project inject a =
 let a a = Atom a
 let v a = Vect a
 let compound a = Compound a
+let compounds a = CompoundS a
 let s a = String a
 
 let list = List
@@ -567,6 +580,13 @@ and construct : type a. a w -> a -> t = fun w a ->
       kK_set k i k'
     end a ;
     K (w, k)
+  | CompoundS ww ->
+    let k = ktn 0 (Array.length a) in
+    Array.iteri begin fun i a ->
+      let K (_, k') = construct (String ww) a in
+      kK_set k i k'
+    end a ;
+    K (w, k)
   | Tup ww ->
     let k = ktn 0 1 in
     let K (_, k') = construct ww a in
@@ -749,6 +769,17 @@ and destruct : type a. a w -> k -> (a, string) result = fun w k ->
         | -1 -> acc
         | i ->
           match destruct (Vect w) (kK k i) with
+          | Error e -> failwith e
+          | Ok v -> inner (v :: acc) (pred i) in
+      try
+        Ok (Array.of_list (inner [] (pred (k_length k))))
+      with Failure msg -> Error msg
+    end
+  | CompoundS w -> begin
+      let rec inner acc = function
+        | -1 -> acc
+        | i ->
+          match destruct (String w) (kK k i) with
           | Error e -> failwith e
           | Ok v -> inner (v :: acc) (pred i) in
       try

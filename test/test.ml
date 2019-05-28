@@ -73,7 +73,7 @@ let pack_unpack_list () =
   pack_unpack "nested"
     (t1 (t1 (a bool))) true ;
   pack_unpack "compound" (compound short) [|[|1;2|]; [|3;4|]|] ;
-  (* pack_unpack "string list" (compound char) ["machin"; "truc"] ; *)
+  pack_unpack "string list" (compounds char) [|"machin"; "truc"|] ;
   ()
 
 let pack_unpack_dict () =

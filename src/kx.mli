@@ -32,6 +32,7 @@ val a : 'a typ -> 'a w
 val v : 'a typ -> 'a array w
 val compound : 'a typ -> 'a array array w
 val s : char typ -> string w
+val compounds : char typ -> string array w
 
 val list : k array w
 val t1 : 'a w -> 'a w
