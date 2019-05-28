@@ -30,6 +30,7 @@ val time      : time typ
 
 val a : 'a typ -> 'a w
 val v : 'a typ -> 'a array w
+val compound : 'a typ -> 'a array array w
 val s : char typ -> string w
 
 val list : k array w

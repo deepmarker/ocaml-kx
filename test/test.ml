@@ -72,6 +72,8 @@ let pack_unpack_list () =
     (t1 (v guid)) [|Uuidm.nil; Uuidm.nil|] ;
   pack_unpack "nested"
     (t1 (t1 (a bool))) true ;
+  pack_unpack "compound" (compound short) [|[|1;2|]; [|3;4|]|] ;
+  (* pack_unpack "string list" (compound char) ["machin"; "truc"] ; *)
   ()
 
 let pack_unpack_dict () =
@@ -137,7 +139,7 @@ let tests_kx = [
   test_case "dict" `Quick (hu pack_unpack_dict) ;
   test_case "table" `Quick (hu pack_unpack_table) ;
   test_case "conv" `Quick (hu pack_unpack_conv) ;
-  test_case "server" `Quick test_server ;
+  (* test_case "server" `Quick test_server ; *)
 ]
 
 (* let tests_kx_async = Alcotest_async.[
