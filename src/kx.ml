@@ -107,7 +107,7 @@ type _ w =
   | String : char typ -> string w
   | Compound : 'a typ -> 'a array array w
   | CompoundS : char typ -> string array w
-  | List : k array w
+  | List : 'a w array -> 'a array w
   | Tup : 'a w -> 'a w
   | Tups : 'a w * 'b w -> ('a * 'b) w
   | Dict : 'a w * 'b w -> ('a * 'b) w
@@ -122,7 +122,7 @@ let rec int_of_w : type a. a w -> int = function
   | String a -> int_of_typ a
   | Compound _ -> 0
   | CompoundS _ -> 0
-  | List -> 0
+  | List _ -> 0
   | Tup _ -> 0
   | Tups _ -> 0
   | Dict _ -> 99
@@ -134,7 +134,15 @@ let rec equal : type a b. a w -> b w -> bool = fun a b ->
   | Atom a, Atom b -> eq_typ a b <> None
   | Vect a, Vect b -> eq_typ a b <> None
   | String a, String b -> eq_typ a b <> None
-  | List, List -> true
+  | List a, List b -> begin
+    Array.length a = Array.length b &&
+    try
+      for i = 0 to Array.length b - 1 do
+        if not (equal a.(i) b.(i)) then raise Exit
+      done ;
+      true
+    with Exit -> false
+  end
   | Tup a, Tup b -> equal a b
   | Tups (a, b), Tups (c, d) -> equal a c && equal b d
   | Dict (a, b), Dict (c, d) -> equal a c && equal b d
@@ -156,7 +164,17 @@ let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
         !ret
     end
   | String _, String _ -> String.equal x y
-  | List, List -> true
+  | List a, List b ->
+    begin
+      match Array.length x, Array.length y, Array.length x, Array.length y with
+      | a, b, c, d when a <> b || a <> c || a <> d -> false
+      | len, _, _, _ ->
+        let ret = ref true in
+        for i = 0 to len - 1 do
+          ret := !ret && equal_typ_val a.(i) b.(i) x.(i) y.(i)
+        done ;
+        !ret
+    end
   | Compound a, Compound b -> begin
       match Array.length x, Array.length y with
       | a, b when a <> b -> false
@@ -221,7 +239,7 @@ let compound a = Compound a
 let compounds a = CompoundS a
 let s a = String a
 
-let list = List
+let list a = List a
 
 let t1 a = Tup a
 let t2 a b = Tups (Tup a, Tup b)
@@ -572,7 +590,13 @@ let rec construct_list :
 
 and construct : type a. a w -> a -> t = fun w a ->
   match w with
-  | List -> K (w, ktn 0 0)
+  | List ws ->
+    let k = ktn 0 (Array.length a) in
+    Array.iteri begin fun i w' ->
+      let K (_, k') = construct w' a.(i) in
+      kK_set k i k'
+    end ws ;
+    K (w, k)
   | Compound ww ->
     let k = ktn 0 (Array.length a) in
     Array.iteri begin fun i a ->
@@ -762,8 +786,17 @@ let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fu
 
 and destruct : type a. a w -> k -> (a, string) result = fun w k ->
   match w with
-  | List when k_objtyp k = 0 ->
-    Ok (Array.init (k_length k) (kK k))
+  | List ws when k_objtyp k = 0 -> begin
+      let rec inner acc = function
+        | -1 -> acc
+        | i ->
+          match destruct ws.(i) (kK k i) with
+          | Error e -> failwith e
+          | Ok v -> inner (v :: acc) (pred i) in
+      try
+        Ok (Array.of_list (inner [] (pred (k_length k))))
+      with Failure msg -> Error msg
+    end
   | Compound w -> begin
       let rec inner acc = function
         | -1 -> acc
@@ -910,7 +943,7 @@ and destruct : type a. a w -> k -> (a, string) result = fun w k ->
     let buf = kI k in
     Ok (Array.init len (fun i -> time_of_int (Int32.to_int @@ Array1.get buf i)))
 
-  | List ->
+  | List _ ->
     Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
   | Atom _ ->
     Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))

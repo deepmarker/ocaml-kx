@@ -62,7 +62,8 @@ let pack_unpack_vect () =
 
 let pack_unpack_list () =
   let open Kx in
-  pack_unpack "empty" list [||] ;
+  pack_unpack "empty" (list [||]) [||] ;
+  pack_unpack "compound2" (list [|v short; v short|]) [|[|1;2|]; [|3;4|]|] ;
   pack_unpack "simple" (t1 (a bool)) true ;
   pack_unpack "simple2" (t2 (a int) (a float)) (0l, 0.) ;
   pack_unpack "vect"
@@ -77,8 +78,8 @@ let pack_unpack_list () =
   ()
 
 let pack_unpack_dict () =
-  let open Kx in
-  pack_unpack "empty" (dict list list) ([||], [||]);
+  (* let open Kx in *)
+  (* pack_unpack "empty" (dict list list) ([||], [||]); *)
   ()
 
 let pack_unpack_table () =
@@ -94,23 +95,23 @@ let pack_unpack_conv () =
     ((1, 2, 3), false, true) ;
   ()
 
-let test_server () =
-  let open Kx in
-  let key = v sym in
-  let values = t9
-      (v sym) (v sym) (v sym)
-      (v int) (v int) (v timestamp)
-      (v timestamp) (v timestamp) list in
-  let retwit = table key values in
-  with_connection
-    (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
-    ~f:begin fun fd ->
-      k0_sync fd
-        ".servers.SERVERS" retwit
-    end |> function
-  | Ok (Ok _a) -> ()
-  | Ok (Error msg) -> failwith msg
-  | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg)
+(* let test_server () =
+ *   let open Kx in
+ *   let key = v sym in
+ *   let values = t9
+ *       (v sym) (v sym) (v sym)
+ *       (v int) (v int) (v timestamp)
+ *       (v timestamp) (v timestamp) list in
+ *   let retwit = table key values in
+ *   with_connection
+ *     (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
+ *     ~f:begin fun fd ->
+ *       k0_sync fd
+ *         ".servers.SERVERS" retwit
+ *     end |> function
+ *   | Ok (Ok _a) -> ()
+ *   | Ok (Error msg) -> failwith msg
+ *   | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg) *)
 
 let do_n_times n m f () =
   for i = 0 to n - 1 do

@@ -34,7 +34,7 @@ val compound : 'a typ -> 'a array array w
 val s : char typ -> string w
 val compounds : char typ -> string array w
 
-val list : k array w
+val list : 'a w array -> 'a array w
 val t1 : 'a w -> 'a w
 val t2 : 'a w -> 'b w -> ('a * 'b) w
 val t3 : 'a w -> 'b w -> 'c w -> ('a * 'b * 'c) w
