@@ -30,11 +30,9 @@ val time      : time typ
 
 val a : 'a typ -> 'a w
 val v : 'a typ -> 'a array w
-val compound : 'a typ -> 'a array array w
 val s : char typ -> string w
-val compounds : char typ -> string array w
 
-val list : 'a w array -> 'a array w
+val list : 'a w -> 'a array w
 val t1 : 'a w -> 'a w
 val t2 : 'a w -> 'b w -> ('a * 'b) w
 val t3 : 'a w -> 'b w -> 'c w -> ('a * 'b * 'c) w

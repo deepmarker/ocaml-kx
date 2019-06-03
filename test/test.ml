@@ -62,8 +62,7 @@ let pack_unpack_vect () =
 
 let pack_unpack_list () =
   let open Kx in
-  pack_unpack "empty" (list [||]) [||] ;
-  pack_unpack "compound2" (list [|v short; v short|]) [|[|1;2|]; [|3;4|]|] ;
+  pack_unpack "empty" (list (a bool)) [||] ;
   pack_unpack "simple" (t1 (a bool)) true ;
   pack_unpack "simple2" (t2 (a int) (a float)) (0l, 0.) ;
   pack_unpack "vect"
@@ -73,18 +72,24 @@ let pack_unpack_list () =
     (t1 (v guid)) [|Uuidm.nil; Uuidm.nil|] ;
   pack_unpack "nested"
     (t1 (t1 (a bool))) true ;
-  pack_unpack "compound" (compound short) [|[|1;2|]; [|3;4|]|] ;
-  pack_unpack "string list" (compounds char) [|"machin"; "truc"|] ;
+  pack_unpack "compound" (list (v short)) [|[|1;2|]; [|3;4|]|] ;
+  pack_unpack "string list" (list (s char)) [|"machin"; "truc"|] ;
   ()
 
 let pack_unpack_dict () =
-  (* let open Kx in *)
-  (* pack_unpack "empty" (dict list list) ([||], [||]); *)
+  let open Kx in
+  pack_unpack "empty" (dict (list (a bool)) (list (a bool))) ([||], [||]);
+  pack_unpack "simple" (dict (v sym) (v long)) ([|"a";"b";"c"|], [|1L;2L;3L|]);
+  pack_unpack "compound"
+    (dict
+       (list (t2 (a bool) (a int)))
+       (list (t2 (a bool) (a int))))
+    ([|true, 3l; false, 2l|], [|false, 1l; true, 2l|]);
   ()
 
 let pack_unpack_table () =
   let open Kx in
-  pack_unpack "empty" (table (v sym) (v long)) ([|"a"|], [|1L|]);
+  pack_unpack "simple" (table (v sym) (v long)) ([|"a"|], [|1L|]);
   ()
 
 let pack_unpack_conv () =

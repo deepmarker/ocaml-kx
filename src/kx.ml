@@ -105,9 +105,7 @@ type _ w =
   | Atom : 'a typ -> 'a w
   | Vect : 'a typ -> 'a array w
   | String : char typ -> string w
-  | Compound : 'a typ -> 'a array array w
-  | CompoundS : char typ -> string array w
-  | List : 'a w array -> 'a array w
+  | List : 'a w -> 'a array w
   | Tup : 'a w -> 'a w
   | Tups : 'a w * 'b w -> ('a * 'b) w
   | Dict : 'a w * 'b w -> ('a * 'b) w
@@ -120,8 +118,6 @@ let rec int_of_w : type a. a w -> int = function
   | Atom a -> -(int_of_typ a)
   | Vect a -> int_of_typ a
   | String a -> int_of_typ a
-  | Compound _ -> 0
-  | CompoundS _ -> 0
   | List _ -> 0
   | Tup _ -> 0
   | Tups _ -> 0
@@ -134,15 +130,7 @@ let rec equal : type a b. a w -> b w -> bool = fun a b ->
   | Atom a, Atom b -> eq_typ a b <> None
   | Vect a, Vect b -> eq_typ a b <> None
   | String a, String b -> eq_typ a b <> None
-  | List a, List b -> begin
-    Array.length a = Array.length b &&
-    try
-      for i = 0 to Array.length b - 1 do
-        if not (equal a.(i) b.(i)) then raise Exit
-      done ;
-      true
-    with Exit -> false
-  end
+  | List a, List b -> equal a b
   | Tup a, Tup b -> equal a b
   | Tups (a, b), Tups (c, d) -> equal a c && equal b d
   | Dict (a, b), Dict (c, d) -> equal a c && equal b d
@@ -166,32 +154,12 @@ let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
   | String _, String _ -> String.equal x y
   | List a, List b ->
     begin
-      match Array.length x, Array.length y, Array.length x, Array.length y with
-      | a, b, c, d when a <> b || a <> c || a <> d -> false
-      | len, _, _, _ ->
-        let ret = ref true in
-        for i = 0 to len - 1 do
-          ret := !ret && equal_typ_val a.(i) b.(i) x.(i) y.(i)
-        done ;
-        !ret
-    end
-  | Compound a, Compound b -> begin
       match Array.length x, Array.length y with
       | a, b when a <> b -> false
       | len, _ ->
         let ret = ref true in
         for i = 0 to len - 1 do
-          ret := !ret && equal_typ_val (Vect a) (Vect b) x.(i) y.(i)
-        done ;
-        !ret
-    end
-  | CompoundS a, CompoundS b -> begin
-      match Array.length x, Array.length y with
-      | a, b when a <> b -> false
-      | len, _ ->
-        let ret = ref true in
-        for i = 0 to len - 1 do
-          ret := !ret && equal_typ_val (String a) (String b) x.(i) y.(i)
+          ret := !ret && equal_typ_val a b x.(i) y.(i)
         done ;
         !ret
     end
@@ -235,8 +203,6 @@ let conv project inject a =
 
 let a a = Atom a
 let v a = Vect a
-let compound a = Compound a
-let compounds a = CompoundS a
 let s a = String a
 
 let list a = List a
@@ -590,24 +556,10 @@ let rec construct_list :
 
 and construct : type a. a w -> a -> t = fun w a ->
   match w with
-  | List ws ->
+  | List w' ->
     let k = ktn 0 (Array.length a) in
-    Array.iteri begin fun i w' ->
-      let K (_, k') = construct w' a.(i) in
-      kK_set k i k'
-    end ws ;
-    K (w, k)
-  | Compound ww ->
-    let k = ktn 0 (Array.length a) in
-    Array.iteri begin fun i a ->
-      let K (_, k') = construct (Vect ww) a in
-      kK_set k i k'
-    end a ;
-    K (w, k)
-  | CompoundS ww ->
-    let k = ktn 0 (Array.length a) in
-    Array.iteri begin fun i a ->
-      let K (_, k') = construct (String ww) a in
+    Array.iteri begin fun i ai ->
+      let K (_, k') = construct w' ai in
       kK_set k i k'
     end a ;
     K (w, k)
@@ -786,33 +738,11 @@ let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fu
 
 and destruct : type a. a w -> k -> (a, string) result = fun w k ->
   match w with
-  | List ws when k_objtyp k = 0 -> begin
+  | List w when k_objtyp k = 0 -> begin
       let rec inner acc = function
         | -1 -> acc
         | i ->
-          match destruct ws.(i) (kK k i) with
-          | Error e -> failwith e
-          | Ok v -> inner (v :: acc) (pred i) in
-      try
-        Ok (Array.of_list (inner [] (pred (k_length k))))
-      with Failure msg -> Error msg
-    end
-  | Compound w -> begin
-      let rec inner acc = function
-        | -1 -> acc
-        | i ->
-          match destruct (Vect w) (kK k i) with
-          | Error e -> failwith e
-          | Ok v -> inner (v :: acc) (pred i) in
-      try
-        Ok (Array.of_list (inner [] (pred (k_length k))))
-      with Failure msg -> Error msg
-    end
-  | CompoundS w -> begin
-      let rec inner acc = function
-        | -1 -> acc
-        | i ->
-          match destruct (String w) (kK k i) with
+          match destruct w (kK k i) with
           | Error e -> failwith e
           | Ok v -> inner (v :: acc) (pred i) in
       try
