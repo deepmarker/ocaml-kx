@@ -69,6 +69,16 @@ val of_string : 'a w -> string -> (t, string) result
 val of_string_exn : 'a w -> string -> t
 val to_string : ?mode:int -> t -> string
 
+val nh : int
+val ni : int32
+val nj : int64
+val nf : float
+
+val wh : int
+val wi : int32
+val wj : int64
+val wf : float
+
 (** Connection to q server *)
 
 val init : unit -> unit

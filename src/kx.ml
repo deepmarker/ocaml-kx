@@ -3,6 +3,18 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
+let nh = 0xffff_8000
+let wh = 0x7fff
+
+let ni = 0x8000_0000l
+let wi = 0x7fff_ffffl
+
+let nj = 0x8000_0000_0000_0000L
+let wj = 0x7fff_ffff_ffff_ffffL
+
+let nf = nan
+let wf = infinity
+
 open Bigarray
 
 type ('ml, 'c) bv = ('ml, 'c, c_layout) Array1.t
