@@ -100,6 +100,15 @@ let pack_unpack_conv () =
     ((1, 2, 3), false, true) ;
   ()
 
+let leaktest n l m () =
+  let open Kx in
+  let o = list (a sym) in
+  for _ = 0 to n - 1 do
+    ignore @@ destruct o (construct o (Array.init l (fun _ -> Bytes.(unsafe_to_string (create m)))))
+  done ;
+  Gc.compact () ;
+  Gc.print_stat stderr
+
 (* let test_server () =
  *   let open Kx in
  *   let key = v sym in
@@ -124,6 +133,7 @@ let do_n_times n m f () =
     if i mod m = 0 then Gc.compact ()
   done
 let hu = do_n_times 100 10
+let th = do_n_times 1000 100
 
 let utilities () =
   check int "month1" 0 (int_of_month (2000, 1, 0)) ;
@@ -138,12 +148,13 @@ let utilities () =
   done
 
 let tests_kx = [
+  test_case "leaktest" `Quick (leaktest 100 100000 4096) ;
   test_case "utilities" `Quick (utilities) ;
   test_case "atom" `Quick (hu pack_unpack_atom) ;
   test_case "vect" `Quick (hu pack_unpack_vect) ;
-  test_case "list" `Quick (hu pack_unpack_list) ;
-  test_case "dict" `Quick (hu pack_unpack_dict) ;
-  test_case "table" `Quick (hu pack_unpack_table) ;
+  test_case "list" `Quick (th pack_unpack_list) ;
+  test_case "dict" `Quick (th pack_unpack_dict) ;
+  test_case "table" `Quick (th pack_unpack_table) ;
   test_case "conv" `Quick (hu pack_unpack_conv) ;
   (* test_case "server" `Quick test_server ; *)
 ]

@@ -14,6 +14,7 @@
 #include "k.h"
 
 #define K_val(v) (*((K*) Data_custom_val(v)))
+#define K_val_r1(v) (r1((*((K*) Data_custom_val(v)))))
 
 static int compare_K(value a, value b) {
     K aa = K_val(a), bb = K_val(b);
@@ -82,7 +83,7 @@ CAMLprim value k_s (value k) {
 CAMLprim value k_k (value k) {
     CAMLparam1(k);
     CAMLlocal1(ret);
-    ret = caml_alloc_K(K_val(k)->k);
+    ret = caml_alloc_K(r1(K_val(k)->k));
     CAMLreturn(ret);
 }
 
@@ -98,7 +99,7 @@ CAMLprim value k_u (value k) {
 CAMLprim value kK_stub (value k, value i) {
     CAMLparam2(k, i);
     CAMLlocal1(ret);
-    ret = caml_alloc_K(r1(kK(r1(K_val(k)))[Long_val(i)]));
+    ret = caml_alloc_K(r1(kK(K_val(k))[Long_val(i)]));
     CAMLreturn(ret);
 }
 
@@ -362,24 +363,6 @@ CAMLprim value ktd_stub (value kt) {
     CAMLreturn(k);
 }
 
-CAMLprim value js_stub (value k, value s) {
-    K ret = js(Data_custom_val(k), ss(String_val(s)));
-    K_val(k) = ret;
-    return Val_unit;
-}
-
-CAMLprim value jk_stub (value k, value v) {
-    K ret = jk(Data_custom_val(k), K_val(v));
-    K_val(k) = ret;
-    return Val_unit;
-}
-
-CAMLprim value jv_stub (value k, value v) {
-    K ret = jv(Data_custom_val(k), K_val(v));
-    K_val(k) = ret;
-    return Val_unit;
-}
-
 CAMLprim value d9_stub (value k) {
     CAMLparam1(k);
     CAMLlocal3(ret, errmsg, kk);
@@ -457,17 +440,17 @@ CAMLprim value k0_stub(value fd, value msg) {
 }
 
 CAMLprim value k1_stub(value fd, value msg, value a) {
-    K r = k(-Int_val(fd), String_val(msg), K_val(a), (K)NULL);
+    K r = k(-Int_val(fd), String_val(msg), K_val_r1(a), (K)NULL);
     return Val_unit;
 }
 
 CAMLprim value k2_stub(value fd, value msg, value a, value b) {
-    K r = k(-Int_val(fd), String_val(msg), K_val(a), K_val(b), (K)NULL);
+    K r = k(-Int_val(fd), String_val(msg), K_val_r1(a), K_val_r1(b), (K)NULL);
     return Val_unit;
 }
 
 CAMLprim value k3_stub(value fd, value msg, value a, value b, value c) {
-    K r = k(-Int_val(fd), String_val(msg), K_val(a), K_val(b), K_val(c), (K)NULL);
+    K r = k(-Int_val(fd), String_val(msg), K_val_r1(a), K_val_r1(b), K_val_r1(c), (K)NULL);
     return Val_unit;
 }
 
@@ -482,8 +465,7 @@ CAMLprim value k0_sync_stub(value fd, value msg) {
 CAMLprim value k1_sync_stub(value fd, value msg, value a) {
     CAMLparam3(fd, msg, a);
     CAMLlocal1(ret);
-    r1(K_val(a));
-    K r = k(Int_val(fd), String_val(msg), K_val(a), (K)NULL);
+    K r = k(Int_val(fd), String_val(msg), K_val_r1(a), (K)NULL);
     ret = caml_alloc_K(r);
     CAMLreturn(ret);
 }
@@ -491,9 +473,7 @@ CAMLprim value k1_sync_stub(value fd, value msg, value a) {
 CAMLprim value k2_sync_stub(value fd, value msg, value a, value b) {
     CAMLparam4(fd, msg, a, b);
     CAMLlocal1(ret);
-    r1(K_val(a));
-    r1(K_val(b));
-    K r = k(Int_val(fd), String_val(msg), K_val(a), K_val(b), (K)NULL);
+    K r = k(Int_val(fd), String_val(msg), K_val_r1(a), K_val_r1(b), (K)NULL);
     ret = caml_alloc_K(r);
     CAMLreturn(ret);
 }
@@ -501,10 +481,7 @@ CAMLprim value k2_sync_stub(value fd, value msg, value a, value b) {
 CAMLprim value k3_sync_stub(value fd, value msg, value a, value b, value c) {
     CAMLparam5(fd, msg, a, b, c);
     CAMLlocal1(ret);
-    r1(K_val(a));
-    r1(K_val(b));
-    r1(K_val(c));
-    K r = k(Int_val(fd), String_val(msg), K_val(a), K_val(b), K_val(c), (K)NULL);
+    K r = k(Int_val(fd), String_val(msg), K_val_r1(a), K_val_r1(b), K_val_r1(c), (K)NULL);
     ret = caml_alloc_K(r);
     CAMLreturn(ret);
 }
@@ -512,43 +489,39 @@ CAMLprim value k3_sync_stub(value fd, value msg, value a, value b, value c) {
 CAMLprim value kn_stub(value fd, value msg, value a) {
     K r, n;
 
-    for(int i=0;i<Wosize_val(a);i++) {
-        r1(K_val(Field(a, i)));
-    }
-
     switch (Wosize_val(a)) {
     case 0:
         r = k(-Int_val(fd), String_val(msg), (K)NULL);
         break;
     case 1:
         r = k(-Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), (K)NULL);
+              K_val_r1(Field(a, 0)), (K)NULL);
         break;
     case 2:
         r = k(-Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), K_val(Field(a, 1)), (K)NULL);
+              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)), (K)NULL);
         break;
     case 3:
         r = k(-Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), K_val(Field(a, 1)),
-              K_val(Field(a, 2)), (K)NULL);
+              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+              K_val_r1(Field(a, 2)), (K)NULL);
         break;
     case 4:
         r = k(-Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), K_val(Field(a, 1)),
-              K_val(Field(a, 2)), K_val(Field(a, 3)), (K)NULL);
+              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+              K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)), (K)NULL);
         break;
     case 5:
         r = k(-Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), K_val(Field(a, 1)),
-              K_val(Field(a, 2)), K_val(Field(a, 3)),
-              K_val(Field(a, 4)), (K)NULL);
+              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+              K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)),
+              K_val_r1(Field(a, 4)), (K)NULL);
         break;
     case 6:
         r = k(-Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), K_val(Field(a, 1)),
-              K_val(Field(a, 2)), K_val(Field(a, 3)),
-              K_val(Field(a, 4)), K_val(Field(a, 5)), (K)NULL);
+              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+              K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)),
+              K_val_r1(Field(a, 4)), K_val_r1(Field(a, 5)), (K)NULL);
         break;
 
     default:
@@ -567,33 +540,33 @@ CAMLprim value kn_sync_stub(value fd, value msg, value a) {
         break;
     case 1:
         r = k(Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), (K)NULL);
+              K_val_r1(Field(a, 0)), (K)NULL);
         break;
     case 2:
         r = k(Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), K_val(Field(a, 1)), (K)NULL);
+              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)), (K)NULL);
         break;
     case 3:
         r = k(Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), K_val(Field(a, 1)),
-              K_val(Field(a, 2)), (K)NULL);
+              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+              K_val_r1(Field(a, 2)), (K)NULL);
         break;
     case 4:
         r = k(Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), K_val(Field(a, 1)),
-              K_val(Field(a, 2)), K_val(Field(a, 3)), (K)NULL);
+              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+              K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)), (K)NULL);
         break;
     case 5:
         r = k(Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), K_val(Field(a, 1)),
-              K_val(Field(a, 2)), K_val(Field(a, 3)),
-              K_val(Field(a, 4)), (K)NULL);
+              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+              K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)),
+              K_val_r1(Field(a, 4)), (K)NULL);
         break;
     case 6:
         r = k(Int_val(fd), String_val(msg),
-              K_val(Field(a, 0)), K_val(Field(a, 1)),
-              K_val(Field(a, 2)), K_val(Field(a, 3)),
-              K_val(Field(a, 4)), K_val(Field(a, 5)), (K)NULL);
+              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+              K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)),
+              K_val_r1(Field(a, 4)), K_val_r1(Field(a, 5)), (K)NULL);
         break;
     }
     ret = caml_alloc_K(r);

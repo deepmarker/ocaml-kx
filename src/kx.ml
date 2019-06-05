@@ -344,9 +344,6 @@ external ktimespan : int64 -> k = "ktimespan_stub"
 (* List constructors *)
 
 external ktn : int -> int -> k = "ktn_stub" (* [ktn type length] *)
-(* external js : k -> string -> unit = "js_stub" *)
-(* external jk : k -> k -> unit = "jk_stub" *)
-(* external jv : k -> k -> unit = "jv_stub" *)
 
 (* Dict/Table accessors *)
 
