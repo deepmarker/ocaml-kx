@@ -356,13 +356,6 @@ CAMLprim value xT_stub (value dict) {
     CAMLreturn(ret);
 }
 
-CAMLprim value ktd_stub (value kt) {
-    CAMLparam1(kt);
-    CAMLlocal1(k);
-    k = caml_alloc_K(ktd(r1(K_val(kt))));
-    CAMLreturn(k);
-}
-
 CAMLprim value d9_stub (value k) {
     CAMLparam1(k);
     CAMLlocal3(ret, errmsg, kk);
@@ -435,22 +428,22 @@ CAMLprim value kread_stub(value fd) {
 }
 
 CAMLprim value k0_stub(value fd, value msg) {
-    K r = k(-Int_val(fd), String_val(msg), (K)NULL);
+    k(-Int_val(fd), String_val(msg), (K)NULL);
     return Val_unit;
 }
 
 CAMLprim value k1_stub(value fd, value msg, value a) {
-    K r = k(-Int_val(fd), String_val(msg), K_val_r1(a), (K)NULL);
+    k(-Int_val(fd), String_val(msg), K_val_r1(a), (K)NULL);
     return Val_unit;
 }
 
 CAMLprim value k2_stub(value fd, value msg, value a, value b) {
-    K r = k(-Int_val(fd), String_val(msg), K_val_r1(a), K_val_r1(b), (K)NULL);
+    k(-Int_val(fd), String_val(msg), K_val_r1(a), K_val_r1(b), (K)NULL);
     return Val_unit;
 }
 
 CAMLprim value k3_stub(value fd, value msg, value a, value b, value c) {
-    K r = k(-Int_val(fd), String_val(msg), K_val_r1(a), K_val_r1(b), K_val_r1(c), (K)NULL);
+    k(-Int_val(fd), String_val(msg), K_val_r1(a), K_val_r1(b), K_val_r1(c), (K)NULL);
     return Val_unit;
 }
 
@@ -487,41 +480,39 @@ CAMLprim value k3_sync_stub(value fd, value msg, value a, value b, value c) {
 }
 
 CAMLprim value kn_stub(value fd, value msg, value a) {
-    K r, n;
-
     switch (Wosize_val(a)) {
     case 0:
-        r = k(-Int_val(fd), String_val(msg), (K)NULL);
+        k(-Int_val(fd), String_val(msg), (K)NULL);
         break;
     case 1:
-        r = k(-Int_val(fd), String_val(msg),
-              K_val_r1(Field(a, 0)), (K)NULL);
+        k(-Int_val(fd), String_val(msg),
+          K_val_r1(Field(a, 0)), (K)NULL);
         break;
     case 2:
-        r = k(-Int_val(fd), String_val(msg),
-              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)), (K)NULL);
+        k(-Int_val(fd), String_val(msg),
+          K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)), (K)NULL);
         break;
     case 3:
-        r = k(-Int_val(fd), String_val(msg),
-              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
-              K_val_r1(Field(a, 2)), (K)NULL);
+        k(-Int_val(fd), String_val(msg),
+          K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+          K_val_r1(Field(a, 2)), (K)NULL);
         break;
     case 4:
-        r = k(-Int_val(fd), String_val(msg),
-              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
-              K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)), (K)NULL);
+        k(-Int_val(fd), String_val(msg),
+          K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+          K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)), (K)NULL);
         break;
     case 5:
-        r = k(-Int_val(fd), String_val(msg),
-              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
-              K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)),
-              K_val_r1(Field(a, 4)), (K)NULL);
+        k(-Int_val(fd), String_val(msg),
+          K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+          K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)),
+          K_val_r1(Field(a, 4)), (K)NULL);
         break;
     case 6:
-        r = k(-Int_val(fd), String_val(msg),
-              K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
-              K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)),
-              K_val_r1(Field(a, 4)), K_val_r1(Field(a, 5)), (K)NULL);
+        k(-Int_val(fd), String_val(msg),
+          K_val_r1(Field(a, 0)), K_val_r1(Field(a, 1)),
+          K_val_r1(Field(a, 2)), K_val_r1(Field(a, 3)),
+          K_val_r1(Field(a, 4)), K_val_r1(Field(a, 5)), (K)NULL);
         break;
 
     default:
