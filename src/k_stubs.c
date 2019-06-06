@@ -13,18 +13,63 @@
 #include <caml/bigarray.h>
 #include "k.h"
 
-#define K_val(v) (*((K*) Data_custom_val(v)))
-#define K_val_r1(v) (r1((*((K*) Data_custom_val(v)))))
+#define K_val(v) (*(K*) Data_custom_val(v))
+#define K_val_r1(v) (r1(*(K*) Data_custom_val(v)))
 
 static int compare_K(value a, value b) {
     K aa = K_val(a), bb = K_val(b);
     return (aa == bb ? 0 : (aa < bb ? -1 : 1));
 }
 
-/* #include <stdio.h> */
+#include <stdio.h>
 static void finalize_K(value k) {
-    /* fprintf(stderr, "%p %d %d\n", K_val(k), K_val(k)->t, K_val(k)->r); */
-    r0(K_val(k));
+    K kk = K_val(k);
+    /* if (kk->t == 0) */
+    /*     for (int i=0; i<kk->n; i++) { */
+    /*         K kki = kK(kk)[i]; */
+    /*         fprintf(stderr, "  %p %d %d\n", k, kki->t, kki->r); */
+    /*         /\* r0(kki); *\/ */
+    /*     } */
+    /* fprintf(stderr, "%p %d %d\n", kk, kk->t, kk->r); */
+    r0(kk);
+}
+
+static size_t kobjsize(K k) {
+    fprintf(stderr, "%p %d\n", k, k->t);
+    int mult = (k->t < 0 ? 1 : k->n);
+    int abst = (k->t > 0 ? k->t : -k->t);
+    int sum = 0;
+
+    switch (abst) {
+    case 1: return 1 * mult;
+    case 2: return 16 * mult;
+    case 4: return 1 * mult;
+    case 5: return 2 * mult;
+    case 6: return 4 * mult;
+    case 7: return 8 * mult;
+    case 8: return 4 * mult;
+    case 9: return 8 * mult;
+    case 10: return 1 * mult;
+    case 11: return 8 * mult;
+    case 12: return 8 * mult;
+    case 13: return 4 * mult;
+    case 14: return 4 * mult;
+    case 15: return 8 * mult;
+    case 16: return 8 * mult;
+    case 17: return 4 * mult;
+    case 18: return 4 * mult;
+    case 19: return 4 * mult;
+
+    case 0:
+        for (int i=0; i<k->n; i++) sum += kobjsize(kK(k)[i]);
+        return sum;
+
+    case 99:
+        return kobjsize(kK(k)[0])+kobjsize(kK(k)[1]);
+
+    case 98:
+        return kobjsize(k->k);
+    }
 }
 
 static struct custom_operations kx_K_ops =
@@ -36,9 +81,10 @@ static struct custom_operations kx_K_ops =
       .serialize = custom_serialize_default,
       .deserialize = custom_deserialize_default };
 
-static value caml_alloc_K (K a) {
+static value caml_alloc_K (K k) {
     value custom = caml_alloc_custom(&kx_K_ops, sizeof(K), 0, 1);
-    K_val(custom) = a;
+    /* value custom = caml_alloc_custom(&kx_K_ops, sizeof(K), kobjsize(k), 10*1<<20); */
+    K_val(custom) = k;
     return custom;
 }
 
