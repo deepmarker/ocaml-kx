@@ -14,16 +14,14 @@
 #include "k.h"
 
 #define K_val(v) (*((K*) Data_custom_val(v)))
-#define K_val_r1(v) (r1((*((K*) Data_custom_val(v)))))
+#define K_val_r1(v) (r1(*(K*) Data_custom_val(v)))
 
 static int compare_K(value a, value b) {
     K aa = K_val(a), bb = K_val(b);
     return (aa == bb ? 0 : (aa < bb ? -1 : 1));
 }
 
-/* #include <stdio.h> */
 static void finalize_K(value k) {
-    /* fprintf(stderr, "%p %d %d\n", K_val(k), K_val(k)->t, K_val(k)->r); */
     r0(K_val(k));
 }
 
@@ -36,9 +34,9 @@ static struct custom_operations kx_K_ops =
       .serialize = custom_serialize_default,
       .deserialize = custom_deserialize_default };
 
-static value caml_alloc_K (K a) {
+static value caml_alloc_K (K k) {
     value custom = caml_alloc_custom(&kx_K_ops, sizeof(K), 0, 1);
-    K_val(custom) = a;
+    K_val(custom) = k;
     return custom;
 }
 

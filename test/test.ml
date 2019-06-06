@@ -4,7 +4,6 @@ open Alcotest
 let pack_unpack
   : type a. string -> a w -> a -> unit = fun name w a ->
   let v = construct w a in
-  Format.eprintf "%a@." Kx.pp v ;
   let v_serialized = to_string v in
   let vv_parsed = of_string_exn w v_serialized in
   let vv_serialized = to_string vv_parsed in
@@ -104,9 +103,9 @@ let leaktest n l m () =
   let open Kx in
   let o = list (a sym) in
   for _ = 0 to n - 1 do
-    ignore @@ destruct o (construct o (Array.init l (fun _ -> Bytes.(unsafe_to_string (create m)))))
+    ignore @@ destruct o (construct o (Array.init l (fun _ -> Bytes.(unsafe_to_string (create m))))) ;
+    Gc.compact ()
   done ;
-  Gc.compact () ;
   Gc.print_stat stderr
 
 (* let test_server () =
