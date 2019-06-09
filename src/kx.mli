@@ -67,7 +67,7 @@ val equal_typ : t -> t -> bool
 val equal : t -> t -> bool
 (** [equal_typ a b] is [true] iff [a] is the same q type and value as [b]. *)
 
-val construct : 'a w -> 'a -> t
+val construct : 'a w -> 'a -> Buffer.t -> string
 val destruct : 'a w -> t -> ('a, string) result
 
 val of_string : 'a w -> string -> (t, string) result
@@ -83,53 +83,6 @@ val wh : int
 val wi : int32
 val wj : int64
 val wf : float
-
-(** Connection to q server *)
-
-val init : unit -> unit
-(** [init ()] must be called before creating any q
-    value. Initialization is also done automatically when connecting to
-    a server. *)
-
-type connection_error =
-  | Authentication
-  | Connection
-  | Timeout
-  | OpenSSL
-
-val pp_connection_error :
-  Format.formatter -> connection_error -> unit
-
-type capability =
-  | OneTBLimit
-  | UseTLS
-
-val connect :
-  ?timeout:Ptime.span ->
-  ?capability:capability -> Uri.t ->
-  (Unix.file_descr, connection_error) result
-
-val with_connection :
-  ?timeout:Ptime.span ->
-  ?capability:capability ->
-  Uri.t -> f:(Unix.file_descr -> 'a) ->
-  ('a, connection_error) result
-
-val kclose : Unix.file_descr -> unit
-
-val kread : Unix.file_descr -> 'a w -> ('a, string) result
-
-val k0 : Unix.file_descr -> string -> unit
-val k1 : Unix.file_descr -> string -> t -> unit
-val k2 : Unix.file_descr -> string -> t -> t -> unit
-val k3 : Unix.file_descr -> string -> t -> t -> t -> unit
-val kn : Unix.file_descr -> string -> t array -> unit
-
-val k0_sync : Unix.file_descr -> string -> 'a w -> ('a, string) result
-val k1_sync : Unix.file_descr -> string -> 'a w -> t -> ('a, string) result
-val k2_sync : Unix.file_descr -> string -> 'a w -> t -> t -> ('a, string) result
-val k3_sync : Unix.file_descr -> string -> 'a w -> t -> t -> t -> ('a, string) result
-val kn_sync : Unix.file_descr -> string -> 'a w -> t array -> ('a, string) result
 
 (**/*)
 

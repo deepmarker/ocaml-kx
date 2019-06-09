@@ -15,17 +15,6 @@ let wj = 0x7fff_ffff_ffff_ffffL
 let nf = nan
 let wf = infinity
 
-open Bigarray
-
-type ('ml, 'c) bv = ('ml, 'c, c_layout) Array1.t
-
-type gv = (int, int8_unsigned_elt) bv
-type hv = (int, int16_signed_elt)  bv
-type iv = (int32, int32_elt)       bv
-type jv = (int64, int64_elt)       bv
-type ev = (float, float32_elt)     bv
-type fv = (float, float64_elt)     bv
-
 type time = { time : Ptime.time ; ms : int }
 type timespan = { time : Ptime.time ; ns : int }
 
@@ -139,9 +128,21 @@ type _ w =
   | List : 'a w * attribute -> 'a array w
   | Tup : 'a w * attribute -> 'a w
   | Tups : 'a w * 'b w * attribute -> ('a * 'b) w
-  | Dict : 'a w * 'b w -> ('a * 'b) w
-  | Table : 'a w * 'b w -> ('a * 'b) w
+  | Dict : 'a w * 'b w * bool -> ('a * 'b) w
+  | Table : 'a w * 'b w * bool -> ('a * 'b) w
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b w -> 'a w
+
+let is_list_type : type a. a w -> bool = function
+  | Tup _ -> true
+  | Tups _ -> true
+  | List _ -> true
+  | _ -> false
+
+let parted : type a. a w -> a w = function
+  | Tup (a, _) -> Tup (a, Parted)
+  | Tups (a, b, _) -> Tups (a, b, Parted)
+  | List (a, _) -> List (a, Parted)
+  | _ -> invalid_arg "parted"
 
 let rec attr : type a. a w -> attribute option = function
   | Vect (_, attr) -> Some attr
@@ -151,8 +152,6 @@ let rec attr : type a. a w -> attribute option = function
   | Tup (_, attr) -> Some attr
   | Tups (_, _, attr) -> Some attr
   | _ -> None
-
-type t = K : 'a w * 'a * 'a Fmt.t -> t
 
 let rec int_of_w : type a. a w -> int = function
   | Atom a -> -(int_of_typ a)
@@ -173,8 +172,8 @@ let rec equal : type a b. a w -> b w -> bool = fun a b ->
   | List (a, aa), List (b, ba) -> equal a b && aa = ba
   | Tup (a, aa), Tup (b, ba) -> equal a b && aa = ba
   | Tups (a, b, aa), Tups (c, d, ba) -> equal a c && equal b d && aa = ba
-  | Dict (a, b), Dict (c, d) -> equal a c && equal b d
-  | Table (a, b), Table (c, d) -> equal a c && equal b d
+  | Dict (a, b, s1), Dict (c, d, s2) -> equal a c && equal b d && s1 = s2
+  | Table (a, b, s1), Table (c, d, s2) -> equal a c && equal b d && s1 = s2
   | Conv (_, _, a), Conv (_, _, b) -> equal a b
   | _ -> false
 
@@ -210,14 +209,14 @@ let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
     let x1, x2 = x in
     let y1, y2 = y in
     aa = ba && equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2
-  | Dict (a, b), Dict (c, d) ->
+  | Dict (a, b, s1), Dict (c, d, s2) ->
     let x1, x2 = x in
     let y1, y2 = y in
-    equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2
-  | Table (a, b), Table (c, d) ->
+    equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2 && s1 = s2
+  | Table (a, b, s1), Table (c, d, s2) ->
     let x1, x2 = x in
     let y1, y2 = y in
-    equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2
+    equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2 && s1 = s2
   | Conv (p1, _, a), Conv (p2, _, b) ->
     equal_typ_val a b (p1 x) (p2 y)
   | _ -> false
@@ -314,8 +313,8 @@ let merge_tups t1 t2 =
 
 let merge_tups ?(attr=NoAttr) a b = tups a b attr
 
-let dict k v = Dict (k, v)
-let table k v = Table (k, v)
+let dict ?(sorted=false) k v = Dict (k, v, sorted)
+let table ?(sorted=false) k v = Table (k, v, sorted)
 
 let millenium =
   match Ptime.of_date (2000, 1, 1) with
@@ -431,23 +430,6 @@ let guids a =
     | Some v -> v
   end
 
-let pp_print_ba pp ppf ba =
-  let len = Array1.dim ba in
-  for i = 0 to len - 1 do
-    Format.fprintf ppf
-      (if i = len - 1 then "%a" else "%a ") pp (Array1.get ba i)
-  done
-
-let pp_print_ba_uuid ppf ba =
-  let len = Bigstring.length ba / 16 in
-  for i = 0 to len - 1 do
-    match (Uuidm.of_bytes (Bigstring.sub_string ba (i * 16) 16)) with
-    | None -> invalid_arg "pp_print_ba_uuid"
-    | Some guid ->
-      Format.fprintf ppf
-        (if i = len - 1 then "%a" else "%a ") Uuidm.pp guid
-  done
-
 let pp_print_month ppf i =
   let y, m, _ = month_of_int i in
   Format.fprintf ppf "%d.%dm" y m
@@ -478,16 +460,17 @@ let pp_print_symbols ppf syms =
 let pp_print_timestamp ppf j =
   Format.fprintf ppf "%a" (Ptime.pp_rfc3339 ~frac_s:9 ()) (timestamp_of_int64 j)
 
-let pp ppf (K (_, t, pp)) = Format.fprintf ppf "%a" pp t
-
 let rec construct_list :
-  type a. Buffer.t -> a w -> a -> unit = fun buf w a ->
+  type a. Buffer.t -> a w -> a -> int = fun buf w a ->
   match w with
-  | Tups (hw, tw, attr) ->
+  | Tup (w, _) ->
+    construct buf w a ;
+    1
+  | Tups (hw, tw, _) ->
     let h, t = a in
-    construct_list buf hw h ;
-    construct_list buf tw t
-  | Tup (w, attr) -> construct buf w a
+    let lenh = construct_list buf hw h in
+    let lent = construct_list buf tw t in
+    lenh + lent
   | _ -> assert false
 
 and construct : type a. Buffer.t -> a w -> a -> unit = fun buf w a ->
@@ -497,32 +480,40 @@ and construct : type a. Buffer.t -> a w -> a -> unit = fun buf w a ->
     Buffer.add_char buf (char_of_attribute attr) ;
     Array.iter (construct buf w') a
 
-  | Tup (ww, attr) -> construct buf ww a
+  | Tup (ww, attr) ->
+    Buffer.add_char buf '\x00' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let b = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 b 0 1l ;
+    Buffer.add_bytes buf b ;
+    construct buf ww a
 
-  | Tups _ ->
-    let ks = construct_list [] w a in
-    let len = List.length ks in
-    let k = ktn 0 len in
-    List.iteri (kK_set k) ks ;
-    K (w, k)
+  | Tups (_, _, attr) ->
+    let buf' = Buffer.create 13 in
+    let len = construct_list buf' w a in
+    Buffer.add_char buf '\x00' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let b = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 b 0 (Int32.of_int len) ;
+    Buffer.add_bytes buf b ;
+    Buffer.add_buffer buf buf'
 
-  | Dict (k, v) ->
+  | Dict (k, v, sorted) ->
+    if not (is_list_type k && is_list_type v) then
+      invalid_arg "dict keys and values must be a list type" ;
     let x, y = a in
-    let K (_, k') = construct k x in
-    let K (_, k'') = construct v y in
-    K (w, xD k' k'')
+    Buffer.add_char buf (if sorted then '\x7f' else '\x63') ;
+    construct buf k x ;
+    construct buf v y
 
-  | Table (k, v) ->
+  | Table (k, v, sorted) ->
     let x, y = a in
-    let K (_, k') = construct k x in
-    let K (_, k'') = construct v y in
-    begin match xT (xD k' k'') with
-      | Error msg -> invalid_arg msg
-      | Ok k ->  K (w, k)
-    end
-  | Conv (project, _, ww) ->
-    let K (_, a) = construct ww (project a) in
-    K (w, a)
+    Buffer.add_char buf '\x62' ;
+    Buffer.add_char buf (if sorted then '\x01' else '\x00') ;
+    construct buf k x ;
+    construct buf (parted v) y
+
+  | Conv (project, _, ww) -> construct buf ww (project a)
 
   | Atom Boolean ->
     Buffer.add_char buf '\xff' ;
@@ -626,7 +617,7 @@ and construct : type a. Buffer.t -> a w -> a -> unit = fun buf w a ->
     let l = Bytes.create 4 in
     EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
     Buffer.add_bytes buf l ;
-    Array.iteri begin fun i -> function
+    Array.iter begin function
       | false -> Buffer.add_char buf '\x00'
       | true -> Buffer.add_char buf '\x01'
     end a
@@ -818,6 +809,16 @@ and construct : type a. Buffer.t -> a w -> a -> unit = fun buf w a ->
 
   | String _ -> assert false
 
+let construct ?(msgtyp=`Async) buf w x =
+  construct buf w x ;
+  let hdr = Bytes.make 8 '\x00' in
+  construct buf w x ;
+  Bytes.set hdr 0 (if Sys.big_endian then '\x00' else '\x01') ;
+  Bytes.set hdr 1
+    (match msgtyp with `Async -> '\x00' | `Sync -> '\x01' | `Response -> '\x02') ;
+  EndianString.NativeEndian.set_int32 hdr 4 (Int32.of_int (Buffer.length buf)) ;
+  Bytes.unsafe_to_string hdr
+
 let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fun w k i ->
   match w with
   | Tup a -> begin
@@ -988,43 +989,6 @@ and destruct : type a. a w -> k -> (a, string) result = fun w k ->
   | Table _ ->
     Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
 
-(* Communication with kdb+ *)
-
-external khp : string -> int -> int = "khp_stub"
-external khpu : string -> int -> string -> int = "khpu_stub"
-external khpun : string -> int -> string -> int -> int = "khpun_stub"
-external khpunc : string -> int -> string -> int -> int -> int = "khpunc_stub"
-external kclose : Unix.file_descr -> unit = "kclose_stub" [@@noalloc]
-
-external kread : Unix.file_descr -> k = "kread_stub"
-external k0 : Unix.file_descr -> string -> unit = "k0_stub" [@@noalloc]
-external k1 : Unix.file_descr -> string -> k -> unit = "k1_stub" [@@noalloc]
-external k2 : Unix.file_descr -> string -> k -> k -> unit = "k2_stub" [@@noalloc]
-external k3 : Unix.file_descr -> string -> k -> k -> k -> unit = "k3_stub" [@@noalloc]
-external kn : Unix.file_descr -> string -> k array -> unit = "kn_stub" [@@noalloc]
-
-external k0_sync : Unix.file_descr -> string -> k = "k0_sync_stub"
-external k1_sync : Unix.file_descr -> string -> k -> k = "k1_sync_stub"
-external k2_sync : Unix.file_descr -> string -> k -> k -> k = "k2_sync_stub"
-external k3_sync : Unix.file_descr -> string -> k -> k -> k -> k = "k3_sync_stub"
-external kn_sync : Unix.file_descr -> string -> k array -> k = "kn_sync_stub"
-
-let kread fd w = destruct w (kread fd)
-
-let k1 fd f (K (_, a)) = k1 fd f a
-let k2 fd f (K (_, a)) (K (_, b)) = k2 fd f a b
-let k3 fd f (K (_, a)) (K (_, b)) (K (_, c)) = k3 fd f a b c
-let kn fd f a = kn fd f (Array.map (function K (_, k) -> k) a)
-
-let k0_sync fd f w = destruct w (k0_sync fd f)
-let k1_sync fd f w (K (_, a)) = destruct w (k1_sync fd f a)
-let k2_sync fd f w (K (_, a)) (K (_, b)) = destruct w (k2_sync fd f a b)
-let k3_sync fd f w (K (_, a)) (K (_, b)) (K (_, c)) = destruct w (k3_sync fd f a b c)
-let kn_sync fd f w a = destruct w (kn_sync fd f (Array.map (function K (_, k) -> k) a))
-
-let destruct_k = destruct
-let destruct w (K (_, k)) = destruct_k w k
-
 let equal_typ (K (w1, _)) (K (w2, _)) = equal w1 w2
 let equal (K (w1, a)) (K (w2, b)) =
   match destruct_k w1 a, destruct_k w2 b with
@@ -1032,92 +996,6 @@ let equal (K (w1, a)) (K (w2, b)) =
   | Error e, Ok _ -> failwith ("first failed: " ^ e)
   | Ok _, Error e -> failwith ("second failed: " ^ e)
   | Error e, Error f -> failwith ("both failed: " ^ e ^ ", " ^ f)
-
-(* Serialization *)
-
-external b9 : int -> k -> (k, string) result = "b9_stub"
-external d9 : k -> (k, string) result = "d9_stub"
-
-let of_string :
-  type a. a w -> string -> (t, string) result = fun w bs ->
-  let K (_, k) = construct (s byte) bs in
-  match d9 k with
-  | Error e -> Error e
-  | Ok a -> Ok (K (w, a))
-
-let of_string_exn w s =
-  match (of_string w s) with
-  | Error msg -> invalid_arg msg
-  | Ok s -> s
-
-let to_string ?(mode = -1) (K (_, k)) =
-  match b9 mode k with
-  | Error e -> failwith e
-  | Ok k ->
-    match destruct_k (s byte) k with
-    | Error msg -> invalid_arg msg
-    | Ok s -> s
-
-type connection_error =
-  | Authentication
-  | Connection
-  | Timeout
-  | OpenSSL
-
-let pp_connection_error ppf = function
-  | Authentication -> Format.pp_print_string ppf "authentification error"
-  | Connection -> Format.pp_print_string ppf "connection error"
-  | Timeout -> Format.pp_print_string ppf "timeout error"
-  | OpenSSL -> Format.pp_print_string ppf "tls error"
-
-type capability =
-  | OneTBLimit
-  | UseTLS
-
-let int_of_capability = function
-  | OneTBLimit -> 1
-  | UseTLS -> 2
-
-let wrap_result f =
-  match f () with
-  | i when i > 0 -> Ok (Obj.magic i : Unix.file_descr)
-  | 0 -> Error Authentication
-  | -1 -> Error Connection
-  | -2 -> Error Timeout
-  | -3 -> Error OpenSSL
-  | i -> failwith ("Unknown q error " ^ string_of_int i)
-
-let up u p = u ^ ":" ^ p
-
-let init () = ignore (khp "" ~-1)
-
-let connect ?timeout ?capability url =
-  let host = Uri.host_with_default ~default:"localhost" url in
-  let userinfo =
-    match Uri.user url, Uri.password url with
-    | Some u, Some p -> Some (u, p)
-    | _ -> None in
-  match Uri.port url with
-  | None -> invalid_arg "connect: port unspecified"
-  | Some port ->
-    match userinfo, timeout, capability with
-    | None, None, None -> wrap_result (fun () -> khp host port)
-    | Some (u, p), None, None -> wrap_result (fun () -> khpu host port (up u p))
-    | Some (u, p), Some t, None ->
-      let t = int_of_float (Ptime.Span.to_float_s t /. 1e3) in
-      wrap_result (fun () -> khpun host port (up u p) t)
-    | Some (u, p), Some t, Some c ->
-      let t = int_of_float (Ptime.Span.to_float_s t /. 1e3) in
-      wrap_result (fun () -> khpunc host port (up u p) t (int_of_capability c))
-    | _ -> invalid_arg "connect"
-
-let with_connection ?timeout ?capability url ~f =
-  match connect ?timeout ?capability url with
-  | Error e -> Error e
-  | Ok fd ->
-    let ret = f fd in
-    kclose fd ;
-    Ok ret
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
