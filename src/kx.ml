@@ -111,25 +111,53 @@ let eq_typ_val : type a b. a typ -> b typ -> a -> b -> (a, b) eq option = fun a 
   | Time, Time when x = y -> Some Eq
   | _ -> None
 
-type k
+type attribute =
+  | NoAttr
+  | Sorted
+  | Unique
+  | Parted
+  | Grouped
+
+let int_of_attribute = function
+  | NoAttr -> 0
+  | Sorted -> 1
+  | Unique -> 2
+  | Parted -> 3
+  | Grouped -> 4
+
+let char_of_attribute = function
+  | NoAttr -> '\x00'
+  | Sorted -> '\x01'
+  | Unique -> '\x02'
+  | Parted -> '\x03'
+  | Grouped -> '\x04'
 
 type _ w =
   | Atom : 'a typ -> 'a w
-  | Vect : 'a typ -> 'a array w
-  | String : char typ -> string w
-  | List : 'a w -> 'a array w
-  | Tup : 'a w -> 'a w
-  | Tups : 'a w * 'b w -> ('a * 'b) w
+  | Vect : 'a typ * attribute -> 'a array w
+  | String : char typ * attribute -> string w
+  | List : 'a w * attribute -> 'a array w
+  | Tup : 'a w * attribute -> 'a w
+  | Tups : 'a w * 'b w * attribute -> ('a * 'b) w
   | Dict : 'a w * 'b w -> ('a * 'b) w
   | Table : 'a w * 'b w -> ('a * 'b) w
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b w -> 'a w
 
-type t = K : 'a w * k -> t
+let rec attr : type a. a w -> attribute option = function
+  | Vect (_, attr) -> Some attr
+  | String (_, attr) -> Some attr
+  | List (_, attr) -> Some attr
+  | Conv (_, _, a) -> attr a
+  | Tup (_, attr) -> Some attr
+  | Tups (_, _, attr) -> Some attr
+  | _ -> None
+
+type t = K : 'a w * 'a * 'a Fmt.t -> t
 
 let rec int_of_w : type a. a w -> int = function
   | Atom a -> -(int_of_typ a)
-  | Vect a -> int_of_typ a
-  | String a -> int_of_typ a
+  | Vect (a, _) -> int_of_typ a
+  | String (a, _) -> int_of_typ a
   | List _ -> 0
   | Tup _ -> 0
   | Tups _ -> 0
@@ -140,11 +168,11 @@ let rec int_of_w : type a. a w -> int = function
 let rec equal : type a b. a w -> b w -> bool = fun a b ->
   match a, b with
   | Atom a, Atom b -> eq_typ a b <> None
-  | Vect a, Vect b -> eq_typ a b <> None
-  | String a, String b -> eq_typ a b <> None
-  | List a, List b -> equal a b
-  | Tup a, Tup b -> equal a b
-  | Tups (a, b), Tups (c, d) -> equal a c && equal b d
+  | Vect (a, aa), Vect (b, ba) -> eq_typ a b <> None && aa = ba
+  | String (a, aa), String (b, ba) -> eq_typ a b <> None && aa = ba
+  | List (a, aa), List (b, ba) -> equal a b && aa = ba
+  | Tup (a, aa), Tup (b, ba) -> equal a b && aa = ba
+  | Tups (a, b, aa), Tups (c, d, ba) -> equal a c && equal b d && aa = ba
   | Dict (a, b), Dict (c, d) -> equal a c && equal b d
   | Table (a, b), Table (c, d) -> equal a c && equal b d
   | Conv (_, _, a), Conv (_, _, b) -> equal a b
@@ -153,7 +181,8 @@ let rec equal : type a b. a w -> b w -> bool = fun a b ->
 let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
   match a, b with
   | Atom a, Atom b -> eq_typ_val a b x y  <> None
-  | Vect a, Vect b -> begin
+  | Vect (a, aa), Vect (b, ba) -> begin
+      aa = ba &&
       match Array.length x, Array.length y with
       | a, b when a <> b -> false
       | len, _ ->
@@ -164,7 +193,8 @@ let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
         !ret
     end
   | String _, String _ -> String.equal x y
-  | List a, List b ->
+  | List (a, aa), List (b, ba) ->
+    aa = ba &&
     begin
       match Array.length x, Array.length y with
       | a, b when a <> b -> false
@@ -175,11 +205,11 @@ let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
         done ;
         !ret
     end
-  | Tup a, Tup b -> equal_typ_val a b x y
-  | Tups (a, b), Tups (c, d) ->
+  | Tup (a, aa), Tup (b, ba) -> aa = ba && equal_typ_val a b x y
+  | Tups (a, b, aa), Tups (c, d, ba) ->
     let x1, x2 = x in
     let y1, y2 = y in
-    equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2
+    aa = ba && equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2
   | Dict (a, b), Dict (c, d) ->
     let x1, x2 = x in
     let y1, y2 = y in
@@ -214,155 +244,104 @@ let conv project inject a =
   Conv (project, inject, a)
 
 let a a = Atom a
-let v a = Vect a
-let s a = String a
+let v ?(attr=NoAttr) a = Vect (a, attr)
+let s ?(attr=NoAttr) a = String (a, attr)
 
-let list a = List a
+let list ?(attr=NoAttr) a = List (a, attr)
 
-let t1 a = Tup a
-let t2 a b = Tups (Tup a, Tup b)
-let t3 a b c =
+let tup a attr = Tup (a, attr)
+let tups a b attr = Tups (a, b, attr)
+
+let t1 ?(attr=NoAttr) a = tup a attr
+let t2 ?(attr=NoAttr) a b = tups (tup a attr) (tup b attr) attr
+let t3 ?(attr=NoAttr) a b c =
   conv
     (fun (a, b, c) -> (a, (b, c)))
     (fun (a, (b, c)) -> (a, b, c))
-    (Tups (Tup a, (Tups (Tup b, Tup c))))
+    (tups (tup a attr) (t2 ~attr b c) attr)
 
-let t4 a b c d =
+let t4 ?(attr=NoAttr) a b c d =
   conv
-    (fun (a, b, c, d) -> (a, (b, (c, d))))
-    (fun (a, (b, (c, d))) -> (a, b, c, d))
-    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tup d))))))
+    (fun (a, b, c, d) -> (a, (b, c, d)))
+    (fun (a, (b, c, d)) -> (a, b, c, d))
+    (tups (tup a attr) (t3 ~attr b c d) attr)
 
-let t5 a b c d e =
+let t5 ?(attr=NoAttr) a b c d e =
   conv
-    (fun (a, b, c, d, e) -> (a, (b, (c, (d, e)))))
-    (fun (a, (b, (c, (d, e)))) -> (a, b, c, d, e))
-    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tup e)))))))
+    (fun (a, b, c, d, e) -> (a, (b, c, d, e)))
+    (fun (a, (b, c, d, e)) -> (a, b, c, d, e))
+    (tups (tup a attr) (t4 ~attr b c d e) attr)
 
-let t6 a b c d e f =
+let t6 ?(attr=NoAttr) a b c d e f =
   conv
-    (fun (a, b, c, d, e, f) -> (a, (b, (c, (d, (e, f))))))
-    (fun (a, (b, (c, (d, (e, f))))) -> (a, b, c, d, e, f))
-    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tups (Tup e, Tup f))))))))
+    (fun (a, b, c, d, e, f) -> (a, (b, c, d, e, f)))
+    (fun (a, (b, c, d, e, f)) -> (a, b, c, d, e, f))
+    (tups (tup a attr) (t5 ~attr b c d e f) attr)
 
-let t7 a b c d e f g =
+let t7 ?(attr=NoAttr) a b c d e f g =
   conv
-    (fun (a, b, c, d, e, f, g) -> (a, (b, (c, (d, (e, (f, g)))))))
-    (fun (a, (b, (c, (d, (e, (f, g)))))) -> (a, b, c, d, e, f, g))
-    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tups (Tup e, Tups (Tup f, Tup g)))))))))
+    (fun (a, b, c, d, e, f, g) -> (a, (b, c, d, e, f, g)))
+    (fun (a, (b, c, d, e, f, g)) -> (a, b, c, d, e, f, g))
+    (tups (tup a attr) (t6 ~attr b c d e f g) attr)
 
-let t8 a b c d e f g h =
+let t8 ?(attr=NoAttr) a b c d e f g h =
   conv
-    (fun (a, b, c, d, e, f, g, h) -> (a, (b, (c, (d, (e, (f, (g, h))))))))
-    (fun (a, (b, (c, (d, (e, (f, (g, h))))))) -> (a, b, c, d, e, f, g, h))
-    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tups (Tup e, Tups (Tup f, Tups (Tup g, Tup h))))))))))
+    (fun (a, b, c, d, e, f, g, h) -> (a, (b, c, d, e, f, g, h)))
+    (fun (a, (b, c, d, e, f, g, h)) -> (a, b, c, d, e, f, g, h))
+    (tups (tup a attr) (t7 ~attr b c d e f g h) attr)
 
-let t9 a b c d e f g h i =
+let t9 ?(attr=NoAttr) a b c d e f g h i =
   conv
-    (fun (a, b, c, d, e, f, g, h, i) -> (a, (b, (c, (d, (e, (f, (g, (h, i)))))))))
-    (fun (a, (b, (c, (d, (e, (f, (g, (h, i)))))))) -> (a, b, c, d, e, f, g, h, i))
-    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tups (Tup e, Tups (Tup f, Tups (Tup g, Tups (Tup h, Tup i)))))))))))
+    (fun (a, b, c, d, e, f, g, h, i) -> (a, (b, c, d, e, f, g, h, i)))
+    (fun (a, (b, c, d, e, f, g, h, i)) -> (a, b, c, d, e, f, g, h, i))
+    (tups (tup a attr) (t8 ~attr b c d e f g h i) attr)
 
-let t10 a b c d e f g h i j =
+let t10 ?(attr=NoAttr) a b c d e f g h i j =
   conv
-    (fun (a, b, c, d, e, f, g, h, i, j) -> (a, (b, (c, (d, (e, (f, (g, (h, (i, j))))))))))
-    (fun (a, (b, (c, (d, (e, (f, (g, (h, (i, j))))))))) -> (a, b, c, d, e, f, g, h, i, j))
-    (Tups (Tup a, (Tups (Tup b, (Tups (Tup c, Tups (Tup d, Tups (Tup e, Tups (Tup f, Tups (Tup g, Tups (Tup h, Tups (Tup i, Tup j))))))))))))
+    (fun (a, b, c, d, e, f, g, h, i, j) -> (a, (b, c, d, e, f, g, h, i, j)))
+    (fun (a, (b, c, d, e, f, g, h, i, j)) -> (a, b, c, d, e, f, g, h, i, j))
+    (tups (tup a attr) (t9 ~attr b c d e f g h i j) attr)
 
-let merge_tups a b = Tups (a, b)
+let merge_tups t1 t2 =
+  let rec is_tup : type t. t w -> attribute option = function
+    | Tup (_, a) -> Some a
+    | Tups (_, _, a)(* by construction *) -> Some a
+    | Conv (_, _, t) -> is_tup t
+    | _ -> None in
+  match is_tup t1, is_tup t2 with
+  | Some a, Some b when a = b -> Tups (t1, t2, a)
+  | _ -> invalid_arg "merge_tups"
+
+let merge_tups ?(attr=NoAttr) a b = tups a b attr
 
 let dict k v = Dict (k, v)
 let table k v = Table (k, v)
 
-(* Accessors *)
+let millenium =
+  match Ptime.of_date (2000, 1, 1) with
+  | None -> assert false
+  | Some t -> t
 
-external k_objtyp : k -> int = "k_objtyp" [@@noalloc]
-external k_objattrs : k -> int = "k_objattrs" [@@noalloc]
-external k_refcount : k -> int = "k_refcount" [@@noalloc]
-external k_length : k -> int = "k_length" [@@noalloc]
+let of_day_exn d =
+  match Ptime.Span.of_d_ps (d, 0L) with
+  | None -> invalid_arg "Ptime.Span.of_d_ps"
+  | Some t -> t
 
-external k_g : k -> int = "k_g" [@@noalloc]
-external k_h : k -> int = "k_h" [@@noalloc]
-external k_ii : k -> int = "k_i_int" [@@noalloc]
-
-external k_i : k -> int32 = "k_i"
-external k_j : k -> int64 = "k_j"
-external k_e : k -> float = "k_e"
-external k_f : k -> float = "k_f"
-
-external k_s : k -> string = "k_s"
-external k_k : k -> k = "k_k"
-external k_u : k -> string = "k_u"
-let k_u k =
-  match Uuidm.of_bytes (k_u k) with
-  | None -> invalid_arg "k_u"
-  | Some u -> u
-
-(* List accessors: memory obtained is valid as long as K object is not
-   GCed. *)
-
-external kK : k -> int -> k = "kK_stub"
-external kK_set : k -> int -> k -> unit = "kK_set_stub"
-external kS : k -> int -> string = "kS_stub"
-external kS_set : k -> int -> string -> unit = "kS_set_stub"
-
-external kG_char : k -> Bigstring.t = "kG_stub"
-external kG : k -> gv = "kG_stub"
-external kU : k -> Bigstring.t = "kU_stub"
-external kH : k -> hv = "kH_stub"
-external kI : k -> iv = "kI_stub"
-external kJ : k -> jv = "kJ_stub"
-external kE : k -> ev = "kE_stub"
-external kF : k -> fv = "kF_stub"
-
-(* Atom constructors *)
-
-external kb : bool -> k = "kb_stub"
-external ku : string -> k = "ku_stub"
-
-external kc : char -> k = "kc_stub"
-external kg : char -> k = "kg_stub"
-external kh : int -> k = "kh_stub"
-external ki : int32 -> k = "ki_stub"
-external kj : int64 -> k = "kj_stub"
-
-external ke : float -> k = "ke_stub"
-external kf : float -> k = "kf_stub"
-
-external ks : string -> k = "ks_stub"
-
-external kt : int -> k = "kt_stub"
-external kd : int -> k = "kd_stub"
-external kmonth : int -> k = "kmonth_stub"
-external kminute : int -> k = "kminute_stub"
-external ksecond : int -> k = "ksecond_stub"
-
-external ktimestamp : int64 -> k = "ktimestamp_stub"
-external ktimespan : int64 -> k = "ktimespan_stub"
-(* external kz : float -> k = "kz_stub" *)
-
-(* List constructors *)
-
-external ktn : int -> int -> k = "ktn_stub" (* [ktn type length] *)
-
-(* Dict/Table accessors *)
-
-external xD : k -> k -> k = "xD_stub"
-external xT : k -> (k, string) result = "xT_stub"
-
-(* Utilities *)
-
-external ymd : int -> int -> int -> int = "ymd_stub" [@@noalloc]
-external dj : int -> int = "dj_stub" [@@noalloc]
+let add_span_exn t s =
+  match Ptime.add_span t s with
+  | None -> invalid_arg "Ptime.add_span"
+  | Some t -> t
 
 let date_of_int d =
-  let date = dj d in
-  let y = date / 10_000 in
-  let m = (date mod 10_000) / 100 in
-  let d = (date mod 10_000) mod 100 in
-  (y, m, d)
+  Ptime.to_date (add_span_exn millenium (of_day_exn d))
 
-let int_of_time ((h, m, s), tz_offset) ms =
+let int_of_date d =
+  match Ptime.of_date d with
+  | None -> invalid_arg "int_of_date"
+  | Some t ->
+    fst Ptime.(Span.to_d_ps (diff t millenium))
+
+let int_of_time { time = ((h, m, s), tz_offset) ; ms } =
   (h - tz_offset) * 3600 + m * 60 + s * 1_000 + ms
 
 let time_of_int time =
@@ -373,7 +352,7 @@ let time_of_int time =
   let ss = s mod 60 in
   { time = ((hh, mm, ss), 0); ms }
 
-let int64_of_timespan ((h, m, s), tz_offset) ns =
+let int64_of_timespan { time = ((h, m, s), tz_offset) ; ns } =
   let open Int64 in
   add
     (mul (of_int ((h - tz_offset) * 3600 + m * 60 + s)) 1_000_000_000L)
@@ -499,84 +478,26 @@ let pp_print_symbols ppf syms =
 let pp_print_timestamp ppf j =
   Format.fprintf ppf "%a" (Ptime.pp_rfc3339 ~frac_s:9 ()) (timestamp_of_int64 j)
 
-let rec pp_print_k ppf k =
-  match k_objtyp k with
-  | 1 -> pp_print_ba (fun ppf a -> Format.pp_print_bool ppf (a = 0)) ppf (kG k)
-  | 2 -> pp_print_ba_uuid ppf (kU k)
-  | 4 -> pp_print_ba Format.pp_print_int ppf (kG k)
-  | 5 -> pp_print_ba Format.pp_print_int ppf (kH k)
-  | 6 -> pp_print_ba (fun ppf a -> Format.fprintf ppf "%ld" a) ppf (kI k)
-  | 7 -> pp_print_ba (fun ppf a -> Format.fprintf ppf "%Ld" a) ppf (kJ k)
-  | 8 -> pp_print_ba Format.pp_print_float ppf (kE k)
-  | 9 -> pp_print_ba Format.pp_print_float ppf (kF k)
-  | 10 -> Format.pp_print_string ppf (Bigstring.to_string (kG_char k))
-  | 11 -> pp_print_symbols ppf (Array.init (k_length k) (kS k))
-  | 12 -> pp_print_ba pp_print_timestamp ppf (kJ k)
-  | 13 -> pp_print_ba (fun ppf i -> pp_print_month ppf (Int32.to_int i)) ppf (kI k)
-  | 14 -> pp_print_ba (fun ppf i -> pp_print_date ppf (Int32.to_int i)) ppf (kI k)
-  | 16 -> pp_print_ba pp_print_timespan ppf (kJ k)
-  | 17 -> pp_print_ba (fun ppf i -> pp_print_minute ppf (Int32.to_int i)) ppf (kI k)
-  | 18 -> pp_print_ba (fun ppf i -> pp_print_second ppf (Int32.to_int i)) ppf (kI k)
-  | 19 -> pp_print_ba (fun ppf i -> pp_print_time ppf (Int32.to_int i)) ppf (kI k)
-  | -1 -> Format.pp_print_bool ppf (k_g k <> 0)
-  | -2 -> Format.fprintf ppf "%a" Uuidm.pp (k_u k)
-  | -4 -> Format.fprintf ppf "%c" (Char.chr (k_g k))
-  | -5 -> Format.pp_print_int ppf (k_h k)
-  | -6 -> Format.fprintf ppf "%ld" (k_i k)
-  | -7 -> Format.fprintf ppf "%Ld" (k_j k)
-  | -8 -> Format.pp_print_float ppf (k_e k)
-  | -9 -> Format.pp_print_float ppf (k_f k)
-  | -10 -> Format.pp_print_char ppf (Char.chr (k_g k))
-  | -11 -> Format.pp_print_string ppf ("`" ^ k_s k)
-  | -12 -> pp_print_timestamp ppf (k_j k)
-  | -13 -> pp_print_month ppf (k_ii k)
-  | -14 -> pp_print_date ppf (k_ii k)
-  | -16 -> pp_print_timespan ppf (k_j k)
-  | -17 -> pp_print_minute ppf (k_ii k)
-  | -18 -> pp_print_second ppf (k_ii k)
-  | -19 -> pp_print_time ppf (k_ii k)
-  | 0 ->
-    let len = k_length k in
-    for i = 0 to len - 1 do
-      Format.fprintf ppf
-        (if i = len - 1 then "%a" else "%a ") pp_print_k (kK k i)
-    done
-  | 98 ->
-    let k = k_k k in
-    Format.fprintf ppf "%a!%a" pp_print_k (kK k 0) pp_print_k (kK k 1)
-  | 99 -> Format.fprintf ppf "%a!%a" pp_print_k (kK k 0) pp_print_k (kK k 1)
-  | _ ->
-    Format.fprintf ppf "<kobj t=%d a=%d r=%d l=%d>"
-      (k_objtyp k) (k_objattrs k) (k_refcount k) (k_length k)
-
-let pp ppf (K (_, k)) = Format.fprintf ppf "%a" pp_print_k k
+let pp ppf (K (_, t, pp)) = Format.fprintf ppf "%a" pp t
 
 let rec construct_list :
-  type a. k list -> a w -> a -> k list = fun ks w a ->
+  type a. Buffer.t -> a w -> a -> unit = fun buf w a ->
   match w with
-  | Tups (hw, tw) ->
+  | Tups (hw, tw, attr) ->
     let h, t = a in
-    let ks = construct_list ks tw t in
-    construct_list ks hw h
-  | Tup w ->
-    let K (_, k) = construct w a in
-    k :: ks
+    construct_list buf hw h ;
+    construct_list buf tw t
+  | Tup (w, attr) -> construct buf w a
   | _ -> assert false
 
-and construct : type a. a w -> a -> t = fun w a ->
+and construct : type a. Buffer.t -> a w -> a -> unit = fun buf w a ->
   match w with
-  | List w' ->
-    let k = ktn 0 (Array.length a) in
-    Array.iteri begin fun i ai ->
-      let K (_, k') = construct w' ai in
-      kK_set k i k'
-    end a ;
-    K (w, k)
-  | Tup ww ->
-    let k = ktn 0 1 in
-    let K (_, k') = construct ww a in
-    kK_set k 0 k' ;
-    K (w, k)
+  | List (w', attr) ->
+    Buffer.add_char buf '\x00' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    Array.iter (construct buf w') a
+
+  | Tup (ww, attr) -> construct buf ww a
 
   | Tups _ ->
     let ks = construct_list [] w a in
@@ -602,130 +523,298 @@ and construct : type a. a w -> a -> t = fun w a ->
   | Conv (project, _, ww) ->
     let K (_, a) = construct ww (project a) in
     K (w, a)
-  | Atom Boolean -> K (w, kb a)
-  | Atom Byte -> K (w, kg a)
-  | Atom Short -> K (w, kh a)
-  | Atom Int -> K (w, ki a)
-  | Atom Long -> K (w, kj a)
-  | Atom Real -> K (w, ke a)
-  | Atom Float -> K (w, kf a)
-  | Atom Char -> K (w, kc a)
-  | Atom Symbol -> K (w, ks a)
-  | Atom Guid -> K (w, ku (Uuidm.to_bytes a))
-  | Atom Date -> let y, m, d = a in K (w, (kd (ymd y m d)))
-  | Atom Time -> let { time ; ms } = a in K (w, (kt (int_of_time time ms)))
-  | Atom Timespan -> let { time ; ns } = a in K (w, (ktimespan (int64_of_timespan time ns)))
-  | Atom Timestamp -> K (w, (ktimestamp (int64_of_timestamp a)))
-  | Atom Month -> K (w, (kmonth (int_of_month a)))
-  | Atom Minute -> K (w, (kminute (int_of_minute a)))
-  | Atom Second -> K (w, (ksecond (int_of_second a)))
 
-  | Vect Boolean ->
-    let k = ktn 1 (Array.length a) in
+  | Atom Boolean ->
+    Buffer.add_char buf '\xff' ;
+    begin match a with
+      | false -> Buffer.add_char buf '\x00'
+      | true -> Buffer.add_char buf '\x01'
+    end
+
+  | Atom Byte ->
+    Buffer.add_char buf '\xfc' ;
+    Buffer.add_char buf a
+
+  | Atom Short ->
+    let l = Bytes.create 2 in
+    Buffer.add_char buf '\xfb' ;
+    EndianString.NativeEndian.set_int16 l 0 a ;
+    Buffer.add_bytes buf l
+
+  | Atom Int ->
+    let l = Bytes.create 4 in
+    Buffer.add_char buf '\xfa' ;
+    EndianString.NativeEndian.set_int32 l 0 a ;
+    Buffer.add_bytes buf l
+
+  | Atom Long ->
+    let l = Bytes.create 8 in
+    Buffer.add_char buf '\xf9' ;
+    EndianString.NativeEndian.set_int64 l 0 a ;
+    Buffer.add_bytes buf l
+
+  | Atom Real ->
+    let l = Bytes.create 4 in
+    Buffer.add_char buf '\xf8' ;
+    EndianString.NativeEndian.set_float l 0 a ;
+    Buffer.add_bytes buf l
+
+  | Atom Float ->
+    let l = Bytes.create 8 in
+    Buffer.add_char buf '\xf7' ;
+    EndianString.NativeEndian.set_double l 0 a ;
+    Buffer.add_bytes buf l
+
+  | Atom Char ->
+    Buffer.add_char buf '\xf6' ;
+    Buffer.add_char buf a
+
+  | Atom Symbol ->
+    Buffer.add_char buf '\xf5' ;
+    Buffer.add_string buf a ;
+    Buffer.add_char buf '\x00'
+
+  | Atom Guid ->
+    Buffer.add_char buf '\xfe' ;
+    Buffer.add_string buf (Uuidm.to_string a)
+
+  | Atom Date ->
+    Buffer.add_char buf '\xf2' ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_date a)) ;
+    Buffer.add_bytes buf l
+
+  | Atom Time ->
+    Buffer.add_char buf '\xed' ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_time a)) ;
+    Buffer.add_bytes buf l
+
+  | Atom Timespan ->
+    Buffer.add_char buf '\xf0' ;
+    let l = Bytes.create 8 in
+    EndianString.NativeEndian.set_int64 l 0 (int64_of_timespan a) ;
+    Buffer.add_bytes buf l
+
+  | Atom Timestamp ->
+    Buffer.add_char buf '\xf4' ;
+    let l = Bytes.create 8 in
+    EndianString.NativeEndian.set_int64 l 0 (int64_of_timestamp a) ;
+    Buffer.add_bytes buf l
+
+  | Atom Month ->
+    Buffer.add_char buf '\xf3' ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_month a)) ;
+    Buffer.add_bytes buf l
+
+  | Atom Minute ->
+    Buffer.add_char buf '\xef' ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_minute a)) ;
+    Buffer.add_bytes buf l
+
+  | Atom Second ->
+    Buffer.add_char buf '\xed' ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_second a)) ;
+    Buffer.add_bytes buf l
+
+  | Vect (Boolean, attr) ->
+    Buffer.add_char buf '\x01' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
     Array.iteri begin fun i -> function
-      | false -> Array1.set (kG k) i 0
-      | true -> Array1.set (kG k) i 1
-    end a ;
-    K (w, k)
+      | false -> Buffer.add_char buf '\x00'
+      | true -> Buffer.add_char buf '\x01'
+    end a
 
-  | String Byte ->
-    let len = String.length a in
-    let k = ktn 4 len in
-    Bigstring.blit_of_string a 0 (kG_char k) 0 len ;
-    K (w, k)
+  | String (Byte, attr) ->
+    Buffer.add_char buf '\x04' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (String.length a)) ;
+    Buffer.add_bytes buf l ;
+    Buffer.add_string buf a
 
-  | Vect Byte ->
-    let a = string_of_chars a in
-    let len = String.length a in
-    let k = ktn 4 len in
-    Bigstring.blit_of_string a 0 (kG_char k) 0 len ;
-    K (w, k)
+  | Vect (Byte, attr) ->
+    Buffer.add_char buf '\x04' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter (Buffer.add_char buf) a
 
-  | String Char ->
-    let len = String.length a in
-    let k = ktn 10 len in
-    Bigstring.blit_of_string a 0 (kG_char k) 0 len ;
-    K (w, k)
+  | String (Char, attr) ->
+    Buffer.add_char buf '\x0a' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (String.length a)) ;
+    Buffer.add_bytes buf l ;
+    Buffer.add_string buf a
 
-  | Vect Char ->
-    let a = string_of_chars a in
-    let len = String.length a in
-    let k = ktn 10 len in
-    Bigstring.blit_of_string a 0 (kG_char k) 0 len ;
-    K (w, k)
+  | Vect (Char, attr) ->
+    Buffer.add_char buf '\x0a' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter (Buffer.add_char buf) a
 
-  | Vect Short ->
-    let k = ktn 5 (Array.length a) in
-    Array.iteri (Array1.set (kH k)) a ;
-    K (w, k)
+  | Vect (Short, attr) ->
+    Buffer.add_char buf '\x05' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter begin fun i ->
+      EndianString.NativeEndian.set_int16 l 0 i ;
+      Buffer.add_subbytes buf l 0 2
+    end a
 
-  | Vect Int ->
-    let k = ktn 6 (Array.length a) in
-    Array.iteri (Array1.set (kI k)) a ;
-    K (w, k)
+  | Vect (Int, attr) ->
+    Buffer.add_char buf '\x06' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter begin fun i ->
+      EndianString.NativeEndian.set_int32 l 0 i ;
+      Buffer.add_bytes buf l
+    end a
 
-  | Vect Long ->
-    let k = ktn 7 (Array.length a) in
-    Array.iteri (Array1.set (kJ k)) a ;
-    K (w, k)
+  | Vect (Long, attr) ->
+    Buffer.add_char buf '\x07' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 8 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_subbytes buf l 0 4 ;
+    Array.iter begin fun i ->
+      EndianString.NativeEndian.set_int64 l 0 i ;
+      Buffer.add_bytes buf l
+    end a
 
-  | Vect Real ->
-    let k = ktn 8 (Array.length a) in
-    Array.iteri (Array1.set (kE k)) a ;
-    K (w, k)
+  | Vect (Real, attr) ->
+    Buffer.add_char buf '\x08' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter begin fun i ->
+      EndianString.NativeEndian.set_float l 0 i ;
+      Buffer.add_bytes buf l
+    end a
 
-  | Vect Float ->
-    let k = ktn 9 (Array.length a) in
-    Array.iteri (Array1.set (kF k)) a ;
-    K (w, k)
+  | Vect (Float, attr) ->
+    Buffer.add_char buf '\x09' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 8 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_subbytes buf l 0 4 ;
+    Array.iter begin fun i ->
+      EndianString.NativeEndian.set_double l 0 i ;
+      Buffer.add_bytes buf l
+    end a
 
-  | Vect Symbol ->
-    let k = ktn 11 (Array.length a) in
-    Array.iteri (kS_set k) a ;
-    K (w, k)
+  | Vect (Symbol, attr) ->
+    Buffer.add_char buf '\x0b' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter begin fun s ->
+      Buffer.add_string buf s ;
+      Buffer.add_char buf '\x00'
+    end a
 
-  | Vect Guid ->
-    let k = ktn 2 (Array.length a) in
-    let buf = kU k in
-    Array.iteri begin fun i u ->
-      Bigstring.blit_of_string (Uuidm.to_bytes u) 0 buf (i*16) 16
-    end a ;
-    K (w, k)
+  | Vect (Guid, attr) ->
+    Buffer.add_char buf '\x02' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter begin fun s ->
+      Buffer.add_string buf (Uuidm.to_bytes s) ;
+    end a
 
-  | Vect Timestamp ->
-    let k = ktn 12 (Array.length a) in
-    Array.iteri (fun i a -> Array1.set (kJ k) i (int64_of_timestamp a)) a ;
-    K (w, k)
+  | Vect (Timestamp, attr) ->
+    Buffer.add_char buf '\x0c' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 8 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_subbytes buf l 0 4 ;
+    Array.iter begin fun ts ->
+      EndianString.NativeEndian.set_int64 l 0 (int64_of_timestamp ts) ;
+      Buffer.add_bytes buf l ;
+    end a
 
-  | Vect Month ->
-    let k = ktn 13 (Array.length a) in
-    Array.iteri (fun i a -> Array1.set (kI k) i (Int32.of_int @@ int_of_month a)) a ;
-    K (w, k)
+  | Vect (Month, attr) ->
+    Buffer.add_char buf '\x0d' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter begin fun m ->
+      EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_month m)) ;
+      Buffer.add_bytes buf l
+    end a
 
-  | Vect Date ->
-    let k = ktn 14 (Array.length a) in
-    Array.iteri (fun i (y,m,d) -> Array1.set (kI k) i (Int32.of_int @@ ymd y m d)) a ;
-    K (w, k)
+  | Vect (Date, attr) ->
+    Buffer.add_char buf '\x0e' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter begin fun m ->
+      EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_date m)) ;
+      Buffer.add_bytes buf l
+    end a
 
-  | Vect Timespan ->
-    let k = ktn 16 (Array.length a) in
-    Array.iteri (fun i { time ; ns } -> Array1.set (kJ k) i (int64_of_timespan time ns)) a ;
-    K (w, k)
+  | Vect (Timespan, attr) ->
+    Buffer.add_char buf '\x10' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 8 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_subbytes buf l 0 4 ;
+    Array.iter begin fun a ->
+      EndianString.NativeEndian.set_int64 l 0 (int64_of_timespan a) ;
+      Buffer.add_bytes buf l ;
+    end a
 
-  | Vect Minute ->
-    let k = ktn 17 (Array.length a) in
-    Array.iteri (fun i a -> Array1.set (kI k) i (Int32.of_int @@ int_of_minute a)) a ;
-    K (w, k)
+  | Vect (Minute, attr) ->
+    Buffer.add_char buf '\x11' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter begin fun m ->
+      EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_minute m)) ;
+      Buffer.add_bytes buf l
+    end a
 
-  | Vect Second ->
-    let k = ktn 18 (Array.length a) in
-    Array.iteri (fun i a -> Array1.set (kI k) i (Int32.of_int @@ int_of_second a)) a ;
-    K (w, k)
+  | Vect (Second, attr) ->
+    Buffer.add_char buf '\x12' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter begin fun m ->
+      EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_second m)) ;
+      Buffer.add_bytes buf l
+    end a
 
-  | Vect Time ->
-    let k = ktn 19 (Array.length a) in
-    Array.iteri (fun i { time ; ms } -> Array1.set (kI k) i (Int32.of_int @@ int_of_time time ms)) a ;
-    K (w, k)
+  | Vect (Time, attr) ->
+    Buffer.add_char buf '\x13' ;
+    Buffer.add_char buf (char_of_attribute attr) ;
+    let l = Bytes.create 4 in
+    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
+    Buffer.add_bytes buf l ;
+    Array.iter begin fun a ->
+      EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_time a)) ;
+      Buffer.add_bytes buf l
+    end a
 
   | String _ -> assert false
 

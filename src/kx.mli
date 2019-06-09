@@ -6,7 +6,13 @@
 type time = { time : Ptime.time ; ms : int }
 type timespan = { time : Ptime.time ; ns : int }
 
-type k
+type attribute =
+  | NoAttr
+  | Sorted
+  | Unique
+  | Parted
+  | Grouped
+
 type _ typ
 type _ w
 
@@ -62,7 +68,6 @@ val equal : t -> t -> bool
 (** [equal_typ a b] is [true] iff [a] is the same q type and value as [b]. *)
 
 val construct : 'a w -> 'a -> t
-val destruct_k : 'a w -> k -> ('a, string) result
 val destruct : 'a w -> t -> ('a, string) result
 
 val of_string : 'a w -> string -> (t, string) result
