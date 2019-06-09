@@ -1,19 +1,24 @@
 open Kx
 open Alcotest
 
-let pack_unpack
-  : type a. string -> a w -> a -> unit = fun name w a ->
-  let v = construct w a in
-  let v_serialized = to_string v in
-  let vv_parsed = of_string_exn w v_serialized in
-  let vv_serialized = to_string vv_parsed in
-  check string (name ^ "_serial") v_serialized vv_serialized ;
-  check (testable Kx.pp Kx.equal) (name ^ "_parse") v vv_parsed ;
-  match destruct w v with
-  | Error msg -> failwith msg
-  | Ok vv ->
-    let vvv = construct w vv in
-    check (testable Kx.pp Kx.equal) (name ^ "_destruct") v vvv
+let make_testable : type a. a w -> a testable = fun a ->
+  testable (Kx.pp a) (fun x y -> Kx.equal a x a y)
+
+let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
+  let tt = make_testable w in
+  let hdr = Faraday.create 8 in
+  let payload = Faraday.create 1024 in
+  construct ~hdr ~payload w a ;
+  let hdr_str = Faraday.serialize_to_string hdr in
+  let serialized = hdr_str ^ Faraday.serialize_to_string payload in
+  Hex.hexdump (Hex.of_string serialized) ;
+  match Angstrom.parse_string (destruct w) serialized with
+  | Error msg -> fail msg
+  | Ok (hdr', v) ->
+    let buf = Faraday.create 8 in
+    write_hdr buf hdr' ;
+    check string (name ^ "_header") hdr_str (Faraday.serialize_to_string buf) ;
+    check tt name a v
 
 let pack_unpack_atom () =
   let open Kx in
@@ -36,59 +41,64 @@ let pack_unpack_atom () =
   pack_unpack "minute" (a minute) ((0, 0, 0), 0) ;
   pack_unpack "second" (a second) ((0, 0, 0), 0) ;
   pack_unpack "time" (a time) { time = ((0, 0, 0), 0) ; ms = 0 };
+  pack_unpack "lambda" (a lambda) ("", "{x+y}");
+  pack_unpack "lambda_ctx" (a lambda) ("d", "{x+y}");
   ()
 
 let pack_unpack_vect () =
   let open Kx in
-  pack_unpack "vect bool" (v bool) [|true; false|] ;
-  pack_unpack "vect guid" (v guid) [|Uuidm.nil; Uuidm.nil|] ;
+  pack_unpack "vect bool" (v bool) [true; false] ;
+  pack_unpack "vect guid" (v guid) [Uuidm.nil; Uuidm.nil] ;
   pack_unpack "vect byte" (s byte) "\x00\x01\x02" ;
-  pack_unpack "vect short" (v short) [|0;1;2|] ;
-  pack_unpack "vect int" (v int) [|0l;1l;2l;Int32.max_int;Int32.min_int|] ;
-  pack_unpack "vect long" (v long) [|0L;1L;2L;Int64.max_int;Int64.min_int|] ;
-  pack_unpack "vect real" (v real) [|0.;1.;nan;infinity;neg_infinity|] ;
-  pack_unpack "vect float" (v float) [|0.;1.;nan;infinity;neg_infinity|] ;
+  pack_unpack "vect short" (v short) [0;1;2] ;
+  pack_unpack "vect int" (v int) [0l;1l;2l;Int32.max_int;Int32.min_int] ;
+  pack_unpack "vect long" (v long) [0L;1L;2L;Int64.max_int;Int64.min_int] ;
+  pack_unpack "vect real" (v real) [0.;1.;nan;infinity;neg_infinity] ;
+  pack_unpack "vect float" (v float) [0.;1.;nan;infinity;neg_infinity] ;
   pack_unpack "vect char" (s char) "bleh" ;
-  pack_unpack "vect symbol" (v sym) [|"machin"; "truc"; "chouette"|] ;
-  pack_unpack "vect timestamp" (v timestamp) [|Ptime.epoch; Ptime.epoch|] ;
-  pack_unpack "vect month" (v month) [|2019, 1, 0 ; 2019, 2, 0|] ;
-  pack_unpack "vect date" (v date) [|2019, 1, 1; 2019, 1, 2|] ;
-  pack_unpack "vect timespan" (v timespan) [||] ;
-  pack_unpack "vect minute" (v minute) [||] ;
-  pack_unpack "vect second" (v second) [||] ;
-  pack_unpack "vect time" (v time) [||] ;
+  pack_unpack "vect symbol" (v sym) ["machin"; "truc"; "chouette"] ;
+  pack_unpack "vect timestamp" (v timestamp) [Ptime.epoch; Ptime.epoch] ;
+  pack_unpack "vect month" (v month) [2019, 1, 0 ; 2019, 2, 0] ;
+  pack_unpack "vect date" (v date) [2019, 1, 1; 2019, 1, 2] ;
+  pack_unpack "vect timespan" (v timespan) [] ;
+  pack_unpack "vect minute" (v minute) [] ;
+  pack_unpack "vect second" (v second) [] ;
+  pack_unpack "vect time" (v time) [] ;
+  pack_unpack "vect lambda" (v lambda) [("", "{x+y}"); ("d", "{x+y}")] ;
   ()
 
 let pack_unpack_list () =
   let open Kx in
-  pack_unpack "empty" (list (a bool)) [||] ;
+  pack_unpack "empty" (list (a bool)) [] ;
   pack_unpack "simple" (t1 (a bool)) true ;
   pack_unpack "simple2" (t2 (a int) (a float)) (0l, 0.) ;
+  pack_unpack "simple3" (t3 (a int) (a float) (a sym)) (0l, 0., "a") ;
   pack_unpack "vect"
     (t2 (v short) (v timestamp))
-    ([|1; 2; 3|], ([|Ptime.epoch; Ptime.epoch|])) ;
+    ([1; 2; 3], ([Ptime.epoch; Ptime.epoch])) ;
   pack_unpack "vect guid"
-    (t1 (v guid)) [|Uuidm.nil; Uuidm.nil|] ;
+    (t1 (v guid)) [Uuidm.nil; Uuidm.nil] ;
   pack_unpack "nested"
     (t1 (t1 (a bool))) true ;
-  pack_unpack "compound" (list (v short)) [|[|1;2|]; [|3;4|]|] ;
-  pack_unpack "string list" (list (s char)) [|"machin"; "truc"|] ;
+  pack_unpack "compound" (list (v short)) [[1;2]; [3;4]] ;
+  pack_unpack "string list" (list (s char)) ["machin"; "truc"] ;
+  pack_unpack "test" (t2 (a sym) (a bool)) ("auie", true) ;
   ()
 
 let pack_unpack_dict () =
   let open Kx in
-  pack_unpack "empty" (dict (list (a bool)) (list (a bool))) ([||], [||]);
-  pack_unpack "simple" (dict (v sym) (v long)) ([|"a";"b";"c"|], [|1L;2L;3L|]);
+  pack_unpack "empty" (dict (list (a bool)) (list (a bool))) ([], []);
+  pack_unpack "simple" (dict (v sym) (v long)) (["a";"b";"c"], [1L;2L;3L]);
   pack_unpack "compound"
     (dict
        (list (t2 (a bool) (a int)))
        (list (t2 (a bool) (a int))))
-    ([|true, 3l; false, 2l|], [|false, 1l; true, 2l|]);
+    ([true, 3l; false, 2l], [false, 1l; true, 2l]);
   ()
 
 let pack_unpack_table () =
   let open Kx in
-  pack_unpack "simple" (table (v sym) (v long)) ([|"a"|], [|1L|]);
+  pack_unpack "simple" (table (v sym) (v long)) (["a"], [1L]);
   ()
 
 let pack_unpack_conv () =
@@ -99,40 +109,16 @@ let pack_unpack_conv () =
     ((1, 2, 3), false, true) ;
   ()
 
-let leaktest n l m () =
-  let open Kx in
-  let o = list (a sym) in
-  for _ = 0 to n - 1 do
-    ignore @@ destruct o (construct o (Array.init l (fun _ -> Bytes.(unsafe_to_string (create m))))) ;
-    Gc.compact ()
-  done ;
-  Gc.print_stat stderr
-
-(* let test_server () =
- *   let open Kx in
- *   let key = v sym in
- *   let values = t9
- *       (v sym) (v sym) (v sym)
- *       (v int) (v int) (v timestamp)
- *       (v timestamp) (v timestamp) list in
- *   let retwit = table key values in
- *   with_connection
- *     (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
- *     ~f:begin fun fd ->
- *       k0_sync fd
- *         ".servers.SERVERS" retwit
- *     end |> function
- *   | Ok (Ok _a) -> ()
- *   | Ok (Error msg) -> failwith msg
- *   | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg) *)
-
-let do_n_times n m f () =
-  for i = 0 to n - 1 do
-    f () ;
-    if i mod m = 0 then Gc.compact ()
-  done
-let hu = do_n_times 100 10
-let th = do_n_times 1000 100
+let test_server () =
+  let open Async in
+  let open Kx_async in
+  let t = create (t2 (s Kx.char) (a Kx.bool)) ("upd", false) in
+  with_connection
+    (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun p ->
+    Pipe.write p t
+  end >>= function
+  | Error e -> fail e
+  | Ok () -> Deferred.unit
 
 let utilities () =
   check int "month1" 0 (int_of_month (2000, 1, 0)) ;
@@ -146,24 +132,40 @@ let utilities () =
     check int "month" i j
   done
 
+let date ds =
+  let testable = testable pp_print_date Pervasives.(=) in
+  List.iter begin fun d ->
+    let d' = date_of_int (int_of_date d) in
+    check testable (Format.asprintf "%a" pp_print_date d) d d'
+  end ds
+
+let date () =
+  date [
+    1985, 5, 20 ;
+    2019, 6, 10 ;
+    2019, 1, 1 ;
+    2019, 1, 2 ;
+    2000, 1, 1 ;
+  ]
+
 let tests_kx = [
-  test_case "leaktest" `Quick (leaktest 100 100000 4096) ;
-  test_case "utilities" `Quick (utilities) ;
-  test_case "atom" `Quick (hu pack_unpack_atom) ;
-  test_case "vect" `Quick (hu pack_unpack_vect) ;
-  test_case "list" `Quick (th pack_unpack_list) ;
-  test_case "dict" `Quick (th pack_unpack_dict) ;
-  test_case "table" `Quick (th pack_unpack_table) ;
-  test_case "conv" `Quick (hu pack_unpack_conv) ;
-  (* test_case "server" `Quick test_server ; *)
+  test_case "utilities" `Quick utilities ;
+  test_case "date" `Quick date ;
+  test_case "atom" `Quick pack_unpack_atom ;
+  test_case "vect" `Quick pack_unpack_vect ;
+  test_case "list" `Quick pack_unpack_list ;
+  test_case "dict" `Quick pack_unpack_dict ;
+  test_case "table" `Quick pack_unpack_table ;
+  test_case "conv" `Quick pack_unpack_conv ;
 ]
 
-(* let tests_kx_async = Alcotest_async.[
- * ] *)
+let tests_kx_async = Alcotest_async.[
+    test_case "server" `Quick test_server ;
+  ]
 
 let () =
-  Kx.init () ;
+  Logs.set_level ~all:true (Some Logs.Debug) ;
   run "q" [
     "kx", tests_kx ;
-    (* "kx-async", tests_kx_async ; *)
+    "kx-async", tests_kx_async ;
   ]

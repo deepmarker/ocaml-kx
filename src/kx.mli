@@ -6,7 +6,13 @@
 type time = { time : Ptime.time ; ms : int }
 type timespan = { time : Ptime.time ; ns : int }
 
-type k
+type attribute =
+  | NoAttr
+  | Sorted
+  | Unique
+  | Parted
+  | Grouped
+
 type _ typ
 type _ w
 
@@ -27,47 +33,47 @@ val timespan  : timespan typ
 val minute    : Ptime.time typ
 val second    : Ptime.time typ
 val time      : time typ
+val lambda    : (string * string) typ
 
 val a : 'a typ -> 'a w
-val v : 'a typ -> 'a array w
-val s : char typ -> string w
+val v : ?attr:attribute -> 'a typ -> 'a list w
+val s : ?attr:attribute -> char typ -> string w
 
-val list : 'a w -> 'a array w
-val t1 : 'a w -> 'a w
-val t2 : 'a w -> 'b w -> ('a * 'b) w
-val t3 : 'a w -> 'b w -> 'c w -> ('a * 'b * 'c) w
-val t4 : 'a w -> 'b w -> 'c w -> 'd w -> ('a * 'b * 'c * 'd) w
-val t5 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> ('a * 'b * 'c * 'd * 'e) w
-val t6 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> ('a * 'b * 'c * 'd * 'e * 'f) w
-val t7 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g) w
-val t8 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) w
-val t9 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> 'i w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) w
-val t10 : 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> 'i w -> 'j w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j) w
+val list : ?attr:attribute -> 'a w -> 'a list w
+val t1 : ?attr:attribute -> 'a w -> 'a w
+val t2 : ?attr:attribute -> 'a w -> 'b w -> ('a * 'b) w
+val t3 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> ('a * 'b * 'c) w
+val t4 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> 'd w -> ('a * 'b * 'c * 'd) w
+val t5 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> ('a * 'b * 'c * 'd * 'e) w
+val t6 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> ('a * 'b * 'c * 'd * 'e * 'f) w
+val t7 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g) w
+val t8 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) w
+val t9 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> 'i w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) w
+val t10 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g w -> 'h w -> 'i w -> 'j w -> ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j) w
 
 val merge_tups : 'a w -> 'b w -> ('a * 'b) w
 
-val dict : 'a w -> 'b w -> ('a * 'b) w
-val table : 'a w -> 'b w -> ('a * 'b) w
+val dict : ?sorted:bool -> 'a w -> 'b w -> ('a * 'b) w
+val table : ?sorted:bool -> 'a w -> 'b w -> ('a * 'b) w
 
 val conv : ('a -> 'b) -> ('b -> 'a) -> 'b w -> 'a w
 
-type t
+type hdr = {
+  endianness: [`Little | `Big] ;
+  typ: [`Async | `Sync | `Response] ;
+  len: int32 ;
+}
 
-val pp : Format.formatter -> t -> unit
+val write_hdr : Faraday.t -> hdr -> unit
 
-val equal_typ : t -> t -> bool
-(** [equal_typ a b] is [true] iff [a] is the same q type as [b]. *)
+val construct :
+  ?endianness:[`Big | `Little] ->
+  ?typ:[`Async | `Sync | `Response] ->
+  hdr:Faraday.t -> payload:Faraday.t ->
+  'a w -> 'a -> unit
 
-val equal : t -> t -> bool
-(** [equal_typ a b] is [true] iff [a] is the same q type and value as [b]. *)
-
-val construct : 'a w -> 'a -> t
-val destruct_k : 'a w -> k -> ('a, string) result
-val destruct : 'a w -> t -> ('a, string) result
-
-val of_string : 'a w -> string -> (t, string) result
-val of_string_exn : 'a w -> string -> t
-val to_string : ?mode:int -> t -> string
+val destruct :
+  ?endianness:[`Big | `Little] -> 'a w -> (hdr * 'a) Angstrom.t
 
 val nh : int
 val ni : int32
@@ -79,57 +85,19 @@ val wi : int32
 val wj : int64
 val wf : float
 
-(** Connection to q server *)
-
-val init : unit -> unit
-(** [init ()] must be called before creating any q
-    value. Initialization is also done automatically when connecting to
-    a server. *)
-
-type connection_error =
-  | Authentication
-  | Connection
-  | Timeout
-  | OpenSSL
-
-val pp_connection_error :
-  Format.formatter -> connection_error -> unit
-
-type capability =
-  | OneTBLimit
-  | UseTLS
-
-val connect :
-  ?timeout:Ptime.span ->
-  ?capability:capability -> Uri.t ->
-  (Unix.file_descr, connection_error) result
-
-val with_connection :
-  ?timeout:Ptime.span ->
-  ?capability:capability ->
-  Uri.t -> f:(Unix.file_descr -> 'a) ->
-  ('a, connection_error) result
-
-val kclose : Unix.file_descr -> unit
-
-val kread : Unix.file_descr -> 'a w -> ('a, string) result
-
-val k0 : Unix.file_descr -> string -> unit
-val k1 : Unix.file_descr -> string -> t -> unit
-val k2 : Unix.file_descr -> string -> t -> t -> unit
-val k3 : Unix.file_descr -> string -> t -> t -> t -> unit
-val kn : Unix.file_descr -> string -> t array -> unit
-
-val k0_sync : Unix.file_descr -> string -> 'a w -> ('a, string) result
-val k1_sync : Unix.file_descr -> string -> 'a w -> t -> ('a, string) result
-val k2_sync : Unix.file_descr -> string -> 'a w -> t -> t -> ('a, string) result
-val k3_sync : Unix.file_descr -> string -> 'a w -> t -> t -> t -> ('a, string) result
-val kn_sync : Unix.file_descr -> string -> 'a w -> t array -> ('a, string) result
+val equal_w : 'a w -> 'b w -> bool
+val equal : 'a w -> 'a -> 'b w -> 'b -> bool
+val pp : 'a w -> Format.formatter -> 'a -> unit
 
 (**/*)
 
 val int_of_month : Ptime.date -> int
 val month_of_int : int -> Ptime.date
+
+val int_of_date : Ptime.date -> int
+val date_of_int : int -> Ptime.date
+
+val pp_print_date : (int * int * int) Fmt.t
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

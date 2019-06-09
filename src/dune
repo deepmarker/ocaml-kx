@@ -3,14 +3,11 @@
  (public_name kx)
  (modules Kx)
  (synopsis "OCaml client for kdb+")
- (c_names k_stubs c)
- (c_flags -DKXVER=3 -gdwarf-2 -g3)
- (c_library_flags -lpthread)
- (libraries bigarray bigstring uuidm ptime uri))
+ (libraries fmt uuidm ptime uri ocplib-endian faraday angstrom))
 
 (library
  (name        kx_async)
  (public_name kx-async)
  (modules Kx_async)
  (synopsis "OCaml client for kdb+, for Jane Street's async")
- (libraries kx core async logs-async))
+ (libraries kx core async async-uri logs-async))

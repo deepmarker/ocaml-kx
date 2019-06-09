@@ -1,17 +1,12 @@
 open Async_kernel
 open Kx
 
+type t
+val create : 'a w -> 'a -> t
+
 val connect :
-  ?timeout:Ptime.span ->
-  ?capability:capability ->
-  Uri.t ->
-  (('a w -> ('a, string) result) Pipe.Reader.t * (string * t array) Pipe.Writer.t,
-   connection_error) result
+  ?buf:Faraday.t -> Uri.t -> (t Pipe.Writer.t, string) result Deferred.t
 
 val with_connection :
-  ?timeout:Ptime.span ->
-  ?capability:capability ->
-  Uri.t ->
-  f:(('a w -> ('a, string) result) Pipe.Reader.t ->
-     (string * t array) Pipe.Writer.t -> 'a Deferred.t) ->
-  ('a, connection_error) result Deferred.t
+  ?buf:Faraday.t -> Uri.t -> f:(t Pipe.Writer.t -> 'a Deferred.t) ->
+  ('a, string) result Deferred.t
