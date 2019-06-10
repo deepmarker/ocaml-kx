@@ -1,19 +1,20 @@
 open Kx
 open Alcotest
 
-let pack_unpack
-  : type a. string -> a w -> a -> unit = fun name w a ->
-  let v = construct w a in
-  let v_serialized = to_string v in
-  let vv_parsed = of_string_exn w v_serialized in
-  let vv_serialized = to_string vv_parsed in
-  check string (name ^ "_serial") v_serialized vv_serialized ;
-  check (testable Kx.pp Kx.equal) (name ^ "_parse") v vv_parsed ;
-  match destruct w v with
-  | Error msg -> failwith msg
-  | Ok vv ->
-    let vvv = construct w vv in
-    check (testable Kx.pp Kx.equal) (name ^ "_destruct") v vvv
+let make_testable : type a. a w -> a testable = fun a ->
+  testable (Kx.pp a) (fun x y -> Kx.equal a x a y)
+
+let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
+  let tt = make_testable w in
+  let buf = Faraday.create 1024 in
+  let hdr = construct buf w a in
+  let serialized = string_of_hdr hdr ^ Faraday.serialize_to_string buf in
+  Hex.hexdump (Hex.of_string serialized) ;
+  match Angstrom.parse_string (destruct w) serialized with
+  | Error msg -> fail msg
+  | Ok (hdr', v) ->
+    assert (hdr = hdr') ;
+    check tt name a v
 
 let pack_unpack_atom () =
   let open Kx in
@@ -99,15 +100,6 @@ let pack_unpack_conv () =
     ((1, 2, 3), false, true) ;
   ()
 
-let leaktest n l m () =
-  let open Kx in
-  let o = list (a sym) in
-  for _ = 0 to n - 1 do
-    ignore @@ destruct o (construct o (Array.init l (fun _ -> Bytes.(unsafe_to_string (create m))))) ;
-    Gc.compact ()
-  done ;
-  Gc.print_stat stderr
-
 (* let test_server () =
  *   let open Kx in
  *   let key = v sym in
@@ -126,14 +118,6 @@ let leaktest n l m () =
  *   | Ok (Error msg) -> failwith msg
  *   | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg) *)
 
-let do_n_times n m f () =
-  for i = 0 to n - 1 do
-    f () ;
-    if i mod m = 0 then Gc.compact ()
-  done
-let hu = do_n_times 100 10
-let th = do_n_times 1000 100
-
 let utilities () =
   check int "month1" 0 (int_of_month (2000, 1, 0)) ;
   check int "month2" 4 (int_of_month (2000, 5, 0)) ;
@@ -146,15 +130,31 @@ let utilities () =
     check int "month" i j
   done
 
+let date ds =
+  let testable = testable pp_print_date Pervasives.(=) in
+  List.iter begin fun d ->
+    let d' = date_of_int (int_of_date d) in
+    check testable (Format.asprintf "%a" pp_print_date d) d d'
+  end ds
+
+let date () =
+  date [
+    1985, 5, 20 ;
+    2019, 6, 10 ;
+    2019, 1, 1 ;
+    2019, 1, 2 ;
+    2000, 1, 1 ;
+  ]
+
 let tests_kx = [
-  test_case "leaktest" `Quick (leaktest 100 100000 4096) ;
-  test_case "utilities" `Quick (utilities) ;
-  test_case "atom" `Quick (hu pack_unpack_atom) ;
-  test_case "vect" `Quick (hu pack_unpack_vect) ;
-  test_case "list" `Quick (th pack_unpack_list) ;
-  test_case "dict" `Quick (th pack_unpack_dict) ;
-  test_case "table" `Quick (th pack_unpack_table) ;
-  test_case "conv" `Quick (hu pack_unpack_conv) ;
+  test_case "utilities" `Quick utilities ;
+  test_case "date" `Quick date ;
+  test_case "atom" `Quick pack_unpack_atom ;
+  test_case "vect" `Quick pack_unpack_vect ;
+  test_case "list" `Quick pack_unpack_list ;
+  test_case "dict" `Quick pack_unpack_dict ;
+  test_case "table" `Quick pack_unpack_table ;
+  test_case "conv" `Quick pack_unpack_conv ;
   (* test_case "server" `Quick test_server ; *)
 ]
 
@@ -162,7 +162,6 @@ let tests_kx = [
  * ] *)
 
 let () =
-  Kx.init () ;
   run "q" [
     "kx", tests_kx ;
     (* "kx-async", tests_kx_async ; *)

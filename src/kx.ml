@@ -37,24 +37,24 @@ type _ typ =
   | Second : Ptime.time typ
   | Time : time typ
 
-let int_of_typ : type a. a typ -> int = function
-  | Boolean -> 1
-  | Guid -> 2
-  | Byte -> 3
-  | Short -> 5
-  | Int -> 6
-  | Long -> 7
-  | Real -> 8
-  | Float -> 9
-  | Char -> 10
-  | Symbol -> 11
-  | Timestamp -> 12
-  | Month -> 13
-  | Date -> 14
-  | Timespan -> 15
-  | Minute -> 17
-  | Second -> 18
-  | Time -> 19
+(* let int_of_typ : type a. a typ -> int = function
+ *   | Boolean -> 1
+ *   | Guid -> 2
+ *   | Byte -> 3
+ *   | Short -> 5
+ *   | Int -> 6
+ *   | Long -> 7
+ *   | Real -> 8
+ *   | Float -> 9
+ *   | Char -> 10
+ *   | Symbol -> 11
+ *   | Timestamp -> 12
+ *   | Month -> 13
+ *   | Date -> 14
+ *   | Timespan -> 15
+ *   | Minute -> 17
+ *   | Second -> 18
+ *   | Time -> 19 *)
 
 type (_, _) eq = Eq : ('a, 'a) eq
 
@@ -107,19 +107,15 @@ type attribute =
   | Parted
   | Grouped
 
-let int_of_attribute = function
-  | NoAttr -> 0
-  | Sorted -> 1
-  | Unique -> 2
-  | Parted -> 3
-  | Grouped -> 4
-
 let char_of_attribute = function
   | NoAttr -> '\x00'
   | Sorted -> '\x01'
   | Unique -> '\x02'
   | Parted -> '\x03'
   | Grouped -> '\x04'
+
+let attribute attr =
+  Angstrom.(char (char_of_attribute attr) >>| ignore)
 
 type _ w =
   | Atom : 'a typ -> 'a w
@@ -144,41 +140,41 @@ let parted : type a. a w -> a w = function
   | List (a, _) -> List (a, Parted)
   | _ -> invalid_arg "parted"
 
-let rec attr : type a. a w -> attribute option = function
-  | Vect (_, attr) -> Some attr
-  | String (_, attr) -> Some attr
-  | List (_, attr) -> Some attr
-  | Conv (_, _, a) -> attr a
-  | Tup (_, attr) -> Some attr
-  | Tups (_, _, attr) -> Some attr
-  | _ -> None
+(* let rec attr : type a. a w -> attribute option = function
+ *   | Vect (_, attr) -> Some attr
+ *   | String (_, attr) -> Some attr
+ *   | List (_, attr) -> Some attr
+ *   | Conv (_, _, a) -> attr a
+ *   | Tup (_, attr) -> Some attr
+ *   | Tups (_, _, attr) -> Some attr
+ *   | _ -> None
+ * 
+ * let rec int_of_w : type a. a w -> int = function
+ *   | Atom a -> -(int_of_typ a)
+ *   | Vect (a, _) -> int_of_typ a
+ *   | String (a, _) -> int_of_typ a
+ *   | List _ -> 0
+ *   | Tup _ -> 0
+ *   | Tups _ -> 0
+ *   | Dict _ -> 99
+ *   | Table _ -> 98
+ *   | Conv (_, _, a) -> int_of_w a *)
 
-let rec int_of_w : type a. a w -> int = function
-  | Atom a -> -(int_of_typ a)
-  | Vect (a, _) -> int_of_typ a
-  | String (a, _) -> int_of_typ a
-  | List _ -> 0
-  | Tup _ -> 0
-  | Tups _ -> 0
-  | Dict _ -> 99
-  | Table _ -> 98
-  | Conv (_, _, a) -> int_of_w a
-
-let rec equal : type a b. a w -> b w -> bool = fun a b ->
+let rec equal_w : type a b. a w -> b w -> bool = fun a b ->
   match a, b with
   | Atom a, Atom b -> eq_typ a b <> None
   | Vect (a, aa), Vect (b, ba) -> eq_typ a b <> None && aa = ba
   | String (a, aa), String (b, ba) -> eq_typ a b <> None && aa = ba
-  | List (a, aa), List (b, ba) -> equal a b && aa = ba
-  | Tup (a, aa), Tup (b, ba) -> equal a b && aa = ba
-  | Tups (a, b, aa), Tups (c, d, ba) -> equal a c && equal b d && aa = ba
-  | Dict (a, b, s1), Dict (c, d, s2) -> equal a c && equal b d && s1 = s2
-  | Table (a, b, s1), Table (c, d, s2) -> equal a c && equal b d && s1 = s2
-  | Conv (_, _, a), Conv (_, _, b) -> equal a b
+  | List (a, aa), List (b, ba) -> equal_w a b && aa = ba
+  | Tup (a, aa), Tup (b, ba) -> equal_w a b && aa = ba
+  | Tups (a, b, aa), Tups (c, d, ba) -> equal_w a c && equal_w b d && aa = ba
+  | Dict (a, b, s1), Dict (c, d, s2) -> equal_w a c && equal_w b d && s1 = s2
+  | Table (a, b, s1), Table (c, d, s2) -> equal_w a c && equal_w b d && s1 = s2
+  | Conv (_, _, a), Conv (_, _, b) -> equal_w a b
   | _ -> false
 
-let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
-  match a, b with
+let rec equal : type a b. a w -> a -> b w -> b -> bool = fun aw x bw y ->
+  match aw, bw with
   | Atom a, Atom b -> eq_typ_val a b x y  <> None
   | Vect (a, aa), Vect (b, ba) -> begin
       aa = ba &&
@@ -200,25 +196,25 @@ let rec equal_typ_val : type a b. a w -> b w -> a -> b -> bool = fun a b x y ->
       | len, _ ->
         let ret = ref true in
         for i = 0 to len - 1 do
-          ret := !ret && equal_typ_val a b x.(i) y.(i)
+          ret := !ret && equal a x.(i) b y.(i)
         done ;
         !ret
     end
-  | Tup (a, aa), Tup (b, ba) -> aa = ba && equal_typ_val a b x y
+  | Tup (a, aa), Tup (b, ba) -> aa = ba && equal a x b y
   | Tups (a, b, aa), Tups (c, d, ba) ->
     let x1, x2 = x in
     let y1, y2 = y in
-    aa = ba && equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2
+    aa = ba && equal a x1 c y1 && equal b x2 d y2
   | Dict (a, b, s1), Dict (c, d, s2) ->
     let x1, x2 = x in
     let y1, y2 = y in
-    equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2 && s1 = s2
+    equal a x1 c y1 && equal b x2 d y2 && s1 = s2
   | Table (a, b, s1), Table (c, d, s2) ->
     let x1, x2 = x in
     let y1, y2 = y in
-    equal_typ_val a c x1 y1 && equal_typ_val b d x2 y2 && s1 = s2
+    equal a x1 c y1 && equal b x2 d y2 && s1 = s2
   | Conv (p1, _, a), Conv (p2, _, b) ->
-    equal_typ_val a b (p1 x) (p2 y)
+    equal a (p1 x) b (p2 y)
   | _ -> false
 
 let bool      = Boolean
@@ -310,8 +306,6 @@ let merge_tups t1 t2 =
   match is_tup t1, is_tup t2 with
   | Some a, Some b when a = b -> Tups (t1, t2, a)
   | _ -> invalid_arg "merge_tups"
-
-let merge_tups ?(attr=NoAttr) a b = tups a b attr
 
 let dict ?(sorted=false) k v = Dict (k, v, sorted)
 let table ?(sorted=false) k v = Table (k, v, sorted)
@@ -415,587 +409,726 @@ let second_of_int nb_seconds =
   let ss = nb_seconds mod 60 in
   (hh, mm, ss), 0
 
-let string_of_chars a =
-  String.init (Array.length a) (Array.get a)
+(* let string_of_chars a = String.init (Array.length a) (Array.get a) *)
+let pp_print_month ppf (y, m, _) = Format.fprintf ppf "%d.%dm" y m
+let pp_print_date ppf (y, m, d) =  Format.fprintf ppf "%d.%d.%d" y m d
+let pp_print_timespan ppf { time = ((hh, mm, ss), _) ; ns } = Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ns
+let pp_print_minute ppf ((hh, mm, _), _) = Format.fprintf ppf "%d:%d" hh mm
+let pp_print_second ppf ((hh, mm, ss), _) = Format.fprintf ppf "%d:%d:%d" hh mm ss
+let pp_print_time ppf { time = ((hh, mm, ss), _) ; ms } = Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ms
+(* let pp_print_symbols ppf syms = Array.iter (fun sym -> Format.fprintf ppf "`%s" sym) syms *)
+let pp_print_timestamp ppf ts = Format.fprintf ppf "%a" (Ptime.pp_rfc3339 ~frac_s:9 ()) ts
 
-let guids a =
-  let len = Bigstring.length a in
-  if len mod 16 <> 0 then
-    invalid_arg ("guids: " ^  string_of_int len) ;
-  let nb_guids =  len / 16 in
-  Array.init nb_guids begin fun i ->
-    let guid = Bigstring.sub_string a (i*16) 16 in
-    match Uuidm.of_bytes guid with
-    | None -> assert false
-    | Some v -> v
-  end
-
-let pp_print_month ppf i =
-  let y, m, _ = month_of_int i in
-  Format.fprintf ppf "%d.%dm" y m
-
-let pp_print_date ppf i =
-  let y, m, d = date_of_int i in
-  Format.fprintf ppf "%d.%d.%d" y m d
-
-let pp_print_timespan ppf j =
-  let { time = ((hh, mm, ss), _) ; ns } = timespan_of_int64 j in
-  Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ns
-
-let pp_print_minute ppf i =
-  let (hh, mm, _), _ = minute_of_int i in
-  Format.fprintf ppf "%d:%d" hh mm
-
-let pp_print_second ppf i =
-  let (hh, mm, ss), _ = second_of_int i in
-  Format.fprintf ppf "%d:%d:%d" hh mm ss
-
-let pp_print_time ppf i =
-  let { time = ((hh, mm, ss), _) ; ms } = time_of_int i in
-  Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ms
-
-let pp_print_symbols ppf syms =
-  Array.iter (fun sym -> Format.fprintf ppf "`%s" sym) syms
-
-let pp_print_timestamp ppf j =
-  Format.fprintf ppf "%a" (Ptime.pp_rfc3339 ~frac_s:9 ()) (timestamp_of_int64 j)
+module type FE = module type of Faraday.BE
 
 let rec construct_list :
-  type a. Buffer.t -> a w -> a -> int = fun buf w a ->
+  type a. [`Big | `Little] -> Faraday.t -> a w -> a -> int = fun e buf w a ->
   match w with
   | Tup (w, _) ->
-    construct buf w a ;
+    construct e buf w a ;
     1
   | Tups (hw, tw, _) ->
     let h, t = a in
-    let lenh = construct_list buf hw h in
-    let lent = construct_list buf tw t in
+    let lenh = construct_list e buf hw h in
+    let lent = construct_list e buf tw t in
     lenh + lent
   | _ -> assert false
 
-and construct : type a. Buffer.t -> a w -> a -> unit = fun buf w a ->
+and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun e buf w a ->
+  let open Faraday in
+  let module FE = (val (match e with `Big -> (module BE) | `Little -> (module LE)) : FE) in
   match w with
   | List (w', attr) ->
-    Buffer.add_char buf '\x00' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    Array.iter (construct buf w') a
+    write_char buf '\x00' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
+    Array.iter (construct e buf w') a
 
   | Tup (ww, attr) ->
-    Buffer.add_char buf '\x00' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let b = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 b 0 1l ;
-    Buffer.add_bytes buf b ;
-    construct buf ww a
+    write_char buf '\x00' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf 1l ;
+    construct e buf ww a
 
   | Tups (_, _, attr) ->
-    let buf' = Buffer.create 13 in
-    let len = construct_list buf' w a in
-    Buffer.add_char buf '\x00' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let b = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 b 0 (Int32.of_int len) ;
-    Buffer.add_bytes buf b ;
-    Buffer.add_buffer buf buf'
+    let buf' = create 13 in
+    let len = construct_list e buf' w a in
+    write_char buf '\x00' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int len) ;
+    (schedule_bigstring buf (serialize_to_bigstring buf'))
 
   | Dict (k, v, sorted) ->
     if not (is_list_type k && is_list_type v) then
       invalid_arg "dict keys and values must be a list type" ;
     let x, y = a in
-    Buffer.add_char buf (if sorted then '\x7f' else '\x63') ;
-    construct buf k x ;
-    construct buf v y
+    write_char buf (if sorted then '\x7f' else '\x63') ;
+    construct e buf k x ;
+    construct e buf v y
 
   | Table (k, v, sorted) ->
     let x, y = a in
-    Buffer.add_char buf '\x62' ;
-    Buffer.add_char buf (if sorted then '\x01' else '\x00') ;
-    construct buf k x ;
-    construct buf (parted v) y
+    write_char buf '\x62' ;
+    write_char buf (if sorted then '\x01' else '\x00') ;
+    construct e buf k x ;
+    construct e buf (parted v) y
 
-  | Conv (project, _, ww) -> construct buf ww (project a)
+  | Conv (project, _, ww) -> construct e buf ww (project a)
 
   | Atom Boolean ->
-    Buffer.add_char buf '\xff' ;
+    write_char buf '\xff' ;
     begin match a with
-      | false -> Buffer.add_char buf '\x00'
-      | true -> Buffer.add_char buf '\x01'
+      | false -> write_char buf '\x00'
+      | true -> write_char buf '\x01'
     end
 
+  | Atom Guid ->
+    write_char buf '\xfe' ;
+    write_string buf (Uuidm.to_bytes a)
+
   | Atom Byte ->
-    Buffer.add_char buf '\xfc' ;
-    Buffer.add_char buf a
+    write_char buf '\xfc' ;
+    write_char buf a
 
   | Atom Short ->
-    let l = Bytes.create 2 in
-    Buffer.add_char buf '\xfb' ;
-    EndianString.NativeEndian.set_int16 l 0 a ;
-    Buffer.add_bytes buf l
+    write_char buf '\xfb' ;
+    FE.write_uint16 buf a
 
   | Atom Int ->
-    let l = Bytes.create 4 in
-    Buffer.add_char buf '\xfa' ;
-    EndianString.NativeEndian.set_int32 l 0 a ;
-    Buffer.add_bytes buf l
+    write_char buf '\xfa' ;
+    FE.write_uint32 buf a ;
 
   | Atom Long ->
-    let l = Bytes.create 8 in
-    Buffer.add_char buf '\xf9' ;
-    EndianString.NativeEndian.set_int64 l 0 a ;
-    Buffer.add_bytes buf l
+    write_char buf '\xf9' ;
+    FE.write_uint64 buf a
 
   | Atom Real ->
-    let l = Bytes.create 4 in
-    Buffer.add_char buf '\xf8' ;
-    EndianString.NativeEndian.set_float l 0 a ;
-    Buffer.add_bytes buf l
+    write_char buf '\xf8' ;
+    FE.write_float buf a
 
   | Atom Float ->
-    let l = Bytes.create 8 in
-    Buffer.add_char buf '\xf7' ;
-    EndianString.NativeEndian.set_double l 0 a ;
-    Buffer.add_bytes buf l
+    write_char buf '\xf7' ;
+    FE.write_double buf a
 
   | Atom Char ->
-    Buffer.add_char buf '\xf6' ;
-    Buffer.add_char buf a
+    write_char buf '\xf6' ;
+    write_char buf a
 
   | Atom Symbol ->
-    Buffer.add_char buf '\xf5' ;
-    Buffer.add_string buf a ;
-    Buffer.add_char buf '\x00'
-
-  | Atom Guid ->
-    Buffer.add_char buf '\xfe' ;
-    Buffer.add_string buf (Uuidm.to_string a)
-
-  | Atom Date ->
-    Buffer.add_char buf '\xf2' ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_date a)) ;
-    Buffer.add_bytes buf l
-
-  | Atom Time ->
-    Buffer.add_char buf '\xed' ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_time a)) ;
-    Buffer.add_bytes buf l
-
-  | Atom Timespan ->
-    Buffer.add_char buf '\xf0' ;
-    let l = Bytes.create 8 in
-    EndianString.NativeEndian.set_int64 l 0 (int64_of_timespan a) ;
-    Buffer.add_bytes buf l
+    write_char buf '\xf5' ;
+    write_string buf a ;
+    write_char buf '\x00'
 
   | Atom Timestamp ->
-    Buffer.add_char buf '\xf4' ;
-    let l = Bytes.create 8 in
-    EndianString.NativeEndian.set_int64 l 0 (int64_of_timestamp a) ;
-    Buffer.add_bytes buf l
+    write_char buf '\xf4' ;
+    FE.write_uint64 buf (int64_of_timestamp a) ;
 
   | Atom Month ->
-    Buffer.add_char buf '\xf3' ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_month a)) ;
-    Buffer.add_bytes buf l
+    write_char buf '\xf3' ;
+    FE.write_uint32 buf (Int32.of_int (int_of_month a))
+
+  | Atom Date ->
+    write_char buf '\xf2' ;
+    FE.write_uint32 buf (Int32.of_int (int_of_date a))
+
+  | Atom Timespan ->
+    write_char buf '\xf0' ;
+    FE.write_uint64 buf (int64_of_timespan a)
 
   | Atom Minute ->
-    Buffer.add_char buf '\xef' ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_minute a)) ;
-    Buffer.add_bytes buf l
+    write_char buf '\xef' ;
+    FE.write_uint32 buf (Int32.of_int (int_of_minute a))
 
   | Atom Second ->
-    Buffer.add_char buf '\xed' ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_second a)) ;
-    Buffer.add_bytes buf l
+    write_char buf '\xee' ;
+    FE.write_uint32 buf (Int32.of_int (int_of_second a))
+
+  | Atom Time ->
+    write_char buf '\xed' ;
+    FE.write_uint32 buf (Int32.of_int (int_of_time a))
 
   | Vect (Boolean, attr) ->
-    Buffer.add_char buf '\x01' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
+    write_char buf '\x01' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
     Array.iter begin function
-      | false -> Buffer.add_char buf '\x00'
-      | true -> Buffer.add_char buf '\x01'
+      | false -> write_char buf '\x00'
+      | true -> write_char buf '\x01'
     end a
 
   | String (Byte, attr) ->
-    Buffer.add_char buf '\x04' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (String.length a)) ;
-    Buffer.add_bytes buf l ;
-    Buffer.add_string buf a
+    write_char buf '\x04' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (String.length a)) ;
+    write_string buf a
 
   | Vect (Byte, attr) ->
-    Buffer.add_char buf '\x04' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
-    Array.iter (Buffer.add_char buf) a
+    write_char buf '\x04' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
+    Array.iter (write_char buf) a
 
   | String (Char, attr) ->
-    Buffer.add_char buf '\x0a' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (String.length a)) ;
-    Buffer.add_bytes buf l ;
-    Buffer.add_string buf a
+    write_char buf '\x0a' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (String.length a)) ;
+    write_string buf a
 
   | Vect (Char, attr) ->
-    Buffer.add_char buf '\x0a' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
-    Array.iter (Buffer.add_char buf) a
+    write_char buf '\x0a' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
+    Array.iter (write_char buf) a
 
   | Vect (Short, attr) ->
-    Buffer.add_char buf '\x05' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
-    Array.iter begin fun i ->
-      EndianString.NativeEndian.set_int16 l 0 i ;
-      Buffer.add_subbytes buf l 0 2
-    end a
+    write_char buf '\x05' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
+    Array.iter (FE.write_uint16 buf) a
 
   | Vect (Int, attr) ->
-    Buffer.add_char buf '\x06' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
-    Array.iter begin fun i ->
-      EndianString.NativeEndian.set_int32 l 0 i ;
-      Buffer.add_bytes buf l
-    end a
+    write_char buf '\x06' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
+    Array.iter (FE.write_uint32 buf) a
 
   | Vect (Long, attr) ->
-    Buffer.add_char buf '\x07' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 8 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_subbytes buf l 0 4 ;
-    Array.iter begin fun i ->
-      EndianString.NativeEndian.set_int64 l 0 i ;
-      Buffer.add_bytes buf l
-    end a
+    write_char buf '\x07' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
+    Array.iter (FE.write_uint64 buf) a
 
   | Vect (Real, attr) ->
-    Buffer.add_char buf '\x08' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
-    Array.iter begin fun i ->
-      EndianString.NativeEndian.set_float l 0 i ;
-      Buffer.add_bytes buf l
-    end a
+    write_char buf '\x08' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
+    Array.iter (FE.write_float buf) a
 
   | Vect (Float, attr) ->
-    Buffer.add_char buf '\x09' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 8 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_subbytes buf l 0 4 ;
-    Array.iter begin fun i ->
-      EndianString.NativeEndian.set_double l 0 i ;
-      Buffer.add_bytes buf l
-    end a
+    write_char buf '\x09' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
+    Array.iter (FE.write_double buf) a
 
   | Vect (Symbol, attr) ->
-    Buffer.add_char buf '\x0b' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
+    write_char buf '\x0b' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
     Array.iter begin fun s ->
-      Buffer.add_string buf s ;
-      Buffer.add_char buf '\x00'
+      write_string buf s ;
+      write_char buf '\x00'
     end a
 
   | Vect (Guid, attr) ->
-    Buffer.add_char buf '\x02' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
+    write_char buf '\x02' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
     Array.iter begin fun s ->
-      Buffer.add_string buf (Uuidm.to_bytes s) ;
+      write_string buf (Uuidm.to_bytes s)
     end a
 
   | Vect (Timestamp, attr) ->
-    Buffer.add_char buf '\x0c' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 8 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_subbytes buf l 0 4 ;
+    write_char buf '\x0c' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
     Array.iter begin fun ts ->
-      EndianString.NativeEndian.set_int64 l 0 (int64_of_timestamp ts) ;
-      Buffer.add_bytes buf l ;
+      FE.write_uint64 buf (int64_of_timestamp ts)
     end a
 
   | Vect (Month, attr) ->
-    Buffer.add_char buf '\x0d' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
+    write_char buf '\x0d' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
     Array.iter begin fun m ->
-      EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_month m)) ;
-      Buffer.add_bytes buf l
+      FE.write_uint32 buf (Int32.of_int (int_of_month m))
     end a
 
   | Vect (Date, attr) ->
-    Buffer.add_char buf '\x0e' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
+    write_char buf '\x0e' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
     Array.iter begin fun m ->
-      EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_date m)) ;
-      Buffer.add_bytes buf l
+      FE.write_uint32 buf (Int32.of_int (int_of_date m))
     end a
 
   | Vect (Timespan, attr) ->
-    Buffer.add_char buf '\x10' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 8 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_subbytes buf l 0 4 ;
+    write_char buf '\x10' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
     Array.iter begin fun a ->
-      EndianString.NativeEndian.set_int64 l 0 (int64_of_timespan a) ;
-      Buffer.add_bytes buf l ;
+      FE.write_uint64 buf (int64_of_timespan a)
     end a
 
   | Vect (Minute, attr) ->
-    Buffer.add_char buf '\x11' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
+    write_char buf '\x11' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
     Array.iter begin fun m ->
-      EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_minute m)) ;
-      Buffer.add_bytes buf l
+      FE.write_uint32 buf (Int32.of_int (int_of_minute m))
     end a
 
   | Vect (Second, attr) ->
-    Buffer.add_char buf '\x12' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
+    write_char buf '\x12' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
     Array.iter begin fun m ->
-      EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_second m)) ;
-      Buffer.add_bytes buf l
+      FE.write_uint32 buf (Int32.of_int (int_of_second m))
     end a
 
   | Vect (Time, attr) ->
-    Buffer.add_char buf '\x13' ;
-    Buffer.add_char buf (char_of_attribute attr) ;
-    let l = Bytes.create 4 in
-    EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (Array.length a)) ;
-    Buffer.add_bytes buf l ;
+    write_char buf '\x13' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
     Array.iter begin fun a ->
-      EndianString.NativeEndian.set_int32 l 0 (Int32.of_int (int_of_time a)) ;
-      Buffer.add_bytes buf l
+      FE.write_uint32 buf (Int32.of_int (int_of_time a))
     end a
 
   | String _ -> assert false
 
-let construct ?(msgtyp=`Async) buf w x =
-  construct buf w x ;
+let char_of_endianness = function
+  | `Big -> '\x00'
+  | `Little -> '\x01'
+
+type hdr = {
+  endianness: [`Little | `Big] ;
+  typ: [`Async | `Sync | `Response] ;
+  len: int32 ;
+}
+
+let string_of_hdr { endianness ; typ ; len } =
+  let module E =
+    (val (match endianness with
+         | `Big -> (module EndianString.BigEndian)
+         | `Little -> (module EndianString.LittleEndian)) : EndianString.EndianStringSig) in
   let hdr = Bytes.make 8 '\x00' in
-  construct buf w x ;
-  Bytes.set hdr 0 (if Sys.big_endian then '\x00' else '\x01') ;
+  Bytes.set hdr 0 (char_of_endianness endianness) ;
   Bytes.set hdr 1
-    (match msgtyp with `Async -> '\x00' | `Sync -> '\x01' | `Response -> '\x02') ;
-  EndianString.NativeEndian.set_int32 hdr 4 (Int32.of_int (Buffer.length buf)) ;
+    (match typ with `Async -> '\x00' | `Sync -> '\x01' | `Response -> '\x02') ;
+  E.set_int32 hdr 4 len ;
   Bytes.unsafe_to_string hdr
 
-let rec destruct_list : type a. a w -> k -> int -> (a * int, string) result = fun w k i ->
+let construct
+    ?(endianness=if Sys.big_endian then `Big else `Little)
+    ?(typ=`Async) buf w x =
+  construct endianness buf w x ;
+  { endianness ; typ ; len = Int32.of_int (Faraday.pending_bytes buf) }
+
+let msgtyp_of_int = function
+  | 0 -> `Async
+  | 1 -> `Sync
+  | 3 -> `Response
+  | _ -> invalid_arg "typ_of_int"
+
+open Angstrom
+
+let msgtyp = any_uint8 >>| msgtyp_of_int
+
+let endianness =
+  any_uint8 >>| function
+  | 0 -> `Big
+  | 1 -> `Little
+  | _ -> invalid_arg "endianness"
+
+module type ENDIAN = module type of BE
+
+let getmod = function
+  | `Big -> (module BE : ENDIAN)
+  | `Little -> (module LE : ENDIAN)
+
+let hdr_encoding =
+  endianness >>= fun e ->
+  msgtyp >>= fun typ ->
+  let module M = (val getmod e) in
+  M.int16 0 *>
+  M.any_int32 >>| fun len ->
+  { endianness = e ; typ ; len }
+
+let bool_atom =
+  char '\xff' *>
+  any_uint8 >>| fun i ->
+  i <> 0
+
+let guid_encoding =
+  take 16 >>| fun guid ->
+  match Uuidm.of_bytes guid with
+  | None -> invalid_arg "guid"
+  | Some v -> v
+
+let guid_atom =
+  char '\xfe' *> guid_encoding
+
+let byte_atom =
+  char '\xfc' *> any_char
+
+let short_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_int16
+
+let short_atom endianness =
+  char '\xfb' *>
+  short_encoding endianness
+
+let int_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_int32
+
+let int_atom endianness =
+  char '\xfa' *>
+  int_encoding endianness
+
+let long_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_int64
+
+let long_atom endianness =
+  char '\xf9' *>
+  long_encoding endianness
+
+let real_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_float
+
+let real_atom endianness =
+  let open Angstrom in
+  char '\xf8' *>
+  real_encoding endianness
+
+let float_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_double
+
+let float_atom endianness =
+  char '\xf7' *> float_encoding endianness
+
+let char_atom =
+  char '\xf6' *> any_char
+
+let symbol_encoding =
+  take_while (fun c -> c <> '\x00') >>= fun res ->
+  char '\x00' >>| fun _ -> res
+
+let symbol_atom =
+  char '\xf5' *> symbol_encoding
+
+let timestamp_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_int64 >>| timestamp_of_int64
+
+let timestamp_atom endianness =
+  char '\xf4' *> timestamp_encoding endianness
+
+let month_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_int32 >>| fun i -> month_of_int (Int32.to_int i)
+
+let month_atom endianness =
+  char '\xf3' *> month_encoding endianness
+
+let date_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_int32 >>| fun i -> date_of_int (Int32.to_int i)
+
+let date_atom endianness =
+  char '\xf2' *> date_encoding endianness
+
+let timespan_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_int64 >>| timespan_of_int64
+
+let timespan_atom endianness =
+  char '\xf0' *> timespan_encoding endianness
+
+let minute_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_int32 >>| fun i -> minute_of_int (Int32.to_int i)
+
+let minute_atom endianness =
+  char '\xef' *> minute_encoding endianness
+
+let second_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_int32 >>| fun i -> second_of_int (Int32.to_int i)
+
+let second_atom endianness =
+  char '\xee' *> second_encoding endianness
+
+let time_encoding endianness =
+  let module M = (val getmod endianness) in
+  M.any_int32 >>| fun i -> time_of_int (Int32.to_int i)
+
+let time_atom endianness =
+  char '\xed' *> time_encoding endianness
+
+let length endianness =
+  let module M = (val getmod endianness) in
+  M.any_int32 >>| Int32.to_int
+
+let bool_vect endianness attr =
+  char '\x01' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  take len >>| fun str ->
+  Array.init len (fun i -> str.[i] <> '\x00')
+
+let guid_vect endianness attr =
+  char '\x02' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len guid_encoding >>| Array.of_list
+
+let char_array len =
+  take len >>| fun str ->
+  Array.init len (fun i -> str.[i])
+
+let byte_vect endianness attr =
+  char '\x04' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  char_array len
+
+let bytestring_vect endianness attr =
+  char '\x04' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  take len
+
+let short_vect endianness attr =
+  char '\x05' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (short_encoding endianness) >>| Array.of_list
+
+let int_vect endianness attr =
+  char '\x06' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (int_encoding endianness) >>| Array.of_list
+
+let long_vect endianness attr =
+  char '\x07' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (long_encoding endianness) >>| Array.of_list
+
+let real_vect endianness attr =
+  char '\x08' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (real_encoding endianness) >>| Array.of_list
+
+let float_vect endianness attr =
+  char '\x09' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (float_encoding endianness) >>| Array.of_list
+
+let char_vect endianness attr =
+  char '\x0a' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  char_array len
+
+let string_vect endianness attr =
+  char '\x0a' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  take len
+
+let symbol_vect endianness attr =
+  char '\x0b' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len symbol_encoding >>| Array.of_list
+
+let timestamp_vect endianness attr =
+  char '\x0c' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (timestamp_encoding endianness) >>| Array.of_list
+
+let month_vect endianness attr =
+  char '\x0d' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (month_encoding endianness) >>| Array.of_list
+
+let date_vect endianness attr =
+  char '\x0e' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (date_encoding endianness) >>| Array.of_list
+
+let timespan_vect endianness attr =
+  char '\x10' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (timespan_encoding endianness) >>| Array.of_list
+
+let minute_vect endianness attr =
+  char '\x11' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (minute_encoding endianness) >>| Array.of_list
+
+let second_vect endianness attr =
+  char '\x12' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (second_encoding endianness) >>| Array.of_list
+
+let time_vect endianness attr =
+  char '\x13' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len (time_encoding endianness) >>| Array.of_list
+
+let general_list endianness attr elt =
+  let open Angstrom in
+  char '\x00' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  count len elt
+
+let rec destruct_list :
+  type a. [`Big | `Little] -> a w -> a Angstrom.t = fun endianness w ->
+  let open Angstrom in
   match w with
-  | Tup a -> begin
-      match destruct a (kK k i) with
-      | Error e -> Error e
-      | Ok a -> Ok (a, succ i)
-    end
-  | Tups (h, t) -> begin
-      match destruct_list h k i with
-      | Error msg -> Error msg
-      | Ok (v, i) -> match destruct_list t k i with
-        | Error e -> Error e
-        | Ok (vv, i) -> Ok ((v, vv), i)
-    end
+  | Tup (ww, _) -> destruct ~endianness ww
+  | Tups (h, t, _) ->
+    destruct_list endianness h >>= fun a ->
+    destruct_list endianness t >>| fun b ->
+    (a, b)
   | _ -> assert false
 
-and destruct : type a. a w -> k -> (a, string) result = fun w k ->
+and destruct :
+  type a. ?endianness:[`Big | `Little] -> a w -> a Angstrom.t =
+  fun ?(endianness = if Sys.big_endian then `Big else `Little) w ->
+  let open Angstrom in
   match w with
-  | List w when k_objtyp k = 0 -> begin
-      let rec inner acc = function
-        | -1 -> acc
-        | i ->
-          match destruct w (kK k i) with
-          | Error e -> failwith e
-          | Ok v -> inner (v :: acc) (pred i) in
-      try
-        Ok (Array.of_list (inner [] (pred (k_length k))))
-      with Failure msg -> Error msg
-    end
-  | Conv (_, inject, w) -> begin
-      match destruct w k with
-      | Error e -> Error e
-      | Ok v -> Ok (inject v)
-    end
-  | Tup w when k_objtyp k = 0 -> destruct w (kK k 0)
-  | Tups _ when k_objtyp k = 0 ->
-    (match destruct_list w k 0 with Error e -> Error e | Ok (v, _) -> Ok v)
-  | Table (key, values) when k_objtyp k = 98 ->
-    destruct (Dict (key, values)) (k_k k)
-  | Dict (kw, vw) when k_objtyp k = 99 -> begin
-      match destruct kw (kK k 0), destruct vw (kK k 1) with
-      | Ok a, Ok b -> Ok (a, b)
-      | Error e, _
-      | _, Error e -> Error e
-    end
+  | List (w, attr) -> general_list endianness attr (destruct ~endianness w) >>| Array.of_list
+  | Conv (_, inject, w) -> destruct ~endianness w >>| inject
+  | Tup (w, attr) -> general_list endianness attr (destruct ~endianness w) >>| List.hd
+  | Tups (_, _, attr) as t ->
+    char '\x00' *>
+    attribute attr >>= fun () ->
+    length endianness >>= fun _len ->
+    destruct_list endianness t
 
-  | Atom Boolean when k_objtyp k = -1 -> Ok (k_g k <> 0)
-  | Atom Guid when k_objtyp k = -2 -> Ok (k_u k)
-  | Atom Byte when k_objtyp k = -4 -> Ok (Char.chr (k_g k))
-  | Atom Short when k_objtyp k = -5 -> Ok (k_h k)
-  | Atom Int when k_objtyp k = -6 -> Ok (k_i k)
-  | Atom Long when k_objtyp k = -7 -> Ok (k_j k)
-  | Atom Real when k_objtyp k = -8 -> Ok (k_e k)
-  | Atom Float when k_objtyp k = -9 -> Ok (k_f k)
-  | Atom Char when k_objtyp k = -10 -> Ok (Char.chr (k_g k))
-  | Atom Symbol when k_objtyp k = -11 -> Ok (k_s k)
-  | Atom Timestamp when k_objtyp k = -12 -> Ok (timestamp_of_int64 (k_j k))
-  | Atom Month when k_objtyp k = -13 -> Ok (month_of_int (k_ii k))
-  | Atom Date when k_objtyp k = -14 -> Ok (date_of_int (k_ii k))
-  | Atom Timespan when k_objtyp k = -16 -> Ok (timespan_of_int64 (k_j k))
-  | Atom Minute when k_objtyp k = -17 -> Ok (minute_of_int (k_ii k))
-  | Atom Second when k_objtyp k = -18 -> Ok (second_of_int (k_ii k))
-  | Atom Time when k_objtyp k = -19 -> Ok (time_of_int (k_ii k))
+  | Dict (kw, vw, sorted) ->
+    char (if sorted then '\x7f' else '\x63') *>
+    destruct ~endianness kw >>= fun k ->
+    destruct ~endianness vw >>| fun v ->
+    k, v
 
-  | Vect Boolean when k_objtyp k = 1 ->
-    let len = k_length k in
-    let buf = kG_char k in
-    Ok (Array.init len (fun i -> Bigstring.get buf i <> '\x00'))
+  | Table (kw, vw, sorted) ->
+    char '\x62' *>
+    char (if sorted then '\x01' else '\x00') *>
+    destruct ~endianness (Dict (kw, vw, false))
 
-  | Vect Guid when k_objtyp k = 2 -> Ok (guids (kU k))
+  | Atom Boolean -> bool_atom
+  | Atom Guid -> guid_atom
+  | Atom Byte -> byte_atom
+  | Atom Short -> short_atom endianness
+  | Atom Int -> int_atom endianness
+  | Atom Long -> long_atom endianness
+  | Atom Real -> real_atom endianness
+  | Atom Float -> float_atom endianness
+  | Atom Char -> char_atom
+  | Atom Symbol -> symbol_atom
+  | Atom Timestamp -> timestamp_atom endianness
+  | Atom Month -> month_atom endianness
+  | Atom Date -> date_atom endianness
+  | Atom Timespan -> timespan_atom endianness
+  | Atom Minute -> minute_atom endianness
+  | Atom Second -> second_atom endianness
+  | Atom Time -> time_atom endianness
 
-  | Vect Byte when k_objtyp k = 4 ->
-    let len = k_length k in
-    let buf = kG_char k in
-    Ok (Array.init len (Bigstring.get buf))
+  | Vect (Boolean, attr) -> bool_vect endianness attr
+  | Vect (Guid, attr) -> guid_vect endianness attr
+  | Vect (Byte, attr) -> byte_vect endianness attr
+  | String (Byte, attr) -> bytestring_vect endianness attr
+  | Vect (Short, attr) -> short_vect endianness attr
+  | Vect (Int, attr)  -> int_vect endianness attr
+  | Vect (Long, attr) -> long_vect endianness attr
+  | Vect (Real, attr) -> real_vect endianness attr
+  | Vect (Float, attr) -> float_vect endianness attr
+  | Vect (Char, attr) -> char_vect endianness attr
+  | String (Char, attr) -> string_vect endianness attr
+  | Vect (Symbol, attr) -> symbol_vect endianness attr
+  | Vect (Timestamp, attr) -> timestamp_vect endianness attr
+  | Vect (Month, attr) -> month_vect endianness attr
+  | Vect (Date, attr) -> date_vect endianness attr
+  | Vect (Timespan, attr) -> timespan_vect endianness attr
+  | Vect (Minute, attr) -> minute_vect endianness attr
+  | Vect (Second, attr) -> second_vect endianness attr
+  | Vect (Time, attr) -> time_vect endianness attr
 
-  | String Byte when k_objtyp k = 4 ->
-    let buf = kG_char k in
-    Ok (Bigstring.to_string buf)
+  | _ -> invalid_arg "destruct"
 
-  | Vect Short when k_objtyp k = 5 ->
-    let len = k_length k in
-    let buf = kH k in
-    Ok (Array.init len (Array1.get buf))
+let destruct ?endianness v =
+  hdr_encoding >>= fun hdr ->
+  destruct ?endianness v >>| fun v ->
+  hdr, v
 
-  | Vect Int when k_objtyp k = 6 ->
-    let len = k_length k in
-    let buf = kI k in
-    Ok (Array.init len (Array1.get buf))
+let rec pp_print_list :
+  type a. Format.formatter -> a w -> a -> unit = fun ppf w v ->
+  match w with
+  | Tup (ww, _) -> pp ww ppf v
+  | Tups (h, t, _) ->
+    pp_print_list ppf h (fst v) ;
+    pp_print_list ppf t (snd v)
+  | _ -> assert false
 
-  | Vect Long when k_objtyp k = 7 ->
-    let len = k_length k in
-    let buf = kJ k in
-    Ok (Array.init len (Array1.get buf))
+and pp :
+  type a. a w -> Format.formatter -> a -> unit = fun w ppf v ->
+  match w with
+  | List (w, _) -> Format.pp_print_list (pp w) ppf (Array.to_list v)
+  | Conv (project, _, w) -> pp w ppf (project v)
+  | Tup (w, _) -> pp w ppf v
+  | Tups _ -> pp_print_list ppf w v
+  | Dict (kw, vw, _sorted) -> Format.fprintf ppf "(%a)!(%a)" (pp kw) (fst v) (pp vw) (snd v)
+  | Table (kw, vw, _sorted) -> Format.fprintf ppf "(flip (%a)!(%a))" (pp kw) (fst v) (pp vw) (snd v)
 
-  | Vect Real when k_objtyp k = 8 ->
-    let len = k_length k in
-    let buf = kE k in
-    Ok (Array.init len (Array1.get buf))
+  | Atom Boolean -> Format.pp_print_bool ppf v
+  | Atom Guid -> Uuidm.pp ppf v
+  | Atom Byte -> Format.fprintf ppf "X%c" v
+  | Atom Short -> Format.pp_print_int ppf v
+  | Atom Int -> Format.fprintf ppf "%ld" v
+  | Atom Long -> Format.fprintf ppf "%Ld" v
+  | Atom Real -> Format.fprintf ppf "%g" v
+  | Atom Float -> Format.fprintf ppf "%g" v
+  | Atom Char -> Format.pp_print_char ppf v
+  | Atom Symbol -> Format.fprintf ppf "`%s" v
+  | Atom Timestamp -> pp_print_timestamp ppf v
+  | Atom Month -> pp_print_month ppf v
+  | Atom Date -> pp_print_date ppf v
+  | Atom Timespan -> pp_print_timespan ppf v
+  | Atom Minute -> pp_print_minute ppf v
+  | Atom Second -> pp_print_second ppf v
+  | Atom Time -> pp_print_time ppf v
 
-  | Vect Float when k_objtyp k = 9 ->
-    let len = k_length k in
-    let buf = kF k in
-    Ok (Array.init len (Array1.get buf))
+  | Vect (Boolean, _) -> Format.pp_print_list Format.pp_print_bool ppf (Array.to_list v)
+  | Vect (Guid, _) -> Format.pp_print_list Uuidm.pp ppf (Array.to_list v)
+  | Vect (Byte, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "X%c") ppf (Array.to_list v)
+  | String (Byte, _) -> Format.pp_print_string ppf v
+  | Vect (Short, _) ->Format.pp_print_list Format.pp_print_int ppf (Array.to_list v)
+  | Vect (Int, _)  -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%ld") ppf (Array.to_list v)
+  | Vect (Long, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%Ld") ppf (Array.to_list v)
+  | Vect (Real, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%g") ppf (Array.to_list v)
+  | Vect (Float, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%g") ppf (Array.to_list v)
+  | Vect (Char, _) -> Format.pp_print_list Format.pp_print_char ppf (Array.to_list v)
+  | String (Char, _) -> Format.pp_print_string ppf v
+  | Vect (Symbol, _) -> Format.pp_print_list Format.pp_print_string ppf (Array.to_list v)
+  | Vect (Timestamp, _) -> Format.pp_print_list pp_print_timestamp ppf (Array.to_list v)
+  | Vect (Month, _) -> Format.pp_print_list pp_print_month ppf (Array.to_list v)
+  | Vect (Date, _) -> Format.pp_print_list pp_print_date ppf (Array.to_list v)
+  | Vect (Timespan, _) -> Format.pp_print_list pp_print_timespan ppf (Array.to_list v)
+  | Vect (Minute, _) -> Format.pp_print_list pp_print_minute ppf (Array.to_list v)
+  | Vect (Second, _) -> Format.pp_print_list pp_print_second ppf (Array.to_list v)
+  | Vect (Time, _) -> Format.pp_print_list pp_print_time ppf (Array.to_list v)
 
-  | Vect Char when k_objtyp k = 10 ->
-    let len = k_length k in
-    let buf = kG_char k in
-    Ok (Array.init len (Bigstring.get buf))
+  | _ -> invalid_arg "destruct"
 
-  | String Char when k_objtyp k = 10 ->
-    let buf = kG_char k in
-    Ok (Bigstring.to_string buf)
-
-  | Vect Symbol when k_objtyp k = 11 ->
-    let len = k_length k in
-    Ok (Array.init len (kS k))
-
-  | Vect Timestamp when k_objtyp k = 12 ->
-    let len = k_length k in
-    let buf = kJ k in
-    Ok (Array.init len (fun i -> timestamp_of_int64 (Array1.get buf i)))
-
-  | Vect Month when k_objtyp k = 13 ->
-    let len = k_length k in
-    let buf = kI k in
-    Ok (Array.init len (fun i -> month_of_int (Int32.to_int @@ Array1.get buf i)))
-
-  | Vect Date when k_objtyp k = 14 ->
-    let len = k_length k in
-    let buf = kI k in
-    Ok (Array.init len (fun i -> date_of_int (Int32.to_int @@ Array1.get buf i)))
-
-  | Vect Timespan when k_objtyp k = 16 ->
-    let len = k_length k in
-    let buf = kJ k in
-    Ok (Array.init len (fun i -> timespan_of_int64 (Array1.get buf i)))
-
-  | Vect Minute when k_objtyp k = 17 ->
-    let len = k_length k in
-    let buf = kI k in
-    Ok (Array.init len (fun i -> minute_of_int (Int32.to_int @@ Array1.get buf i)))
-
-  | Vect Second when k_objtyp k = 18 ->
-    let len = k_length k in
-    let buf = kI k in
-    Ok (Array.init len (fun i -> second_of_int (Int32.to_int @@ Array1.get buf i)))
-
-  | Vect Time when k_objtyp k = 19 ->
-    let len = k_length k in
-    let buf = kI k in
-    Ok (Array.init len (fun i -> time_of_int (Int32.to_int @@ Array1.get buf i)))
-
-  | List _ ->
-    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
-  | Atom _ ->
-    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
-  | Vect _ ->
-    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
-  | String _ ->
-    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
-  | Tup _ ->
-    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
-  | Tups _ ->
-    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
-  | Dict _ ->
-    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
-  | Table _ ->
-    Error (Printf.sprintf "got type %d, expected %d" (k_objtyp k) (int_of_w w))
-
-let equal_typ (K (w1, _)) (K (w2, _)) = equal w1 w2
-let equal (K (w1, a)) (K (w2, b)) =
-  match destruct_k w1 a, destruct_k w2 b with
-  | Ok aa, Ok bb -> equal_typ_val w1 w2 aa bb
-  | Error e, Ok _ -> failwith ("first failed: " ^ e)
-  | Ok _, Error e -> failwith ("second failed: " ^ e)
-  | Error e, Error f -> failwith ("both failed: " ^ e ^ ", " ^ f)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

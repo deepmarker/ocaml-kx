@@ -3,7 +3,7 @@
  (public_name kx)
  (modules Kx)
  (synopsis "OCaml client for kdb+")
- (libraries bigarray bigstring fmt uuidm ptime uri ocplib-endian))
+ (libraries fmt uuidm ptime uri ocplib-endian faraday angstrom))
 
 ; (library
 ;  (name        kx_async)
