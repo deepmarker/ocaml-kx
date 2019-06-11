@@ -33,6 +33,7 @@ val timespan  : timespan typ
 val minute    : Ptime.time typ
 val second    : Ptime.time typ
 val time      : time typ
+val lambda    : (string * string) typ
 
 val a : 'a typ -> 'a w
 val v : ?attr:attribute -> 'a typ -> 'a array w

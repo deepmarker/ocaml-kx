@@ -36,6 +36,7 @@ type _ typ =
   | Minute : Ptime.time typ
   | Second : Ptime.time typ
   | Time : time typ
+  | Lambda : (string * string) typ
 
 (* let int_of_typ : type a. a typ -> int = function
  *   | Boolean -> 1
@@ -77,6 +78,7 @@ let eq_typ : type a b. a typ -> b typ -> (a, b) eq option = fun a b ->
   | Minute, Minute -> Some Eq
   | Second, Second -> Some Eq
   | Time, Time -> Some Eq
+  | Lambda, Lambda -> Some Eq
   | _ -> None
 
 let eq_typ_val : type a b. a typ -> b typ -> a -> b -> (a, b) eq option = fun a b x y ->
@@ -98,6 +100,7 @@ let eq_typ_val : type a b. a typ -> b typ -> a -> b -> (a, b) eq option = fun a 
   | Minute, Minute when x = y -> Some Eq
   | Second, Second when x = y -> Some Eq
   | Time, Time when x = y -> Some Eq
+  | Lambda, Lambda when String.equal (fst x) (fst y) && String.equal (snd x) (snd y) -> Some Eq
   | _ -> None
 
 type attribute =
@@ -132,12 +135,14 @@ let is_list_type : type a. a w -> bool = function
   | Tup _ -> true
   | Tups _ -> true
   | List _ -> true
+  | Vect _ -> true
   | _ -> false
 
 let parted : type a. a w -> a w = function
   | Tup (a, _) -> Tup (a, Parted)
   | Tups (a, b, _) -> Tups (a, b, Parted)
   | List (a, _) -> List (a, Parted)
+  | Vect (a, _) -> Vect (a, Parted)
   | _ -> invalid_arg "parted"
 
 (* let rec attr : type a. a w -> attribute option = function
@@ -234,6 +239,7 @@ let timespan  = Timespan
 let minute    = Minute
 let second    = Second
 let time      = Time
+let lambda    = Lambda
 
 let conv project inject a =
   Conv (project, inject, a)
@@ -467,11 +473,9 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
     construct e buf v y
 
   | Table (k, v, sorted) ->
-    let x, y = a in
     write_char buf '\x62' ;
     write_char buf (if sorted then '\x01' else '\x00') ;
-    construct e buf k x ;
-    construct e buf (parted v) y
+    construct e buf (Dict (k, (if sorted then (parted v) else v), sorted)) a
 
   | Conv (project, _, ww) -> construct e buf ww (project a)
 
@@ -546,6 +550,23 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
   | Atom Time ->
     write_char buf '\xed' ;
     FE.write_uint32 buf (Int32.of_int (int_of_time a))
+
+  | Atom Lambda ->
+    write_char buf '\x64' ;
+    write_string buf (fst a) ;
+    write_char buf '\x00' ;
+    construct e buf (String (Char, NoAttr)) (snd a)
+
+  | Vect (Lambda, attr) ->
+    begin match attr with
+    | NoAttr
+    | Grouped -> ()
+    | _ -> invalid_arg "lambda cannot have attr except grouped"
+    end ;
+    write_char buf '\x00' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
+    Array.iter (fun lam -> construct e buf (Atom Lambda) lam) a
 
   | Vect (Boolean, attr) ->
     write_char buf '\x01' ;
@@ -982,12 +1003,20 @@ let time_vect endianness attr =
   length endianness >>= fun len ->
   count len (time_encoding endianness) >>| Array.of_list
 
+let lambda_atom endianness =
+  char '\x64' *> symbol_encoding >>= fun sym ->
+  string_vect endianness NoAttr >>| fun lam ->
+  (sym, lam)
+
 let general_list endianness attr elt =
   let open Angstrom in
   char '\x00' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
   count len elt
+
+let lambda_vect endianness attr =
+  general_list endianness attr (lambda_atom endianness) >>| Array.of_list
 
 let rec destruct_list :
   type a. [`Big | `Little] -> a w -> a Angstrom.t = fun endianness w ->
@@ -1042,6 +1071,7 @@ and destruct :
   | Atom Minute -> minute_atom endianness
   | Atom Second -> second_atom endianness
   | Atom Time -> time_atom endianness
+  | Atom Lambda -> lambda_atom endianness
 
   | Vect (Boolean, attr) -> bool_vect endianness attr
   | Vect (Guid, attr) -> guid_vect endianness attr
@@ -1062,6 +1092,7 @@ and destruct :
   | Vect (Minute, attr) -> minute_vect endianness attr
   | Vect (Second, attr) -> second_vect endianness attr
   | Vect (Time, attr) -> time_vect endianness attr
+  | Vect (Lambda, attr) -> lambda_vect endianness attr
 
   | _ -> invalid_arg "destruct"
 

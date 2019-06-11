@@ -37,6 +37,8 @@ let pack_unpack_atom () =
   pack_unpack "minute" (a minute) ((0, 0, 0), 0) ;
   pack_unpack "second" (a second) ((0, 0, 0), 0) ;
   pack_unpack "time" (a time) { time = ((0, 0, 0), 0) ; ms = 0 };
+  pack_unpack "lambda" (a lambda) ("", "{x+y}");
+  pack_unpack "lambda_ctx" (a lambda) ("d", "{x+y}");
   ()
 
 let pack_unpack_vect () =
@@ -58,6 +60,7 @@ let pack_unpack_vect () =
   pack_unpack "vect minute" (v minute) [||] ;
   pack_unpack "vect second" (v second) [||] ;
   pack_unpack "vect time" (v time) [||] ;
+  pack_unpack "vect lambda" (v lambda) [|("", "{x+y}"); ("d", "{x+y}")|] ;
   ()
 
 let pack_unpack_list () =
