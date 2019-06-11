@@ -434,10 +434,10 @@ let rec construct_list :
     construct e buf w a ;
     1
   | Tups (hw, tw, _) ->
-    let h, t = a in
-    let lenh = construct_list e buf hw h in
-    let lent = construct_list e buf tw t in
+    let lenh = construct_list e buf hw (fst a) in
+    let lent = construct_list e buf tw (snd a) in
     lenh + lent
+  | Conv (project, _, w) -> construct_list e buf w (project a)
   | _ -> assert false
 
 and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun e buf w a ->
@@ -706,9 +706,14 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
 
   | String _ -> assert false
 
-let char_of_endianness = function
-  | `Big -> '\x00'
-  | `Little -> '\x01'
+let int_of_endianness = function
+  | `Big -> 0
+  | `Little -> 1
+
+let int_of_msgtyp = function
+  | `Async -> 0
+  | `Sync -> 1
+  | `Response -> 2
 
 type hdr = {
   endianness: [`Little | `Big] ;
@@ -716,23 +721,26 @@ type hdr = {
   len: int32 ;
 }
 
-let string_of_hdr { endianness ; typ ; len } =
-  let module E =
-    (val (match endianness with
-         | `Big -> (module EndianString.BigEndian)
-         | `Little -> (module EndianString.LittleEndian)) : EndianString.EndianStringSig) in
-  let hdr = Bytes.make 8 '\x00' in
-  Bytes.set hdr 0 (char_of_endianness endianness) ;
-  Bytes.set hdr 1
-    (match typ with `Async -> '\x00' | `Sync -> '\x01' | `Response -> '\x02') ;
-  E.set_int32 hdr 4 len ;
-  Bytes.unsafe_to_string hdr
+let write_hdr buf { endianness; typ; len } =
+  let open Faraday in
+  let module FE = (val (match endianness with
+      | `Big -> (module BE) | `Little -> (module LE)) : FE) in
+  write_uint8 buf (int_of_endianness endianness) ;
+  write_uint8 buf (int_of_msgtyp typ) ;
+  FE.write_uint16 buf 0 ;
+  FE.write_uint32 buf len
 
 let construct
     ?(endianness=if Sys.big_endian then `Big else `Little)
-    ?(typ=`Async) buf w x =
-  construct endianness buf w x ;
-  { endianness ; typ ; len = Int32.of_int (Faraday.pending_bytes buf) }
+    ?(typ=`Async) ~hdr ~payload w x =
+  let open Faraday in
+  let module FE = (val (match endianness with
+      | `Big -> (module BE) | `Little -> (module LE)) : FE) in
+  construct endianness payload w x ;
+  write_uint8 hdr (int_of_endianness endianness) ;
+  write_uint8 hdr (int_of_msgtyp typ) ;
+  FE.write_uint16 hdr 0 ;
+  FE.write_uint32 hdr (Int32.of_int (8 + pending_bytes payload))
 
 let msgtyp_of_int = function
   | 0 -> `Async
@@ -1108,6 +1116,8 @@ let rec pp_print_list :
   | Tups (h, t, _) ->
     pp_print_list ppf h (fst v) ;
     pp_print_list ppf t (snd v)
+  | Conv (project, _, w) ->
+    pp_print_list ppf w (project v)
   | _ -> assert false
 
 and pp :

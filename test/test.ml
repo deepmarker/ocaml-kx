@@ -6,14 +6,18 @@ let make_testable : type a. a w -> a testable = fun a ->
 
 let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
   let tt = make_testable w in
-  let buf = Faraday.create 1024 in
-  let hdr = construct buf w a in
-  let serialized = string_of_hdr hdr ^ Faraday.serialize_to_string buf in
+  let hdr = Faraday.create 8 in
+  let payload = Faraday.create 1024 in
+  construct ~hdr ~payload w a ;
+  let hdr_str = Faraday.serialize_to_string hdr in
+  let serialized = hdr_str ^ Faraday.serialize_to_string payload in
   Hex.hexdump (Hex.of_string serialized) ;
   match Angstrom.parse_string (destruct w) serialized with
   | Error msg -> fail msg
   | Ok (hdr', v) ->
-    assert (hdr = hdr') ;
+    let buf = Faraday.create 8 in
+    write_hdr buf hdr' ;
+    check string (name ^ "_header") hdr_str (Faraday.serialize_to_string buf) ;
     check tt name a v
 
 let pack_unpack_atom () =
@@ -68,6 +72,7 @@ let pack_unpack_list () =
   pack_unpack "empty" (list (a bool)) [||] ;
   pack_unpack "simple" (t1 (a bool)) true ;
   pack_unpack "simple2" (t2 (a int) (a float)) (0l, 0.) ;
+  pack_unpack "simple3" (t3 (a int) (a float) (a sym)) (0l, 0., "a") ;
   pack_unpack "vect"
     (t2 (v short) (v timestamp))
     ([|1; 2; 3|], ([|Ptime.epoch; Ptime.epoch|])) ;
@@ -77,6 +82,7 @@ let pack_unpack_list () =
     (t1 (t1 (a bool))) true ;
   pack_unpack "compound" (list (v short)) [|[|1;2|]; [|3;4|]|] ;
   pack_unpack "string list" (list (s char)) [|"machin"; "truc"|] ;
+  pack_unpack "test" (t2 (a sym) (a bool)) ("auie", true) ;
   ()
 
 let pack_unpack_dict () =
@@ -103,23 +109,16 @@ let pack_unpack_conv () =
     ((1, 2, 3), false, true) ;
   ()
 
-(* let test_server () =
- *   let open Kx in
- *   let key = v sym in
- *   let values = t9
- *       (v sym) (v sym) (v sym)
- *       (v int) (v int) (v timestamp)
- *       (v timestamp) (v timestamp) list in
- *   let retwit = table key values in
- *   with_connection
- *     (Uri.make ~userinfo:"discovery:pass" ~host:"localhost" ~port:6001 ())
- *     ~f:begin fun fd ->
- *       k0_sync fd
- *         ".servers.SERVERS" retwit
- *     end |> function
- *   | Ok (Ok _a) -> ()
- *   | Ok (Error msg) -> failwith msg
- *   | Error msg -> failwith (Format.asprintf "%a" pp_connection_error msg) *)
+let test_server () =
+  let open Async in
+  let open Kx_async in
+  let t = create (t2 (s Kx.char) (a Kx.bool)) ("upd", false) in
+  with_connection
+    (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun p ->
+    Pipe.write p t
+  end >>= function
+  | Error e -> fail e
+  | Ok () -> Deferred.unit
 
 let utilities () =
   check int "month1" 0 (int_of_month (2000, 1, 0)) ;
@@ -158,14 +157,15 @@ let tests_kx = [
   test_case "dict" `Quick pack_unpack_dict ;
   test_case "table" `Quick pack_unpack_table ;
   test_case "conv" `Quick pack_unpack_conv ;
-  (* test_case "server" `Quick test_server ; *)
 ]
 
-(* let tests_kx_async = Alcotest_async.[
- * ] *)
+let tests_kx_async = Alcotest_async.[
+    test_case "server" `Quick test_server ;
+  ]
 
 let () =
+  Logs.set_level ~all:true (Some Logs.Debug) ;
   run "q" [
     "kx", tests_kx ;
-    (* "kx-async", tests_kx_async ; *)
+    "kx-async", tests_kx_async ;
   ]

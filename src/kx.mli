@@ -64,11 +64,13 @@ type hdr = {
   len: int32 ;
 }
 
-val string_of_hdr : hdr -> string
+val write_hdr : Faraday.t -> hdr -> unit
+
 val construct :
   ?endianness:[`Big | `Little] ->
   ?typ:[`Async | `Sync | `Response] ->
-  Faraday.t -> 'a w -> 'a -> hdr
+  hdr:Faraday.t -> payload:Faraday.t ->
+  'a w -> 'a -> unit
 
 val destruct :
   ?endianness:[`Big | `Little] -> 'a w -> (hdr * 'a) Angstrom.t

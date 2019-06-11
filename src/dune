@@ -5,9 +5,9 @@
  (synopsis "OCaml client for kdb+")
  (libraries fmt uuidm ptime uri ocplib-endian faraday angstrom))
 
-; (library
-;  (name        kx_async)
-;  (public_name kx-async)
-;  (modules Kx_async)
-;  (synopsis "OCaml client for kdb+, for Jane Street's async")
-;  (libraries kx core async logs-async))
+(library
+ (name        kx_async)
+ (public_name kx-async)
+ (modules Kx_async)
+ (synopsis "OCaml client for kdb+, for Jane Street's async")
+ (libraries kx core async async-uri logs-async))
