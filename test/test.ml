@@ -47,58 +47,58 @@ let pack_unpack_atom () =
 
 let pack_unpack_vect () =
   let open Kx in
-  pack_unpack "vect bool" (v bool) [|true; false|] ;
-  pack_unpack "vect guid" (v guid) [|Uuidm.nil; Uuidm.nil|] ;
+  pack_unpack "vect bool" (v bool) [true; false] ;
+  pack_unpack "vect guid" (v guid) [Uuidm.nil; Uuidm.nil] ;
   pack_unpack "vect byte" (s byte) "\x00\x01\x02" ;
-  pack_unpack "vect short" (v short) [|0;1;2|] ;
-  pack_unpack "vect int" (v int) [|0l;1l;2l;Int32.max_int;Int32.min_int|] ;
-  pack_unpack "vect long" (v long) [|0L;1L;2L;Int64.max_int;Int64.min_int|] ;
-  pack_unpack "vect real" (v real) [|0.;1.;nan;infinity;neg_infinity|] ;
-  pack_unpack "vect float" (v float) [|0.;1.;nan;infinity;neg_infinity|] ;
+  pack_unpack "vect short" (v short) [0;1;2] ;
+  pack_unpack "vect int" (v int) [0l;1l;2l;Int32.max_int;Int32.min_int] ;
+  pack_unpack "vect long" (v long) [0L;1L;2L;Int64.max_int;Int64.min_int] ;
+  pack_unpack "vect real" (v real) [0.;1.;nan;infinity;neg_infinity] ;
+  pack_unpack "vect float" (v float) [0.;1.;nan;infinity;neg_infinity] ;
   pack_unpack "vect char" (s char) "bleh" ;
-  pack_unpack "vect symbol" (v sym) [|"machin"; "truc"; "chouette"|] ;
-  pack_unpack "vect timestamp" (v timestamp) [|Ptime.epoch; Ptime.epoch|] ;
-  pack_unpack "vect month" (v month) [|2019, 1, 0 ; 2019, 2, 0|] ;
-  pack_unpack "vect date" (v date) [|2019, 1, 1; 2019, 1, 2|] ;
-  pack_unpack "vect timespan" (v timespan) [||] ;
-  pack_unpack "vect minute" (v minute) [||] ;
-  pack_unpack "vect second" (v second) [||] ;
-  pack_unpack "vect time" (v time) [||] ;
-  pack_unpack "vect lambda" (v lambda) [|("", "{x+y}"); ("d", "{x+y}")|] ;
+  pack_unpack "vect symbol" (v sym) ["machin"; "truc"; "chouette"] ;
+  pack_unpack "vect timestamp" (v timestamp) [Ptime.epoch; Ptime.epoch] ;
+  pack_unpack "vect month" (v month) [2019, 1, 0 ; 2019, 2, 0] ;
+  pack_unpack "vect date" (v date) [2019, 1, 1; 2019, 1, 2] ;
+  pack_unpack "vect timespan" (v timespan) [] ;
+  pack_unpack "vect minute" (v minute) [] ;
+  pack_unpack "vect second" (v second) [] ;
+  pack_unpack "vect time" (v time) [] ;
+  pack_unpack "vect lambda" (v lambda) [("", "{x+y}"); ("d", "{x+y}")] ;
   ()
 
 let pack_unpack_list () =
   let open Kx in
-  pack_unpack "empty" (list (a bool)) [||] ;
+  pack_unpack "empty" (list (a bool)) [] ;
   pack_unpack "simple" (t1 (a bool)) true ;
   pack_unpack "simple2" (t2 (a int) (a float)) (0l, 0.) ;
   pack_unpack "simple3" (t3 (a int) (a float) (a sym)) (0l, 0., "a") ;
   pack_unpack "vect"
     (t2 (v short) (v timestamp))
-    ([|1; 2; 3|], ([|Ptime.epoch; Ptime.epoch|])) ;
+    ([1; 2; 3], ([Ptime.epoch; Ptime.epoch])) ;
   pack_unpack "vect guid"
-    (t1 (v guid)) [|Uuidm.nil; Uuidm.nil|] ;
+    (t1 (v guid)) [Uuidm.nil; Uuidm.nil] ;
   pack_unpack "nested"
     (t1 (t1 (a bool))) true ;
-  pack_unpack "compound" (list (v short)) [|[|1;2|]; [|3;4|]|] ;
-  pack_unpack "string list" (list (s char)) [|"machin"; "truc"|] ;
+  pack_unpack "compound" (list (v short)) [[1;2]; [3;4]] ;
+  pack_unpack "string list" (list (s char)) ["machin"; "truc"] ;
   pack_unpack "test" (t2 (a sym) (a bool)) ("auie", true) ;
   ()
 
 let pack_unpack_dict () =
   let open Kx in
-  pack_unpack "empty" (dict (list (a bool)) (list (a bool))) ([||], [||]);
-  pack_unpack "simple" (dict (v sym) (v long)) ([|"a";"b";"c"|], [|1L;2L;3L|]);
+  pack_unpack "empty" (dict (list (a bool)) (list (a bool))) ([], []);
+  pack_unpack "simple" (dict (v sym) (v long)) (["a";"b";"c"], [1L;2L;3L]);
   pack_unpack "compound"
     (dict
        (list (t2 (a bool) (a int)))
        (list (t2 (a bool) (a int))))
-    ([|true, 3l; false, 2l|], [|false, 1l; true, 2l|]);
+    ([true, 3l; false, 2l], [false, 1l; true, 2l]);
   ()
 
 let pack_unpack_table () =
   let open Kx in
-  pack_unpack "simple" (table (v sym) (v long)) ([|"a"|], [|1L|]);
+  pack_unpack "simple" (table (v sym) (v long)) (["a"], [1L]);
   ()
 
 let pack_unpack_conv () =

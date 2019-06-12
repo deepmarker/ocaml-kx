@@ -81,7 +81,7 @@ let eq_typ : type a b. a typ -> b typ -> (a, b) eq option = fun a b ->
   | Lambda, Lambda -> Some Eq
   | _ -> None
 
-let eq_typ_val : type a b. a typ -> b typ -> a -> b -> (a, b) eq option = fun a b x y ->
+let eq_typ_val : type a b. a typ -> a -> b typ -> b -> (a, b) eq option = fun a x b y ->
   match a, b with
   | Boolean, Boolean when x = y -> Some Eq
   | Guid, Guid when Uuidm.equal x y -> Some Eq
@@ -122,9 +122,9 @@ let attribute attr =
 
 type _ w =
   | Atom : 'a typ -> 'a w
-  | Vect : 'a typ * attribute -> 'a array w
+  | Vect : 'a typ * attribute -> 'a list w
   | String : char typ * attribute -> string w
-  | List : 'a w * attribute -> 'a array w
+  | List : 'a w * attribute -> 'a list w
   | Tup : 'a w * attribute -> 'a w
   | Tups : 'a w * 'b w * attribute -> ('a * 'b) w
   | Dict : 'a w * 'b w * bool -> ('a * 'b) w
@@ -180,31 +180,16 @@ let rec equal_w : type a b. a w -> b w -> bool = fun a b ->
 
 let rec equal : type a b. a w -> a -> b w -> b -> bool = fun aw x bw y ->
   match aw, bw with
-  | Atom a, Atom b -> eq_typ_val a b x y  <> None
-  | Vect (a, aa), Vect (b, ba) -> begin
-      aa = ba &&
-      match Array.length x, Array.length y with
-      | a, b when a <> b -> false
-      | len, _ ->
-        let ret = ref true in
-        for i = 0 to len - 1 do
-          ret := !ret && eq_typ_val a b x.(i) y.(i) <> None
-        done ;
-        !ret
-    end
+  | Atom a, Atom b -> eq_typ_val a x b y  <> None
+  | Vect (a, aa), Vect (b, ba) ->
+    aa = ba &&
+    List.length x = List.length y &&
+    List.fold_left2 (fun acc x y -> acc && eq_typ_val a x b y <> None) true x y
   | String _, String _ -> String.equal x y
   | List (a, aa), List (b, ba) ->
     aa = ba &&
-    begin
-      match Array.length x, Array.length y with
-      | a, b when a <> b -> false
-      | len, _ ->
-        let ret = ref true in
-        for i = 0 to len - 1 do
-          ret := !ret && equal a x.(i) b y.(i)
-        done ;
-        !ret
-    end
+    List.length x = List.length y &&
+    List.fold_left2 (fun acc x y -> acc && equal a x b y) true x y
   | Tup (a, aa), Tup (b, ba) -> aa = ba && equal a x b y
   | Tups (a, b, aa), Tups (c, d, ba) ->
     let x1, x2 = x in
@@ -447,8 +432,8 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
   | List (w', attr) ->
     write_char buf '\x00' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter (construct e buf w') a
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (construct e buf w') a
 
   | Tup (ww, attr) ->
     write_char buf '\x00' ;
@@ -565,14 +550,14 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
     end ;
     write_char buf '\x00' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter (fun lam -> construct e buf (Atom Lambda) lam) a
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (fun lam -> construct e buf (Atom Lambda) lam) a
 
   | Vect (Boolean, attr) ->
     write_char buf '\x01' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter begin function
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter begin function
       | false -> write_char buf '\x00'
       | true -> write_char buf '\x01'
     end a
@@ -586,8 +571,8 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
   | Vect (Byte, attr) ->
     write_char buf '\x04' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter (write_char buf) a
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (write_char buf) a
 
   | String (Char, attr) ->
     write_char buf '\x0a' ;
@@ -598,44 +583,44 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
   | Vect (Char, attr) ->
     write_char buf '\x0a' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter (write_char buf) a
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (write_char buf) a
 
   | Vect (Short, attr) ->
     write_char buf '\x05' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter (FE.write_uint16 buf) a
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (FE.write_uint16 buf) a
 
   | Vect (Int, attr) ->
     write_char buf '\x06' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter (FE.write_uint32 buf) a
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (FE.write_uint32 buf) a
 
   | Vect (Long, attr) ->
     write_char buf '\x07' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter (FE.write_uint64 buf) a
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (FE.write_uint64 buf) a
 
   | Vect (Real, attr) ->
     write_char buf '\x08' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter (FE.write_float buf) a
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (FE.write_float buf) a
 
   | Vect (Float, attr) ->
     write_char buf '\x09' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter (FE.write_double buf) a
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (FE.write_double buf) a
 
   | Vect (Symbol, attr) ->
     write_char buf '\x0b' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter begin fun s ->
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter begin fun s ->
       write_string buf s ;
       write_char buf '\x00'
     end a
@@ -643,64 +628,64 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
   | Vect (Guid, attr) ->
     write_char buf '\x02' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter begin fun s ->
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter begin fun s ->
       write_string buf (Uuidm.to_bytes s)
     end a
 
   | Vect (Timestamp, attr) ->
     write_char buf '\x0c' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter begin fun ts ->
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter begin fun ts ->
       FE.write_uint64 buf (int64_of_timestamp ts)
     end a
 
   | Vect (Month, attr) ->
     write_char buf '\x0d' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter begin fun m ->
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter begin fun m ->
       FE.write_uint32 buf (Int32.of_int (int_of_month m))
     end a
 
   | Vect (Date, attr) ->
     write_char buf '\x0e' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter begin fun m ->
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter begin fun m ->
       FE.write_uint32 buf (Int32.of_int (int_of_date m))
     end a
 
   | Vect (Timespan, attr) ->
     write_char buf '\x10' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter begin fun a ->
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter begin fun a ->
       FE.write_uint64 buf (int64_of_timespan a)
     end a
 
   | Vect (Minute, attr) ->
     write_char buf '\x11' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter begin fun m ->
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter begin fun m ->
       FE.write_uint32 buf (Int32.of_int (int_of_minute m))
     end a
 
   | Vect (Second, attr) ->
     write_char buf '\x12' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter begin fun m ->
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter begin fun m ->
       FE.write_uint32 buf (Int32.of_int (int_of_second m))
     end a
 
   | Vect (Time, attr) ->
     write_char buf '\x13' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
-    Array.iter begin fun a ->
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter begin fun a ->
       FE.write_uint32 buf (Int32.of_int (int_of_time a))
     end a
 
@@ -897,17 +882,17 @@ let bool_vect endianness attr =
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
   take len >>| fun str ->
-  Array.init len (fun i -> str.[i] <> '\x00')
+  List.init len (fun i -> str.[i] <> '\x00')
 
 let guid_vect endianness attr =
   char '\x02' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len guid_encoding >>| Array.of_list
+  count len guid_encoding
 
 let char_array len =
   take len >>| fun str ->
-  Array.init len (fun i -> str.[i])
+  List.init len (fun i -> str.[i])
 
 let byte_vect endianness attr =
   char '\x04' *>
@@ -925,31 +910,31 @@ let short_vect endianness attr =
   char '\x05' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (short_encoding endianness) >>| Array.of_list
+  count len (short_encoding endianness)
 
 let int_vect endianness attr =
   char '\x06' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (int_encoding endianness) >>| Array.of_list
+  count len (int_encoding endianness)
 
 let long_vect endianness attr =
   char '\x07' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (long_encoding endianness) >>| Array.of_list
+  count len (long_encoding endianness)
 
 let real_vect endianness attr =
   char '\x08' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (real_encoding endianness) >>| Array.of_list
+  count len (real_encoding endianness)
 
 let float_vect endianness attr =
   char '\x09' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (float_encoding endianness) >>| Array.of_list
+  count len (float_encoding endianness)
 
 let char_vect endianness attr =
   char '\x0a' *>
@@ -967,49 +952,49 @@ let symbol_vect endianness attr =
   char '\x0b' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len symbol_encoding >>| Array.of_list
+  count len symbol_encoding
 
 let timestamp_vect endianness attr =
   char '\x0c' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (timestamp_encoding endianness) >>| Array.of_list
+  count len (timestamp_encoding endianness)
 
 let month_vect endianness attr =
   char '\x0d' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (month_encoding endianness) >>| Array.of_list
+  count len (month_encoding endianness)
 
 let date_vect endianness attr =
   char '\x0e' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (date_encoding endianness) >>| Array.of_list
+  count len (date_encoding endianness)
 
 let timespan_vect endianness attr =
   char '\x10' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (timespan_encoding endianness) >>| Array.of_list
+  count len (timespan_encoding endianness)
 
 let minute_vect endianness attr =
   char '\x11' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (minute_encoding endianness) >>| Array.of_list
+  count len (minute_encoding endianness)
 
 let second_vect endianness attr =
   char '\x12' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (second_encoding endianness) >>| Array.of_list
+  count len (second_encoding endianness)
 
 let time_vect endianness attr =
   char '\x13' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
-  count len (time_encoding endianness) >>| Array.of_list
+  count len (time_encoding endianness)
 
 let lambda_atom endianness =
   char '\x64' *> symbol_encoding >>= fun sym ->
@@ -1024,7 +1009,7 @@ let general_list endianness attr elt =
   count len elt
 
 let lambda_vect endianness attr =
-  general_list endianness attr (lambda_atom endianness) >>| Array.of_list
+  general_list endianness attr (lambda_atom endianness)
 
 let rec destruct_list :
   type a. [`Big | `Little] -> a w -> a Angstrom.t = fun endianness w ->
@@ -1042,7 +1027,7 @@ and destruct :
   fun ?(endianness = if Sys.big_endian then `Big else `Little) w ->
   let open Angstrom in
   match w with
-  | List (w, attr) -> general_list endianness attr (destruct ~endianness w) >>| Array.of_list
+  | List (w, attr) -> general_list endianness attr (destruct ~endianness w)
   | Conv (_, inject, w) -> destruct ~endianness w >>| inject
   | Tup (w, attr) -> general_list endianness attr (destruct ~endianness w) >>| List.hd
   | Tups (_, _, attr) as t ->
@@ -1123,7 +1108,7 @@ let rec pp_print_list :
 and pp :
   type a. a w -> Format.formatter -> a -> unit = fun w ppf v ->
   match w with
-  | List (w, _) -> Format.pp_print_list (pp w) ppf (Array.to_list v)
+  | List (w, _) -> Format.pp_print_list (pp w) ppf v
   | Conv (project, _, w) -> pp w ppf (project v)
   | Tup (w, _) -> pp w ppf v
   | Tups _ -> pp_print_list ppf w v
@@ -1148,25 +1133,25 @@ and pp :
   | Atom Second -> pp_print_second ppf v
   | Atom Time -> pp_print_time ppf v
 
-  | Vect (Boolean, _) -> Format.pp_print_list Format.pp_print_bool ppf (Array.to_list v)
-  | Vect (Guid, _) -> Format.pp_print_list Uuidm.pp ppf (Array.to_list v)
-  | Vect (Byte, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "X%c") ppf (Array.to_list v)
+  | Vect (Boolean, _) -> Format.pp_print_list Format.pp_print_bool ppf v
+  | Vect (Guid, _) -> Format.pp_print_list Uuidm.pp ppf v
+  | Vect (Byte, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "X%c") ppf v
   | String (Byte, _) -> Format.pp_print_string ppf v
-  | Vect (Short, _) ->Format.pp_print_list Format.pp_print_int ppf (Array.to_list v)
-  | Vect (Int, _)  -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%ld") ppf (Array.to_list v)
-  | Vect (Long, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%Ld") ppf (Array.to_list v)
-  | Vect (Real, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%g") ppf (Array.to_list v)
-  | Vect (Float, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%g") ppf (Array.to_list v)
-  | Vect (Char, _) -> Format.pp_print_list Format.pp_print_char ppf (Array.to_list v)
+  | Vect (Short, _) ->Format.pp_print_list Format.pp_print_int ppf v
+  | Vect (Int, _)  -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%ld") ppf v
+  | Vect (Long, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%Ld") ppf v
+  | Vect (Real, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%g") ppf v
+  | Vect (Float, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%g") ppf v
+  | Vect (Char, _) -> Format.pp_print_list Format.pp_print_char ppf v
   | String (Char, _) -> Format.pp_print_string ppf v
-  | Vect (Symbol, _) -> Format.pp_print_list Format.pp_print_string ppf (Array.to_list v)
-  | Vect (Timestamp, _) -> Format.pp_print_list pp_print_timestamp ppf (Array.to_list v)
-  | Vect (Month, _) -> Format.pp_print_list pp_print_month ppf (Array.to_list v)
-  | Vect (Date, _) -> Format.pp_print_list pp_print_date ppf (Array.to_list v)
-  | Vect (Timespan, _) -> Format.pp_print_list pp_print_timespan ppf (Array.to_list v)
-  | Vect (Minute, _) -> Format.pp_print_list pp_print_minute ppf (Array.to_list v)
-  | Vect (Second, _) -> Format.pp_print_list pp_print_second ppf (Array.to_list v)
-  | Vect (Time, _) -> Format.pp_print_list pp_print_time ppf (Array.to_list v)
+  | Vect (Symbol, _) -> Format.pp_print_list Format.pp_print_string ppf v
+  | Vect (Timestamp, _) -> Format.pp_print_list pp_print_timestamp ppf v
+  | Vect (Month, _) -> Format.pp_print_list pp_print_month ppf v
+  | Vect (Date, _) -> Format.pp_print_list pp_print_date ppf v
+  | Vect (Timespan, _) -> Format.pp_print_list pp_print_timespan ppf v
+  | Vect (Minute, _) -> Format.pp_print_list pp_print_minute ppf v
+  | Vect (Second, _) -> Format.pp_print_list pp_print_second ppf v
+  | Vect (Time, _) -> Format.pp_print_list pp_print_time ppf v
 
   | _ -> invalid_arg "destruct"
 

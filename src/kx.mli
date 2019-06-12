@@ -36,10 +36,10 @@ val time      : time typ
 val lambda    : (string * string) typ
 
 val a : 'a typ -> 'a w
-val v : ?attr:attribute -> 'a typ -> 'a array w
+val v : ?attr:attribute -> 'a typ -> 'a list w
 val s : ?attr:attribute -> char typ -> string w
 
-val list : ?attr:attribute -> 'a w -> 'a array w
+val list : ?attr:attribute -> 'a w -> 'a list w
 val t1 : ?attr:attribute -> 'a w -> 'a w
 val t2 : ?attr:attribute -> 'a w -> 'b w -> ('a * 'b) w
 val t3 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> ('a * 'b * 'c) w
