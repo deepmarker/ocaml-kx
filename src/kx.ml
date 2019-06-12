@@ -1100,6 +1100,7 @@ let rec pp_print_list :
   | Tup (ww, _) -> pp ww ppf v
   | Tups (h, t, _) ->
     pp_print_list ppf h (fst v) ;
+    Format.pp_print_newline ppf () ;
     pp_print_list ppf t (snd v)
   | Conv (project, _, w) ->
     pp_print_list ppf w (project v)
@@ -1107,8 +1108,9 @@ let rec pp_print_list :
 
 and pp :
   type a. a w -> Format.formatter -> a -> unit = fun w ppf v ->
+  let pp_sep ppf () = Format.pp_print_char ppf ' ' in
   match w with
-  | List (w, _) -> Format.pp_print_list (pp w) ppf v
+  | List (w, _) -> Format.(pp_print_list ~pp_sep:pp_print_newline (pp w) ppf v)
   | Conv (project, _, w) -> pp w ppf (project v)
   | Tup (w, _) -> pp w ppf v
   | Tups _ -> pp_print_list ppf w v
@@ -1133,25 +1135,25 @@ and pp :
   | Atom Second -> pp_print_second ppf v
   | Atom Time -> pp_print_time ppf v
 
-  | Vect (Boolean, _) -> Format.pp_print_list Format.pp_print_bool ppf v
-  | Vect (Guid, _) -> Format.pp_print_list Uuidm.pp ppf v
-  | Vect (Byte, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "X%c") ppf v
+  | Vect (Boolean, _) -> Format.pp_print_list ~pp_sep Format.pp_print_bool ppf v
+  | Vect (Guid, _) -> Format.pp_print_list ~pp_sep Uuidm.pp ppf v
+  | Vect (Byte, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "X%c") ppf v
   | String (Byte, _) -> Format.pp_print_string ppf v
-  | Vect (Short, _) ->Format.pp_print_list Format.pp_print_int ppf v
-  | Vect (Int, _)  -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%ld") ppf v
-  | Vect (Long, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%Ld") ppf v
-  | Vect (Real, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%g") ppf v
-  | Vect (Float, _) -> Format.pp_print_list (fun ppf -> Format.fprintf ppf "%g") ppf v
-  | Vect (Char, _) -> Format.pp_print_list Format.pp_print_char ppf v
+  | Vect (Short, _) ->Format.pp_print_list ~pp_sep Format.pp_print_int ppf v
+  | Vect (Int, _)  -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%ld") ppf v
+  | Vect (Long, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%Ld") ppf v
+  | Vect (Real, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%g") ppf v
+  | Vect (Float, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%g") ppf v
+  | Vect (Char, _) -> Format.pp_print_string ppf (String.init (List.length v) (List.nth v))
   | String (Char, _) -> Format.pp_print_string ppf v
-  | Vect (Symbol, _) -> Format.pp_print_list Format.pp_print_string ppf v
-  | Vect (Timestamp, _) -> Format.pp_print_list pp_print_timestamp ppf v
-  | Vect (Month, _) -> Format.pp_print_list pp_print_month ppf v
-  | Vect (Date, _) -> Format.pp_print_list pp_print_date ppf v
-  | Vect (Timespan, _) -> Format.pp_print_list pp_print_timespan ppf v
-  | Vect (Minute, _) -> Format.pp_print_list pp_print_minute ppf v
-  | Vect (Second, _) -> Format.pp_print_list pp_print_second ppf v
-  | Vect (Time, _) -> Format.pp_print_list pp_print_time ppf v
+  | Vect (Symbol, _) -> Format.pp_print_list ~pp_sep Format.pp_print_string ppf v
+  | Vect (Timestamp, _) -> Format.pp_print_list ~pp_sep pp_print_timestamp ppf v
+  | Vect (Month, _) -> Format.pp_print_list ~pp_sep pp_print_month ppf v
+  | Vect (Date, _) -> Format.pp_print_list ~pp_sep pp_print_date ppf v
+  | Vect (Timespan, _) -> Format.pp_print_list ~pp_sep pp_print_timespan ppf v
+  | Vect (Minute, _) -> Format.pp_print_list ~pp_sep pp_print_minute ppf v
+  | Vect (Second, _) -> Format.pp_print_list ~pp_sep pp_print_second ppf v
+  | Vect (Time, _) -> Format.pp_print_list ~pp_sep pp_print_time ppf v
 
   | _ -> invalid_arg "destruct"
 
