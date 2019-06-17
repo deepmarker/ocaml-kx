@@ -6,14 +6,21 @@
 let nh = 0xffff_8000
 let wh = 0x7fff
 
-let ni = 0x8000_0000l
-let wi = 0x7fff_ffffl
+let ni = Int32.min_int
+let wi = Int32.max_int
 
-let nj = 0x8000_0000_0000_0000L
-let wj = 0x7fff_ffff_ffff_ffffL
+let nj = Int64.min_int
+let wj = Int64.max_int
 
 let nf = nan
 let wf = infinity
+
+let ptime_neginf =
+  let open Ptime in
+  let d, ps = Span.to_d_ps (to_span min) in
+  match of_span (Span.unsafe_of_d_ps (d, Int64.succ ps)) with
+  | None -> assert false
+  | Some t -> t
 
 type time = { time : Ptime.time ; ms : int }
 type timespan = { time : Ptime.time ; ns : int }
@@ -359,7 +366,9 @@ let day_in_ns d =
   Int64.(mul (of_int (d * 24 * 3600)) 1_000_000_000L)
 
 let int64_of_timestamp = function
-  | ts when Ptime.(equal ts min) -> Int64.min_int
+  | ts when Ptime.(equal ts min) -> nj
+  | ts when Ptime.(equal ts max) -> wj
+  | ts when Ptime.(equal ts ptime_neginf) -> Int64.neg wj
   | ts ->
     let span_since_kxepoch =
       Ptime.(Span.sub (to_span ts) kx_epoch_span) in
@@ -367,7 +376,9 @@ let int64_of_timestamp = function
     Int64.(add (day_in_ns d) (div ps 1_000L))
 
 let timestamp_of_int64 = function
-  | i when Int64.(equal i min_int) -> Ptime.min
+  | i when Int64.(equal i nj) -> Ptime.min
+  | i when Int64.(equal i wj) -> Ptime.max
+  | i when Int64.(equal i (neg wj)) -> ptime_neginf
   | nanos_since_kxepoch ->
     let one_day_in_ns = day_in_ns 1 in
     let days_since_kxepoch =

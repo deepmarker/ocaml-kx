@@ -84,6 +84,7 @@ val wh : int
 val wi : int32
 val wj : int64
 val wf : float
+val ptime_neginf : Ptime.t
 
 val equal_w : 'a w -> 'b w -> bool
 val equal : 'a w -> 'a -> 'b w -> 'b -> bool
