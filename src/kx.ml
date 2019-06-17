@@ -45,25 +45,6 @@ type _ typ =
   | Time : time typ
   | Lambda : (string * string) typ
 
-(* let int_of_typ : type a. a typ -> int = function
- *   | Boolean -> 1
- *   | Guid -> 2
- *   | Byte -> 3
- *   | Short -> 5
- *   | Int -> 6
- *   | Long -> 7
- *   | Real -> 8
- *   | Float -> 9
- *   | Char -> 10
- *   | Symbol -> 11
- *   | Timestamp -> 12
- *   | Month -> 13
- *   | Date -> 14
- *   | Timespan -> 15
- *   | Minute -> 17
- *   | Second -> 18
- *   | Time -> 19 *)
-
 type (_, _) eq = Eq : ('a, 'a) eq
 
 let eq_typ : type a b. a typ -> b typ -> (a, b) eq option = fun a b ->
@@ -151,26 +132,6 @@ let parted : type a. a w -> a w = function
   | List (a, _) -> List (a, Parted)
   | Vect (a, _) -> Vect (a, Parted)
   | _ -> invalid_arg "parted"
-
-(* let rec attr : type a. a w -> attribute option = function
- *   | Vect (_, attr) -> Some attr
- *   | String (_, attr) -> Some attr
- *   | List (_, attr) -> Some attr
- *   | Conv (_, _, a) -> attr a
- *   | Tup (_, attr) -> Some attr
- *   | Tups (_, _, attr) -> Some attr
- *   | _ -> None
- * 
- * let rec int_of_w : type a. a w -> int = function
- *   | Atom a -> -(int_of_typ a)
- *   | Vect (a, _) -> int_of_typ a
- *   | String (a, _) -> int_of_typ a
- *   | List _ -> 0
- *   | Tup _ -> 0
- *   | Tups _ -> 0
- *   | Dict _ -> 99
- *   | Table _ -> 98
- *   | Conv (_, _, a) -> int_of_w a *)
 
 let rec equal_w : type a b. a w -> b w -> bool = fun a b ->
   match a, b with
