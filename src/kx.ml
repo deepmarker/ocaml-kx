@@ -3,6 +3,9 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
+type time = { time : Ptime.time ; ms : int }
+type timespan = { time : Ptime.time ; ns : int }
+
 let nh = 0xffff_8000
 let wh = 0x7fff
 
@@ -22,8 +25,157 @@ let ptime_neginf =
   | None -> assert false
   | Some t -> t
 
-type time = { time : Ptime.time ; ms : int }
-type timespan = { time : Ptime.time ; ns : int }
+let millenium =
+  match Ptime.of_date (2000, 1, 1) with
+  | None -> assert false
+  | Some t -> t
+
+let of_day_exn d =
+  match Ptime.Span.of_d_ps (Int32.to_int d, 0L) with
+  | None -> invalid_arg "Ptime.Span.of_d_ps"
+  | Some t -> t
+
+let add_span_exn t s =
+  match Ptime.add_span t s with
+  | None -> invalid_arg "Ptime.add_span"
+  | Some t -> t
+
+let date_of_int32 d =
+  if d = ni then (0, 1, 1)
+  else if d = wi then (9999, 12, 12)
+  else if d = Int32.neg wi then (0, 1, 2)
+  else Ptime.to_date (add_span_exn millenium (of_day_exn d))
+
+let int32_of_date = function
+  | 0, 1, 1 -> ni
+  | 0, 1, 2 -> Int32.neg wi
+  | d ->
+    match Ptime.of_date d with
+    | None -> invalid_arg "int32_of_date"
+    | Some t ->
+      Int32.of_int (fst Ptime.(Span.to_d_ps (diff t millenium)))
+
+let int32_of_time { time = ((h, m, s), _) ; ms } =
+  Int32.of_int ((h * 3600 + m * 60 + s) * 1_000 + ms)
+
+let time_of_int32 time =
+  let open Int32 in
+  let ms = rem time 1_000l in
+  let s = div time 1_000l in
+  let hh = div s 3600l in
+  let mm = rem (div s 60l) 60l in
+  let ss = rem s 60l in
+  { time = ((to_int hh, to_int mm, to_int ss), 0); ms = to_int ms }
+
+let int64_of_timespan { time = ((h, m, s), _) ; ns } =
+  let open Int64 in
+  add
+    (mul (of_int (h * 3600 + m * 60 + s)) 1_000_000_000L)
+    (of_int ns)
+
+let timespan_of_int64 time =
+  let ns = Int64.(to_int (rem time 1_000_000_000L)) in
+  let s = Int64.(to_int (div time 1_000_000_000L)) in
+  let hh = s / 3600 in
+  let mm = (s / 60) mod 60 in
+  let ss = s mod 60 in
+  { time = (hh, mm, ss), 0 ; ns }
+
+let kx_epoch, kx_epoch_span =
+  match Ptime.of_date (2000, 1, 1) with
+  | None -> assert false
+  | Some t -> t, Ptime.to_span t
+
+let day_in_ns d =
+  Int64.(mul (of_int (d * 24 * 3600)) 1_000_000_000L)
+
+let int64_of_timestamp = function
+  | ts when Ptime.(equal ts min) -> nj
+  | ts when Ptime.(equal ts max) -> wj
+  | ts when Ptime.(equal ts ptime_neginf) -> Int64.neg wj
+  | ts ->
+    let span_since_kxepoch =
+      Ptime.(Span.sub (to_span ts) kx_epoch_span) in
+    let d, ps = Ptime.Span.to_d_ps span_since_kxepoch in
+    Int64.(add (day_in_ns d) (div ps 1_000L))
+
+let timestamp_of_int64 = function
+  | i when Int64.(equal i nj) -> Ptime.min
+  | i when Int64.(equal i wj) -> Ptime.max
+  | i when Int64.(equal i (neg wj)) -> ptime_neginf
+  | nanos_since_kxepoch ->
+    let one_day_in_ns = day_in_ns 1 in
+    let days_since_kxepoch =
+      Int64.(to_int (div nanos_since_kxepoch one_day_in_ns)) in
+    let remaining_ps =
+      Int64.(mul (rem nanos_since_kxepoch one_day_in_ns) 1_000L) in
+    let span =
+      Ptime.Span.v (days_since_kxepoch, remaining_ps) in
+    match Ptime.add_span kx_epoch span with
+    | None -> invalid_arg "timestamp_of_int64"
+    | Some ts -> ts
+
+let int32_of_month (y, m, _) =
+  Int32.of_int ((y - 2000) * 12 + (pred m))
+
+let month_of_int32 m =
+  let open Int32 in
+  let y = div m 12l in
+  let rem_m = rem m 12l in
+  to_int (add 2000l y), to_int (succ rem_m), 0
+
+let int32_of_minute ((hh, mm, _), tz) =
+  if tz = min_int then Int32.min_int
+  else if tz = max_int then Int32.max_int
+  else if tz = min_int + 1 then Int32.(succ min_int)
+  else Int32.of_int (hh * 60 + mm)
+
+let minute_of_int32 i =
+  if i = ni then (0, 0, 0), min_int
+  else if i = wi then (0, 0, 0), max_int
+  else if i = Int32.neg wi then (0, 0, 0), succ min_int
+  else Int32.(to_int (div i 60l), to_int (rem i 60l), 0), 0
+
+let int32_of_second ((hh, mm, ss), tz) =
+  if tz = min_int then Int32.min_int
+  else if tz = max_int then Int32.max_int
+  else if tz = min_int + 1 then Int32.(succ min_int)
+  else Int32.of_int (hh * 3600 + mm * 60 + ss)
+
+let second_of_int32 i =
+  if i = ni then (0, 0, 0), min_int
+  else if i = wi then (0, 0, 0), max_int
+  else if i = Int32.neg wi then (0, 0, 0), succ min_int
+  else
+    let open Int32 in
+    let hh = div i 3600l in
+    let mm = rem (div i 60l) 60l in
+    let ss = rem i 60l in
+    (to_int hh, to_int mm, to_int ss), 0
+
+let nn = timespan_of_int64 nj
+let wn = timespan_of_int64 wj
+let minus_wn = timespan_of_int64 (Int64.neg wj)
+
+let nt = time_of_int32 ni
+let wt = time_of_int32 wi
+let minus_wt = time_of_int32 (Int32.neg wi)
+
+let nm = month_of_int32 ni
+let wm = month_of_int32 wi
+let minus_wm = month_of_int32 (Int32.neg wi)
+
+let nd = date_of_int32 ni
+let wd = date_of_int32 wi
+let minus_wd = date_of_int32 (Int32.neg wi)
+
+let nu = minute_of_int32 ni
+let wu = minute_of_int32 wi
+let minus_wu = minute_of_int32 (Int32.neg wi)
+
+let nv = second_of_int32 ni
+let wv = second_of_int32 wi
+let minus_wv = second_of_int32 (Int32.neg wi)
 
 type _ typ =
   | Boolean : bool typ
@@ -269,109 +421,6 @@ let merge_tups t1 t2 =
 let dict ?(sorted=false) k v = Dict (k, v, sorted)
 let table ?(sorted=false) k v = Table (k, v, sorted)
 
-let millenium =
-  match Ptime.of_date (2000, 1, 1) with
-  | None -> assert false
-  | Some t -> t
-
-let of_day_exn d =
-  match Ptime.Span.of_d_ps (d, 0L) with
-  | None -> invalid_arg "Ptime.Span.of_d_ps"
-  | Some t -> t
-
-let add_span_exn t s =
-  match Ptime.add_span t s with
-  | None -> invalid_arg "Ptime.add_span"
-  | Some t -> t
-
-let date_of_int d =
-  Ptime.to_date (add_span_exn millenium (of_day_exn d))
-
-let int_of_date d =
-  match Ptime.of_date d with
-  | None -> invalid_arg "int_of_date"
-  | Some t ->
-    fst Ptime.(Span.to_d_ps (diff t millenium))
-
-let int_of_time { time = ((h, m, s), tz_offset) ; ms } =
-  (h - tz_offset) * 3600 + m * 60 + s * 1_000 + ms
-
-let time_of_int time =
-  let ms = time mod 1_000 in
-  let s = time / 1_000 in
-  let hh = s / 3600 in
-  let mm = (s / 60) mod 60 in
-  let ss = s mod 60 in
-  { time = ((hh, mm, ss), 0); ms }
-
-let int64_of_timespan { time = ((h, m, s), tz_offset) ; ns } =
-  let open Int64 in
-  add
-    (mul (of_int ((h - tz_offset) * 3600 + m * 60 + s)) 1_000_000_000L)
-    (of_int ns)
-
-let timespan_of_int64 time =
-  let ns = Int64.(to_int (rem time 1_000_000_000L)) in
-  let s = Int64.(to_int (div time 1_000_000_000L)) in
-  let hh = s / 3600 in
-  let mm = (s / 60) mod 60 in
-  let ss = s mod 60 in
-  { time = (hh, mm, ss), 0 ; ns }
-
-let kx_epoch, kx_epoch_span =
-  match Ptime.of_date (2000, 1, 1) with
-  | None -> assert false
-  | Some t -> t, Ptime.to_span t
-
-let day_in_ns d =
-  Int64.(mul (of_int (d * 24 * 3600)) 1_000_000_000L)
-
-let int64_of_timestamp = function
-  | ts when Ptime.(equal ts min) -> nj
-  | ts when Ptime.(equal ts max) -> wj
-  | ts when Ptime.(equal ts ptime_neginf) -> Int64.neg wj
-  | ts ->
-    let span_since_kxepoch =
-      Ptime.(Span.sub (to_span ts) kx_epoch_span) in
-    let d, ps = Ptime.Span.to_d_ps span_since_kxepoch in
-    Int64.(add (day_in_ns d) (div ps 1_000L))
-
-let timestamp_of_int64 = function
-  | i when Int64.(equal i nj) -> Ptime.min
-  | i when Int64.(equal i wj) -> Ptime.max
-  | i when Int64.(equal i (neg wj)) -> ptime_neginf
-  | nanos_since_kxepoch ->
-    let one_day_in_ns = day_in_ns 1 in
-    let days_since_kxepoch =
-      Int64.(to_int (div nanos_since_kxepoch one_day_in_ns)) in
-    let remaining_ps =
-      Int64.(mul (rem nanos_since_kxepoch one_day_in_ns) 1_000L) in
-    let span =
-      Ptime.Span.v (days_since_kxepoch, remaining_ps) in
-    match Ptime.add_span kx_epoch span with
-    | None -> invalid_arg "timestamp_of_int64"
-    | Some ts -> ts
-
-let int_of_month (y, m, _) = (y - 2000) * 12 + (pred m)
-let month_of_int m =
-  let y = m / 12 in
-  let rem_m = m mod 12 in
-  2000 + y, succ rem_m, 0
-
-let int_of_minute ((hh, mm, _), tz_offset) = (hh * 60 + mm + tz_offset / 60)
-
-let minute_of_int nb_minutes =
-  (nb_minutes / 60, nb_minutes mod 60, 0), 0
-
-let int_of_second ((hh, mm, ss), tz_offset) =
-  (hh * 3600 + mm * 60 + ss + tz_offset)
-
-let second_of_int nb_seconds =
-  let hh = nb_seconds / 3600 in
-  let mm = (nb_seconds / 60) mod 60 in
-  let ss = nb_seconds mod 60 in
-  (hh, mm, ss), 0
-
 (* let string_of_chars a = String.init (Array.length a) (Array.get a) *)
 let pp_print_month ppf (y, m, _) = Format.fprintf ppf "%d.%dm" y m
 let pp_print_date ppf (y, m, d) =  Format.fprintf ppf "%d.%d.%d" y m d
@@ -486,11 +535,11 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
 
   | Atom Month ->
     write_char buf '\xf3' ;
-    FE.write_uint32 buf (Int32.of_int (int_of_month a))
+    FE.write_uint32 buf (int32_of_month a)
 
   | Atom Date ->
     write_char buf '\xf2' ;
-    FE.write_uint32 buf (Int32.of_int (int_of_date a))
+    FE.write_uint32 buf (int32_of_date a)
 
   | Atom Timespan ->
     write_char buf '\xf0' ;
@@ -498,15 +547,15 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
 
   | Atom Minute ->
     write_char buf '\xef' ;
-    FE.write_uint32 buf (Int32.of_int (int_of_minute a))
+    FE.write_uint32 buf (int32_of_minute a)
 
   | Atom Second ->
     write_char buf '\xee' ;
-    FE.write_uint32 buf (Int32.of_int (int_of_second a))
+    FE.write_uint32 buf (int32_of_second a)
 
   | Atom Time ->
     write_char buf '\xed' ;
-    FE.write_uint32 buf (Int32.of_int (int_of_time a))
+    FE.write_uint32 buf (int32_of_time a)
 
   | Atom Lambda ->
     write_char buf '\x64' ;
@@ -618,7 +667,7 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
     write_char buf (char_of_attribute attr) ;
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter begin fun m ->
-      FE.write_uint32 buf (Int32.of_int (int_of_month m))
+      FE.write_uint32 buf (int32_of_month m)
     end a
 
   | Vect (Date, attr) ->
@@ -626,7 +675,7 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
     write_char buf (char_of_attribute attr) ;
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter begin fun m ->
-      FE.write_uint32 buf (Int32.of_int (int_of_date m))
+      FE.write_uint32 buf (int32_of_date m)
     end a
 
   | Vect (Timespan, attr) ->
@@ -642,7 +691,7 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
     write_char buf (char_of_attribute attr) ;
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter begin fun m ->
-      FE.write_uint32 buf (Int32.of_int (int_of_minute m))
+      FE.write_uint32 buf (int32_of_minute m)
     end a
 
   | Vect (Second, attr) ->
@@ -650,7 +699,7 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
     write_char buf (char_of_attribute attr) ;
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter begin fun m ->
-      FE.write_uint32 buf (Int32.of_int (int_of_second m))
+      FE.write_uint32 buf (int32_of_second m)
     end a
 
   | Vect (Time, attr) ->
@@ -658,7 +707,7 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
     write_char buf (char_of_attribute attr) ;
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter begin fun a ->
-      FE.write_uint32 buf (Int32.of_int (int_of_time a))
+      FE.write_uint32 buf (int32_of_time a)
     end a
 
   | String _ -> assert false
@@ -805,14 +854,14 @@ let timestamp_atom endianness =
 
 let month_encoding endianness =
   let module M = (val getmod endianness) in
-  M.any_int32 >>| fun i -> month_of_int (Int32.to_int i)
+  M.any_int32 >>| month_of_int32
 
 let month_atom endianness =
   char '\xf3' *> month_encoding endianness
 
 let date_encoding endianness =
   let module M = (val getmod endianness) in
-  M.any_int32 >>| fun i -> date_of_int (Int32.to_int i)
+  M.any_int32 >>| date_of_int32
 
 let date_atom endianness =
   char '\xf2' *> date_encoding endianness
@@ -826,21 +875,21 @@ let timespan_atom endianness =
 
 let minute_encoding endianness =
   let module M = (val getmod endianness) in
-  M.any_int32 >>| fun i -> minute_of_int (Int32.to_int i)
+  M.any_int32 >>| minute_of_int32
 
 let minute_atom endianness =
   char '\xef' *> minute_encoding endianness
 
 let second_encoding endianness =
   let module M = (val getmod endianness) in
-  M.any_int32 >>| fun i -> second_of_int (Int32.to_int i)
+  M.any_int32 >>| second_of_int32
 
 let second_atom endianness =
   char '\xee' *> second_encoding endianness
 
 let time_encoding endianness =
   let module M = (val getmod endianness) in
-  M.any_int32 >>| fun i -> time_of_int (Int32.to_int i)
+  M.any_int32 >>| time_of_int32
 
 let time_atom endianness =
   char '\xed' *> time_encoding endianness

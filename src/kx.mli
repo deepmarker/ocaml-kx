@@ -76,15 +76,47 @@ val destruct :
   ?endianness:[`Big | `Little] -> 'a w -> (hdr * 'a) Angstrom.t
 
 val nh : int
-val ni : int32
-val nj : int64
-val nf : float
-
 val wh : int
+
+val ni : int32
 val wi : int32
+
+val nj : int64
 val wj : int64
+
+val nf : float
 val wf : float
 val ptime_neginf : Ptime.t
+
+(** Timespan *)
+val nn : timespan
+val wn : timespan
+val minus_wn : timespan
+
+(** Time *)
+val nt : time
+val wt : time
+val minus_wt : time
+
+(** Month *)
+val nm : Ptime.date
+val wm : Ptime.date
+val minus_wm : Ptime.date
+
+(** Date *)
+val nd : Ptime.date
+val wd : Ptime.date
+val minus_wd : Ptime.date
+
+(** Minute *)
+val nu : Ptime.time
+val wu : Ptime.time
+val minus_wu : Ptime.time
+
+(** Second *)
+val nv : Ptime.time
+val wv : Ptime.time
+val minus_wv : Ptime.time
 
 val equal_w : 'a w -> 'b w -> bool
 val equal : 'a w -> 'a -> 'b w -> 'b -> bool
@@ -92,11 +124,14 @@ val pp : 'a w -> Format.formatter -> 'a -> unit
 
 (**/*)
 
-val int_of_month : Ptime.date -> int
-val month_of_int : int -> Ptime.date
+val int32_of_month : Ptime.date -> int32
+val month_of_int32 : int32 -> Ptime.date
 
-val int_of_date : Ptime.date -> int
-val date_of_int : int -> Ptime.date
+val int32_of_date : Ptime.date -> int32
+val date_of_int32 : int32 -> Ptime.date
+
+val int32_of_time : time -> int32
+val time_of_int32 : int32 -> time
 
 val pp_print_date : (int * int * int) Fmt.t
 

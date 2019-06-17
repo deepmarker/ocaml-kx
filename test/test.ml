@@ -121,21 +121,21 @@ let test_server () =
   | Ok () -> Deferred.unit
 
 let utilities () =
-  check int "month1" 0 (int_of_month (2000, 1, 0)) ;
-  check int "month2" 4 (int_of_month (2000, 5, 0)) ;
-  check int "month3" 12 (int_of_month (2001, 1, 0)) ;
-  check int "month4" 228 (int_of_month (2019, 1, 0)) ;
-  check int "month5" 229 (int_of_month (2019, 2, 0)) ;
+  check int32 "month1" 0l (int32_of_month (2000, 1, 0)) ;
+  check int32 "month2" 4l (int32_of_month (2000, 5, 0)) ;
+  check int32 "month3" 12l (int32_of_month (2001, 1, 0)) ;
+  check int32 "month4" 228l (int32_of_month (2019, 1, 0)) ;
+  check int32 "month5" 229l (int32_of_month (2019, 2, 0)) ;
   for _ = 0 to 1000 do
-    let i = Random.int 1000 in
-    let j = int_of_month (month_of_int i) in
-    check int "month" i j
+    let i = Random.int32 1000l in
+    let j = int32_of_month (month_of_int32 i) in
+    check int32 "month" i j
   done
 
 let date ds =
   let testable = testable pp_print_date Pervasives.(=) in
   List.iter begin fun d ->
-    let d' = date_of_int (int_of_date d) in
+    let d' = date_of_int32 (int32_of_date d) in
     check testable (Format.asprintf "%a" pp_print_date d) d d'
   end ds
 
