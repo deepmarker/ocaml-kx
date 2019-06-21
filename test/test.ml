@@ -110,6 +110,7 @@ let pack_unpack_conv () =
   ()
 
 let test_server () =
+  let open Core in
   let open Async in
   let open Kx_async in
   let t = create (t2 (s Kx.char) (a Kx.bool)) ("upd", false) in
@@ -117,7 +118,8 @@ let test_server () =
     (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun p ->
     Pipe.write p t
   end >>= function
-  | Error e -> fail e
+  | Error e ->
+    failwithf "%s" (Format.asprintf "%a" Kx_async.pp_print_error e) ()
   | Ok () -> Deferred.unit
 
 let utilities () =
