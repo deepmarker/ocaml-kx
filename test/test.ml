@@ -83,6 +83,7 @@ let pack_unpack_list () =
   pack_unpack "compound" (list (v short)) [[1;2]; [3;4]] ;
   pack_unpack "string list" (list (s char)) ["machin"; "truc"] ;
   pack_unpack "test" (t2 (a sym) (a bool)) ("auie", true) ;
+  pack_unpack "t4" (t4 (a bool) (a bool) (a bool) (a bool)) (true, true, true, true) ;
   ()
 
 let pack_unpack_dict () =
@@ -99,6 +100,41 @@ let pack_unpack_dict () =
 let pack_unpack_table () =
   let open Kx in
   pack_unpack "simple" (table (v sym) (v long)) (["a"], [1L]);
+  pack_unpack "simple_2" (table (v sym) (t2 (v long) (v long))) (["a"], ([1L], [1L]));
+  pack_unpack "symsym" (table (v sym) (t1 (v sym))) (["a"], ["truc"]);
+  pack_unpack "symsym2" (table (v sym) (t2 (v timespan) (v sym))) (["a"], ([wn], ["truc"]));
+  pack_unpack "symsym3" (table (v sym) (t2 (v timespan) (v long))) (["a"], ([wn], [0L]));
+  pack_unpack "symsym3" (table (v sym) (t3 (v timespan) (v timespan) (v timespan))) (["a"], ([wn], [wn], [wn]));
+  pack_unpack "symsym3" (table (v sym) (t3 (v timespan) (v long) (v sym))) (["a"], ([wn], [0L], ["truc"]));
+  pack_unpack "simple_3" (table (v sym) (t3 (v timespan) (v sym) (v long))) (["a"], ([wn], ["truc"], [1L]));
+  pack_unpack "trade0" begin
+    let k = (v sym) in
+    let v = t3 (v timespan) (v sym) (v long) in
+    table k v
+  end
+    (["time"; "sym"; "side"; "size" ; "price"],
+     ([wn], ["XBTUSD"], [1L])) ;
+  pack_unpack "trade1" begin
+    let k = (v sym) in
+    let v = t4 (v timespan) (v sym) (v long) (v long) in
+    table k v
+  end
+    (["time"; "sym"; "side"; "size" ; "price"],
+     ([wn], ["XBTUSD"], [1L], [1L])) ;
+  pack_unpack "trade1" begin
+    let k = (v sym) in
+    let v = t4 (v timespan) (v sym) (v char) (v long) in
+    table k v
+  end
+    (["time"; "sym"; "side"; "size" ; "price"],
+     ([wn], ["XBTUSD"], ['a'], [1L])) ;
+  pack_unpack "trade" begin
+    let k = (v sym) in
+    let v = t5 (v timespan) (v sym) (v char) (v long) (v float) in
+    table k v
+  end
+    (["time"; "sym"; "side"; "size" ; "price"],
+     ([wn], ["XBTUSD"], ['b'], [1L], [1.])) ;
   ()
 
 let pack_unpack_conv () =
@@ -115,7 +151,7 @@ let test_server () =
   let open Kx_async in
   let t = create (t2 (s Kx.char) (a Kx.bool)) ("upd", false) in
   with_connection
-    (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun p ->
+    (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun _ p ->
     Pipe.write p t
   end >>= function
   | Error e ->
@@ -169,5 +205,5 @@ let () =
   Logs.set_level ~all:true (Some Logs.Debug) ;
   run "q" [
     "kx", tests_kx ;
-    "kx-async", tests_kx_async ;
+    (* "kx-async", tests_kx_async ; *)
   ]

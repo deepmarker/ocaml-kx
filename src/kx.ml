@@ -3,6 +3,8 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
+open Sexplib.Std
+
 type time = { time : Ptime.time ; ms : int }
 type timespan = { time : Ptime.time ; ns : int }
 
@@ -271,11 +273,12 @@ type _ w =
   | Table : 'a w * 'b w * bool -> ('a * 'b) w
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b w -> 'a w
 
-let is_list_type : type a. a w -> bool = function
+let rec is_list_type : type a. a w -> bool = function
   | Tup _ -> true
   | Tups _ -> true
   | List _ -> true
   | Vect _ -> true
+  | Conv (_, _, w) -> is_list_type w
   | _ -> false
 
 let parted : type a. a w -> a w = function
@@ -471,8 +474,10 @@ and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun 
     (schedule_bigstring buf (serialize_to_bigstring buf'))
 
   | Dict (k, v, sorted) ->
-    if not (is_list_type k && is_list_type v) then
-      invalid_arg "dict keys and values must be a list type" ;
+    if not (is_list_type k) then
+      invalid_arg "dict keys must be a list type" ;
+    if not (is_list_type v) then
+      invalid_arg "dict values must be a list type" ;
     let x, y = a in
     write_char buf (if sorted then '\x7f' else '\x63') ;
     construct e buf k x ;
@@ -725,7 +730,10 @@ type hdr = {
   endianness: [`Little | `Big] ;
   typ: [`Async | `Sync | `Response] ;
   len: int32 ;
-}
+} [@@deriving sexp]
+
+let pp_print_hdr ppf t =
+  Format.fprintf ppf "%a" Sexplib.Sexp.pp (sexp_of_hdr t)
 
 let write_hdr buf { endianness; typ; len } =
   let open Faraday in
@@ -824,7 +832,6 @@ let real_encoding endianness =
   M.any_float
 
 let real_atom endianness =
-  let open Angstrom in
   char '\xf8' *>
   real_encoding endianness
 
@@ -1023,7 +1030,6 @@ let lambda_atom endianness =
   (sym, lam)
 
 let general_list endianness attr elt =
-  let open Angstrom in
   char '\x00' *>
   attribute attr >>= fun () ->
   length endianness >>= fun len ->
@@ -1034,19 +1040,18 @@ let lambda_vect endianness attr =
 
 let rec destruct_list :
   type a. [`Big | `Little] -> a w -> a Angstrom.t = fun endianness w ->
-  let open Angstrom in
   match w with
   | Tup (ww, _) -> destruct ~endianness ww
   | Tups (h, t, _) ->
     destruct_list endianness h >>= fun a ->
     destruct_list endianness t >>| fun b ->
     (a, b)
+  | Conv (_, f, ww) -> lift f (destruct_list endianness ww)
   | _ -> assert false
 
 and destruct :
   type a. ?endianness:[`Big | `Little] -> a w -> a Angstrom.t =
   fun ?(endianness = if Sys.big_endian then `Big else `Little) w ->
-  let open Angstrom in
   match w with
   | List (w, attr) -> general_list endianness attr (destruct ~endianness w)
   | Conv (_, inject, w) -> destruct ~endianness w >>| inject

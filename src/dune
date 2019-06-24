@@ -2,12 +2,28 @@
  (name        kx)
  (public_name kx)
  (modules Kx)
+ (preprocess (pps ppx_sexp_conv))
  (synopsis "OCaml client for kdb+")
- (libraries fmt uuidm ptime uri ocplib-endian faraday angstrom))
+ (libraries
+   sexplib
+   fmt
+   uuidm
+   ptime
+   uri
+   ocplib-endian
+   faraday
+   angstrom))
 
 (library
  (name        kx_async)
  (public_name kx-async)
  (modules Kx_async)
+ (preprocess (pps ppx_sexp_conv))
  (synopsis "OCaml client for kdb+, for Jane Street's async")
- (libraries kx core async async-uri logs-async))
+ (libraries
+   kx
+   core
+   async
+   async-uri
+   logs-async
+   angstrom-async))

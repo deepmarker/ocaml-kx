@@ -1,3 +1,18 @@
+(executable
+ (name sub)
+ (public_name sub)
+ (modules sub)
+ (preprocess (pps ppx_jane ppx_sexp_conv))
+ (package kx-async)
+ (libraries
+   logs
+   core
+   async
+   logs-async-reporter
+   kx-async))
+
 (test
  (name test)
+ (modules test)
+ (preprocess (pps ppx_jane ppx_sexp_conv))
  (libraries hex alcotest alcotest-async kx kx-async))

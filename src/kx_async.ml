@@ -38,7 +38,7 @@ type error = [
   | `Exn of exn
   | `ProtoError of int
   | `Eof
-] [@@deriving sexp]
+]
 
 let pp_print_error ppf = function
   | `ProtoError ver ->
@@ -63,8 +63,9 @@ let connect ?(buf=Faraday.create 4096) url =
            (Option.value ~default:"" (Uri.password url))) ;
       Reader.read_char r >>= function
       | `Ok '\x03' ->
-        Ivar.fill connected (Ok client_write) ;
         begin try_with begin fun () ->
+            let f w = Angstrom_async.parse (destruct w) r in
+            Ivar.fill connected (Ok (f, client_write)) ;
             Pipe.iter kx_read ~f:begin fun (K (wit, msg)) ->
               construct ~hdr ~payload:buf wit msg ;
               flush w hdr >>= fun () ->
@@ -96,6 +97,6 @@ let connect ?(buf=Faraday.create 4096) url =
 let with_connection ?buf url ~f =
   connect ?buf url >>= function
   | Error _ as e -> return e
-  | Ok w ->
-  Monitor.protect (fun () -> f w >>| fun v -> Ok v)
+  | Ok (f', w) ->
+  Monitor.protect (fun () -> f f' w >>| fun v -> Ok v)
     ~finally:(fun () -> Pipe.close w ; Deferred.unit)

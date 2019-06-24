@@ -62,8 +62,9 @@ type hdr = {
   endianness: [`Little | `Big] ;
   typ: [`Async | `Sync | `Response] ;
   len: int32 ;
-}
+} [@@deriving sexp]
 
+val pp_print_hdr : Format.formatter -> hdr -> unit
 val write_hdr : Faraday.t -> hdr -> unit
 
 val construct :
