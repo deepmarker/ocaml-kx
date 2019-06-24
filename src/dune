@@ -10,4 +10,4 @@
  (public_name kx-async)
  (modules Kx_async)
  (synopsis "OCaml client for kdb+, for Jane Street's async")
- (libraries kx core async async-uri logs-async))
+ (libraries kx core async async-uri logs-async angstrom-async))

@@ -115,7 +115,7 @@ let test_server () =
   let open Kx_async in
   let t = create (t2 (s Kx.char) (a Kx.bool)) ("upd", false) in
   with_connection
-    (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun p ->
+    (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun _ p ->
     Pipe.write p t
   end >>= function
   | Error e ->
