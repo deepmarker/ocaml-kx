@@ -145,12 +145,19 @@ let pack_unpack_conv () =
     ((1, 2, 3), false, true) ;
   ()
 
+let unpack_buggy () =
+  let test = "\001\002\000\0004\000\000\000\245:/home/vb/code/TorQ/hdb/database2019.06.21\000" in
+  let p = destruct (a sym) in
+  match Angstrom.parse_string p test with
+  | Error msg -> fail msg
+  | Ok (_hdr, v) -> check string "buggy_one" ":/home/vb/code/TorQ/hdb/database2019.06.21" v
+
 let test_server () =
   let open Core in
   let open Async in
   let open Kx_async in
   let t = create (t2 (s Kx.char) (a Kx.bool)) ("upd", false) in
-  with_connection
+  with_connection_async
     (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun _ p ->
     Pipe.write p t
   end >>= function
@@ -195,6 +202,7 @@ let tests_kx = [
   test_case "dict" `Quick pack_unpack_dict ;
   test_case "table" `Quick pack_unpack_table ;
   test_case "conv" `Quick pack_unpack_conv ;
+  test_case "unpack_buggy" `Quick unpack_buggy ;
 ]
 
 let tests_kx_async = Alcotest_async.[

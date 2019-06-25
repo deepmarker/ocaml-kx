@@ -68,8 +68,8 @@ val pp_print_hdr : Format.formatter -> hdr -> unit
 val write_hdr : Faraday.t -> hdr -> unit
 
 val construct :
-  ?endianness:[`Big | `Little] ->
-  ?typ:[`Async | `Sync | `Response] ->
+  ?endianness:[< `Big | `Little] ->
+  ?typ:[< `Async | `Sync | `Response] ->
   hdr:Faraday.t -> payload:Faraday.t ->
   'a w -> 'a -> unit
 

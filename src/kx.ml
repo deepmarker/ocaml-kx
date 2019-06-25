@@ -437,7 +437,7 @@ let pp_print_timestamp ppf ts = Format.fprintf ppf "%a" (Ptime.pp_rfc3339 ~frac_
 module type FE = module type of Faraday.BE
 
 let rec construct_list :
-  type a. [`Big | `Little] -> Faraday.t -> a w -> a -> int = fun e buf w a ->
+  type a. (module FE) -> Faraday.t -> a w -> a -> int = fun e buf w a ->
   match w with
   | Tup (w, _) ->
     construct e buf w a ;
@@ -449,9 +449,9 @@ let rec construct_list :
   | Conv (project, _, w) -> construct_list e buf w (project a)
   | _ -> assert false
 
-and construct : type a. [`Big | `Little] -> Faraday.t -> a w -> a -> unit = fun e buf w a ->
+and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf w a ->
   let open Faraday in
-  let module FE = (val (match e with `Big -> (module BE) | `Little -> (module LE)) : FE) in
+  let module FE = (val e : FE) in
   match w with
   | List (w', attr) ->
     write_char buf '\x00' ;
@@ -721,10 +721,23 @@ let int_of_endianness = function
   | `Big -> 0
   | `Little -> 1
 
+let int_of_endianness_opt = function
+  | Some `Big -> 0
+  | Some `Little -> 1
+  | None -> match Sys.big_endian with
+    | true -> 0
+    | false -> 1
+
 let int_of_msgtyp = function
   | `Async -> 0
   | `Sync -> 1
   | `Response -> 2
+
+let int_of_msgtyp_opt = function
+  | None -> 0
+  | Some `Async -> 0
+  | Some `Sync -> 1
+  | Some `Response -> 2
 
 type hdr = {
   endianness: [`Little | `Big] ;
@@ -744,23 +757,23 @@ let write_hdr buf { endianness; typ; len } =
   FE.write_uint16 buf 0 ;
   FE.write_uint32 buf len
 
-let construct
-    ?(endianness=if Sys.big_endian then `Big else `Little)
-    ?(typ=`Async) ~hdr ~payload w x =
+let construct ?endianness ?typ ~hdr ~payload w x =
   let open Faraday in
   let module FE = (val (match endianness with
-      | `Big -> (module BE) | `Little -> (module LE)) : FE) in
-  construct endianness payload w x ;
-  write_uint8 hdr (int_of_endianness endianness) ;
-  write_uint8 hdr (int_of_msgtyp typ) ;
+      | None -> if Sys.big_endian then (module BE) else (module LE)
+      | Some `Big -> (module BE)
+      | Some `Little -> (module LE)) : FE) in
+  construct (module FE) payload w x ;
+  write_uint8 hdr (int_of_endianness_opt endianness) ;
+  write_uint8 hdr (int_of_msgtyp_opt typ) ;
   FE.write_uint16 hdr 0 ;
   FE.write_uint32 hdr (Int32.of_int (8 + pending_bytes payload))
 
 let msgtyp_of_int = function
   | 0 -> `Async
   | 1 -> `Sync
-  | 3 -> `Response
-  | _ -> invalid_arg "typ_of_int"
+  | 2 -> `Response
+  | _ -> invalid_arg "msgtyp_of_int"
 
 open Angstrom
 
