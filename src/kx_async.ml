@@ -9,27 +9,16 @@ module Log_async = (val Logs_async.src_log src : Logs_async.LOG)
 type t = K : [`Big | `Little] * [`Sync | `Async] * 'a w * 'a -> t
 let create ?(endianness=`Little) ?(typ=`Async) w v = K (endianness, typ, w, v)
 
-let rec write_iovec w { Faraday.buffer ; off ; len } =
-  Writer.write_direct w ~f:begin fun buf ~pos ~len:len' ->
-    let nbwritten = min len len' in
-    Bigstring.blit ~src:buffer ~src_pos:off ~dst:buf ~dst_pos:pos ~len:nbwritten ;
-    nbwritten, nbwritten
-  end |> function
-  | None -> failwith "write_iovec stopped"
-  | Some n when n = len -> ()
-  | Some n -> write_iovec w { Faraday.buffer ; off = off + n ; len = len - n }
-
 let rec flush w buf =
-  let write_iovec iovec =
-    List.fold_left iovec ~init:0 ~f:begin fun a ({ Faraday.len; _ } as iovec) ->
-      write_iovec w iovec ;
-      a+len
-    end in
   match Faraday.operation buf with
   | `Close -> raise Exit
   | `Yield -> Deferred.unit
   | `Writev iovecs ->
-    let nb_written = write_iovec iovecs in
+    let nb_written =
+      List.fold_left iovecs ~init:0 ~f:begin fun a { Faraday.buffer ; off ; len } ->
+        Writer.write_bigstring w buffer ~pos:off ~len ;
+        a+len
+      end in
     Faraday.shift buf nb_written ;
     flush w buf
 
