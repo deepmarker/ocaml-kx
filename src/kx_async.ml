@@ -66,7 +66,9 @@ let connect_async ?(buf=Faraday.create 4096) url =
               construct ~endianness ~typ ~hdr ~payload:buf wit msg ;
               flush w hdr >>= fun () ->
               flush w buf >>= fun () ->
-              Log_async.debug (fun m -> m "-> %a" (Kx.pp wit) msg)
+              Log_async.debug begin fun m ->
+                m "@[%a@]" (Kx.pp wit) msg
+              end
             end
           end >>| fun _ ->
           Pipe.close_read kx_read

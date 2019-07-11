@@ -1139,7 +1139,7 @@ let rec pp_print_list :
   | Tup (ww, _) -> pp ww ppf v
   | Tups (h, t, _) ->
     pp_print_list ppf h (fst v) ;
-    Format.pp_print_newline ppf () ;
+    Format.pp_print_char ppf ' ' ;
     pp_print_list ppf t (snd v)
   | Conv (project, _, w) ->
     pp_print_list ppf w (project v)
@@ -1149,13 +1149,14 @@ and pp :
   type a. a w -> Format.formatter -> a -> unit = fun w ppf v ->
   let pp_sep ppf () = Format.pp_print_char ppf ' ' in
   match w with
-  | List (w, _) -> Format.(pp_print_list ~pp_sep:pp_print_newline (pp w) ppf v)
+  | List (w, _) -> Format.(pp_print_list ~pp_sep (pp w) ppf v)
   | Conv (project, _, w) -> pp w ppf (project v)
   | Tup (w, _) -> pp w ppf v
   | Tups _ -> pp_print_list ppf w v
-  | Dict (kw, vw, _sorted) -> Format.fprintf ppf "(%a)!(%a)" (pp kw) (fst v) (pp vw) (snd v)
-  | Table (kw, vw, _sorted) -> Format.fprintf ppf "(flip (%a)!(%a))" (pp kw) (fst v) (pp vw) (snd v)
-
+  | Dict (kw, vw, _sorted) ->
+    Format.fprintf ppf "(%a)!(%a)" (pp kw) (fst v) (pp vw) (snd v)
+  | Table (kw, vw, _sorted) ->
+    Format.fprintf ppf "(+(%a)!(%a))" (pp kw) (fst v) (pp vw) (snd v)
   | Atom Boolean -> Format.pp_print_bool ppf v
   | Atom Guid -> Uuidm.pp ppf v
   | Atom Byte -> Format.fprintf ppf "X%c" v
