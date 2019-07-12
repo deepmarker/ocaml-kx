@@ -114,16 +114,16 @@ let connect_sync ?endianness ?(buf=Faraday.create 4096) url =
   | `Ok '\x03' ->
     Monitor.detach (Writer.monitor w) ;
     let f = { f = fun wq q wr ->
-      try_with begin fun () ->
-        construct ?endianness ~typ:`Sync ~hdr ~payload:buf wq q ;
-        flush w hdr >>= fun () ->
-        flush w buf >>= fun () ->
-        Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
-        Angstrom_async.parse (destruct wr) r
-      end >>| function
-      | Error e -> Error (`Exn e)
-      | Ok (Error msg) -> Error (`Angstrom msg)
-      | Ok (Ok v) -> Ok v
+        try_with begin fun () ->
+          construct ?endianness ~typ:`Sync ~hdr ~payload:buf wq q ;
+          flush w hdr >>= fun () ->
+          flush w buf >>= fun () ->
+          Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
+          Angstrom_async.parse (destruct wr) r
+        end >>| function
+        | Error e -> Error (`Exn e)
+        | Ok (Error msg) -> Error (`Angstrom msg)
+        | Ok (Ok v) -> Ok v
       } in
     return (Ok (f, r, w))
   | `Ok c -> return (Error (`ProtoError (Char.to_int c)))
