@@ -46,41 +46,41 @@ let connect_async ?(buf=Faraday.create 4096) url =
   let hdr = Faraday.create 8 in
   let kx_read, client_write = Pipe.create () in
   let connected = Ivar.create () in
-  let inner () =
-    Async_uri.with_connection url begin fun _s _tls r w ->
-      Monitor.detach (Writer.monitor w) ;
-      Writer.write w
-        (Printf.sprintf "%s:%s\x03\x00"
-           (Option.value ~default:"" (Uri.user url))
-           (Option.value ~default:"" (Uri.password url))) ;
-      Reader.read_char r >>= function
-      | `Ok '\x03' ->
-        begin try_with begin fun () ->
-            let f w =
-              Reader.peek r ~len:1 >>= fun _ ->
-              let msg = Reader.peek_available r ~len:4096 in
-              Log.debug (fun m -> m "--> %S" msg);
-              Angstrom_async.parse (destruct w) r in
-            Ivar.fill connected (Ok (f, client_write)) ;
-            Pipe.iter kx_read ~f:begin fun (K (endianness, typ, wit, msg)) ->
-              construct ~endianness ~typ ~hdr ~payload:buf wit msg ;
-              flush w hdr >>= fun () ->
-              flush w buf >>= fun () ->
-              Log_async.debug begin fun m ->
-                m "@[%a@]" (Kx.pp wit) msg
-              end
+  let process _s _tls r w =
+    Monitor.detach (Writer.monitor w) ;
+    Writer.write w
+      (Printf.sprintf "%s:%s\x03\x00"
+         (Option.value ~default:"" (Uri.user url))
+         (Option.value ~default:"" (Uri.password url))) ;
+    Reader.read_char r >>= function
+    | `Ok '\x03' ->
+      begin try_with begin fun () ->
+          let f w =
+            Reader.peek r ~len:1 >>= fun _ ->
+            let msg = Reader.peek_available r ~len:4096 in
+            Log.debug (fun m -> m "--> %S" msg);
+            Angstrom_async.parse (destruct w) r in
+          Ivar.fill connected (Ok (f, client_write)) ;
+          Pipe.iter kx_read ~f:begin fun (K (endianness, typ, wit, msg)) ->
+            construct ~endianness ~typ ~hdr ~payload:buf wit msg ;
+            flush w hdr >>= fun () ->
+            flush w buf >>= fun () ->
+            Log_async.debug begin fun m ->
+              m "@[%a@]" (Kx.pp wit) msg
             end
-          end >>| fun _ ->
-          Pipe.close_read kx_read
-        end
-      | `Ok c ->
-        Ivar.fill connected (Error (`ProtoError (Char.to_int c))) ;
-        Deferred.unit
-      | `Eof ->
-        Ivar.fill connected (Error (`Eof)) ;
-        Deferred.unit
-    end in
-  let th = try_with ~extract_exn:true inner >>| fun e ->
+          end
+        end >>| fun _ ->
+        Pipe.close_read kx_read
+      end
+    | `Ok c ->
+      Ivar.fill connected (Error (`ProtoError (Char.to_int c))) ;
+      Deferred.unit
+    | `Eof ->
+      Ivar.fill connected (Error (`Eof)) ;
+      Deferred.unit in
+  let th = try_with ~extract_exn:true begin fun () ->
+      Async_uri.with_connection url process
+    end >>| fun e ->
     Pipe.close_read kx_read ;
     e in
   Deferred.any [
