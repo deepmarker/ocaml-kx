@@ -76,6 +76,10 @@ val construct :
 val destruct :
   ?endianness:[`Big | `Little] -> 'a w -> (hdr * 'a) Angstrom.t
 
+val destruct_stream :
+  ?endianness:[`Big | `Little] ->
+  'a list w -> ('a -> unit) -> (hdr * unit) Angstrom.t
+
 val nh : int
 val wh : int
 

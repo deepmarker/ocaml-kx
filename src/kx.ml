@@ -1049,6 +1049,21 @@ let general_list endianness attr elt =
   length endianness >>= fun len ->
   count len elt
 
+let stream n p f =
+  if n < 0 then invalid_arg "stream: n < 0";
+  let rec loop = function
+    | 0 -> return ()
+    | n ->
+      lift f p >>= fun () ->
+      loop (n - 1) in
+  loop n
+
+let general_list_stream endianness attr elt f =
+  char '\x00' *>
+  attribute attr >>= fun () ->
+  length endianness >>= fun len ->
+  stream len elt f
+
 let lambda_vect endianness attr =
   general_list endianness attr (lambda_atom endianness)
 
@@ -1129,9 +1144,22 @@ and destruct :
 
   | _ -> invalid_arg "destruct"
 
+let destruct_stream :
+  ?endianness:[`Big | `Little] -> 'a list w -> ('a -> unit) -> unit Angstrom.t =
+  fun ?(endianness = if Sys.big_endian then `Big else `Little) w f ->
+  match w with
+  | List (w, attr) ->
+    general_list_stream endianness attr (destruct ~endianness w) f
+  | _ -> invalid_arg "destruct_stream: not a general list"
+
 let destruct ?endianness v =
   hdr_encoding >>= fun hdr ->
   destruct ?endianness v >>| fun v ->
+  hdr, v
+
+let destruct_stream ?endianness v f =
+  hdr_encoding >>= fun hdr ->
+  destruct_stream ?endianness v f >>| fun v ->
   hdr, v
 
 let rec pp_print_list :
