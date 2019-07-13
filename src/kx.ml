@@ -1155,9 +1155,9 @@ and pp :
   | Tup (w, _) -> pp w ppf v
   | Tups _ -> pp_print_list ppf w v
   | Dict (kw, vw, _sorted) ->
-    Format.fprintf ppf "(%a)!(%a)" (pp kw) (fst v) (pp vw) (snd v)
+    Format.fprintf ppf "%a!%a" (pp kw) (fst v) (pp vw) (snd v)
   | Table (kw, vw, _sorted) ->
-    Format.fprintf ppf "(+(%a)!(%a))" (pp kw) (fst v) (pp vw) (snd v)
+    Format.fprintf ppf "+%a!%a" (pp kw) (fst v) (pp vw) (snd v)
   | Atom Boolean -> Format.pp_print_bool ppf v
   | Atom Guid -> Uuidm.pp ppf v
   | Atom Byte -> Format.fprintf ppf "X%c" v
