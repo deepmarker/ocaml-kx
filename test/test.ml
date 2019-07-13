@@ -11,7 +11,9 @@ let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
   construct ~hdr ~payload w a ;
   let hdr_str = Faraday.serialize_to_string hdr in
   let serialized = hdr_str ^ Faraday.serialize_to_string payload in
-  Hex.hexdump (Hex.of_string serialized) ;
+  let serialized_hex = Hex.of_string serialized in
+  (* Hex.hexdump serialized_hex ; *)
+  Format.printf "%a@." Hex.pp serialized_hex ;
   match Angstrom.parse_string (destruct w) serialized with
   | Error msg -> fail msg
   | Ok (hdr', v) ->
@@ -94,7 +96,12 @@ let pack_unpack_dict () =
     (dict
        (list (t2 (a bool) (a int)))
        (list (t2 (a bool) (a int))))
-    ([true, 3l; false, 2l], [false, 1l; true, 2l]);
+    ([true, 3l; false, 2l], [false, 1l; true, 2l]) ;
+  pack_unpack "keyed table"
+    (dict
+       (table (v sym) (list (v short)))
+       (table (v sym) (list (v short))))
+    ((["id"], [[1; 2; 3]]), (["v"], [[4; 5; 6]])) ;
   ()
 
 let pack_unpack_table () =

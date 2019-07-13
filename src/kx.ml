@@ -278,6 +278,7 @@ let rec is_list_type : type a. a w -> bool = function
   | Tups _ -> true
   | List _ -> true
   | Vect _ -> true
+  | Table _ -> true
   | Conv (_, _, w) -> is_list_type w
   | _ -> false
 
