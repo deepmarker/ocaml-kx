@@ -23,6 +23,7 @@ let rec flush w buf =
     flush w buf
 
 type error = [
+  | `Q of string
   | `Angstrom of string
   | `ConnectionTerminated
   | `Exn of exn
@@ -31,6 +32,8 @@ type error = [
 ]
 
 let pp_print_error ppf = function
+  | `Q msg ->
+    Format.fprintf ppf "Q error: %s" msg
   | `Angstrom msg ->
     Format.fprintf ppf "Parsing error: %s" msg
   | `ProtoError ver ->
@@ -41,6 +44,11 @@ let pp_print_error ppf = function
     Format.fprintf ppf "Connection terminated"
   | `Exn exn ->
     Format.fprintf ppf "%a" Exn.pp exn
+
+let fail err = failwith (Format.asprintf "%a" pp_print_error err)
+let fail_on_error = function
+  | Ok v -> v
+  | Error e -> fail e
 
 let connect_async ?(buf=Faraday.create 4096) url =
   let hdr = Faraday.create 8 in
@@ -58,16 +66,18 @@ let connect_async ?(buf=Faraday.create 4096) url =
           let f w =
             Reader.peek r ~len:1 >>= fun _ ->
             let msg = Reader.peek_available r ~len:4096 in
-            Log.debug (fun m -> m "--> %S" msg);
-            Angstrom_async.parse (destruct w) r in
+            Log.debug (fun m -> m "--> %S" msg) ;
+            Angstrom_async.parse (destruct w) r >>| function
+            | Ok (Ok v) -> Ok v
+            | Ok (Error msg) -> Error (`Q msg)
+            | Error msg -> Error (`Angstrom msg)
+          in
           Ivar.fill connected (Ok (f, client_write)) ;
           Pipe.iter kx_read ~f:begin fun (K (endianness, typ, wit, msg)) ->
             construct ~endianness ~typ ~hdr ~payload:buf wit msg ;
             flush w hdr >>= fun () ->
             flush w buf >>= fun () ->
-            Log_async.debug begin fun m ->
-              m "@[%a@]" (Kx.pp wit) msg
-            end
+            Log_async.debug (fun m -> m "@[%a@]" (Kx.pp wit) msg)
           end
         end >>| fun _ ->
         Pipe.close_read kx_read
@@ -123,7 +133,8 @@ let connect_sync ?endianness ?(buf=Faraday.create 4096) url =
         end >>| function
         | Error e -> Error (`Exn e)
         | Ok (Error msg) -> Error (`Angstrom msg)
-        | Ok (Ok v) -> Ok v
+        | Ok (Ok (Ok v)) -> Ok v
+        | Ok (Ok (Error err)) -> Error (`Q err)
       } in
     return (Ok (f, r, w))
   | `Ok c -> return (Error (`ProtoError (Char.to_int c)))

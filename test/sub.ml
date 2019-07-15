@@ -53,7 +53,8 @@ let main port =
     Pipe.write w sub >>= fun () ->
     let rec inner () =
       f updmsg >>= function
-      | Error e -> failwithf "Parsing error: %s" e ()
+      | Error `Angstrom msg -> failwithf "Parsing error: %s" msg ()
+      | Error `Q err -> failwithf "Q error: %s" err ()
       | Ok (hdr, a) ->
         Logs.app begin fun m ->
           m "%a %a" Kx.pp_print_hdr hdr (Kx.pp updmsg) a

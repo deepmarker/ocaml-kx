@@ -263,6 +263,7 @@ let attribute attr =
   Angstrom.(char (char_of_attribute attr) >>| ignore)
 
 type _ w =
+  | Err : string w
   | Atom : 'a typ -> 'a w
   | Vect : 'a typ * attribute -> 'a list w
   | String : char typ * attribute -> string w
@@ -353,6 +354,7 @@ let lambda    = Lambda
 let conv project inject a =
   Conv (project, inject, a)
 
+let err = Err
 let a a = Atom a
 let v ?(attr=NoAttr) a = Vect (a, attr)
 let s ?(attr=NoAttr) a = String (a, attr)
@@ -454,6 +456,11 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
   let open Faraday in
   let module FE = (val e : FE) in
   match w with
+  | Err ->
+    write_char buf '\x80' ;
+    write_string buf a ;
+    write_char buf '\x00'
+
   | List (w', attr) ->
     write_char buf '\x00' ;
     write_char buf (char_of_attribute attr) ;
@@ -860,11 +867,13 @@ let char_atom =
   char '\xf6' *> any_char
 
 let symbol_encoding =
-  take_while (fun c -> c <> '\x00') >>= fun res ->
-  char '\x00' >>| fun _ -> res
+  take_while (fun c -> c <> '\x00') <* char '\x00'
 
 let symbol_atom =
   char '\xf5' *> symbol_encoding
+
+let err_atom =
+  char '\x80' *> symbol_encoding
 
 let timestamp_encoding endianness =
   let module M = (val getmod endianness) in
@@ -1082,6 +1091,7 @@ and destruct :
   type a. ?endianness:[`Big | `Little] -> a w -> a Angstrom.t =
   fun ?(endianness = if Sys.big_endian then `Big else `Little) w ->
   match w with
+  | Err -> err_atom
   | List (w, attr) -> general_list endianness attr (destruct ~endianness w)
   | Conv (_, inject, w) -> destruct ~endianness w >>| inject
   | Tup (w, attr) -> general_list endianness attr (destruct ~endianness w) >>| List.hd
@@ -1152,10 +1162,19 @@ let destruct_stream :
     general_list_stream endianness attr (destruct ~endianness w) f
   | _ -> invalid_arg "destruct_stream: not a general list"
 
+let destruct_exn ?endianness v =
+  hdr_encoding >>= fun hdr ->
+  choice [
+    (destruct ?endianness v >>| fun v -> hdr, v) ;
+    (destruct ?endianness err >>| fun msg -> failwith msg) ;
+  ]
+
 let destruct ?endianness v =
   hdr_encoding >>= fun hdr ->
-  destruct ?endianness v >>| fun v ->
-  hdr, v
+  choice [
+    (destruct ?endianness v >>| fun v -> Ok (hdr, v)) ;
+    (destruct ?endianness err >>| fun msg -> Error msg) ;
+  ]
 
 let destruct_stream ?endianness v f =
   hdr_encoding >>= fun hdr ->

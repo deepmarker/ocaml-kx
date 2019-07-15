@@ -14,7 +14,7 @@ let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
   let serialized_hex = Hex.of_string serialized in
   (* Hex.hexdump serialized_hex ; *)
   Format.printf "%a@." Hex.pp serialized_hex ;
-  match Angstrom.parse_string (destruct w) serialized with
+  match Angstrom.parse_string (destruct_exn w) serialized with
   | Error msg -> fail msg
   | Ok (hdr', v) ->
     let buf = Faraday.create 8 in
@@ -154,8 +154,7 @@ let pack_unpack_conv () =
 
 let unpack_buggy () =
   let test = "\001\002\000\0004\000\000\000\245:/home/vb/code/TorQ/hdb/database2019.06.21\000" in
-  let p = destruct (a sym) in
-  match Angstrom.parse_string p test with
+  match Angstrom.parse_string (destruct_exn (a sym)) test with
   | Error msg -> fail msg
   | Ok (_hdr, v) -> check string "buggy_one" ":/home/vb/code/TorQ/hdb/database2019.06.21" v
 

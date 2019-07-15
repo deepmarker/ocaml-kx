@@ -35,6 +35,7 @@ val second    : Ptime.time typ
 val time      : time typ
 val lambda    : (string * string) typ
 
+val err : string w
 val a : 'a typ -> 'a w
 val v : ?attr:attribute -> 'a typ -> 'a list w
 val s : ?attr:attribute -> char typ -> string w
@@ -74,6 +75,8 @@ val construct :
   'a w -> 'a -> unit
 
 val destruct :
+  ?endianness:[`Big | `Little] -> 'a w -> (hdr * 'a, string) result Angstrom.t
+val destruct_exn :
   ?endianness:[`Big | `Little] -> 'a w -> (hdr * 'a) Angstrom.t
 
 val destruct_stream :
