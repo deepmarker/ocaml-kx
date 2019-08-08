@@ -46,13 +46,13 @@ let add_random_trades w =
 let main port =
   let url = Uri.with_port url (Some port) in
   let sub = Kx_async.create submsg (".u.sub", "trade", "") in
-  Kx_async.with_connection_async url ~f:begin fun f w ->
+  Kx_async.with_connection_async url ~f:begin fun { af } w ->
     Clock_ns.every
       (Time_ns.Span.of_int_sec 1)
       (fun () -> add_random_trades w) ;
     Pipe.write w sub >>= fun () ->
     let rec inner () =
-      f updmsg >>= function
+      af updmsg >>= function
       | Error `Angstrom msg -> failwithf "Parsing error: %s" msg ()
       | Error `Q err -> failwithf "Q error: %s" err ()
       | Ok (hdr, a) ->

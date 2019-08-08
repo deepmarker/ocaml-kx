@@ -50,6 +50,10 @@ let fail_on_error = function
   | Ok v -> v
   | Error e -> fail e
 
+type af = {
+  af: 'a. 'a w -> (hdr * 'a, [`Q of string | `Angstrom of string]) result Deferred.t
+}
+
 let connect_async ?(buf=Faraday.create 4096) url =
   let hdr = Faraday.create 8 in
   let kx_read, client_write = Pipe.create () in
@@ -63,7 +67,7 @@ let connect_async ?(buf=Faraday.create 4096) url =
     Reader.read_char r >>= function
     | `Ok '\x03' ->
       begin try_with begin fun () ->
-          let f w =
+          let af w =
             Reader.peek r ~len:1 >>= fun _ ->
             let msg = Reader.peek_available r ~len:4096 in
             Log.debug (fun m -> m "--> %S" msg) ;
@@ -72,7 +76,7 @@ let connect_async ?(buf=Faraday.create 4096) url =
             | Ok (Error msg) -> Error (`Q msg)
             | Error msg -> Error (`Angstrom msg)
           in
-          Ivar.fill connected (Ok (f, client_write)) ;
+          Ivar.fill connected (Ok ({ af }, client_write)) ;
           Pipe.iter kx_read ~f:begin fun (K (endianness, typ, wit, msg)) ->
             construct ~endianness ~typ ~hdr ~payload:buf wit msg ;
             flush w hdr >>= fun () ->
@@ -109,8 +113,8 @@ let with_connection_async ?buf url ~f =
     Monitor.protect (fun () -> f f' w >>| fun v -> Ok v)
       ~finally:(fun () -> Pipe.close w ; Deferred.unit)
 
-type f = {
-  f: 'a 'b. ('a w -> 'a -> 'b w -> (hdr * 'b, error) result Deferred.t)
+type sf = {
+  sf: 'a 'b. ('a w -> 'a -> 'b w -> (hdr * 'b, error) result Deferred.t)
 }
 
 let connect_sync ?endianness ?(buf=Faraday.create 4096) url =
@@ -123,7 +127,7 @@ let connect_sync ?endianness ?(buf=Faraday.create 4096) url =
   Reader.read_char r >>= function
   | `Ok '\x03' ->
     Monitor.detach (Writer.monitor w) ;
-    let f = { f = fun wq q wr ->
+    let f = { sf = fun wq q wr ->
         try_with begin fun () ->
           construct ?endianness ~typ:`Sync ~hdr ~payload:buf wq q ;
           flush w hdr >>= fun () ->
