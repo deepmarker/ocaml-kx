@@ -15,6 +15,7 @@ type attribute =
 
 type _ typ
 type _ w
+type _ case
 
 val bool      : bool typ
 val guid      : Uuidm.t typ
@@ -58,6 +59,8 @@ val dict : ?sorted:bool -> 'a w -> 'b w -> ('a * 'b) w
 val table : ?sorted:bool -> 'a w -> 'b w -> ('a * 'b) w
 
 val conv : ('a -> 'b) -> ('b -> 'a) -> 'b w -> 'a w
+val case : 'a w -> ('b -> 'a option) -> ('a -> 'b) -> 'b case
+val union : 'a case list -> 'a w
 
 type hdr = {
   endianness: [`Little | `Big] ;

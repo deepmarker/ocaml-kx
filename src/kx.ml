@@ -273,6 +273,15 @@ type _ w =
   | Dict : 'a w * 'b w * bool -> ('a * 'b) w
   | Table : 'a w * 'b w * bool -> ('a * 'b) w
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b w -> 'a w
+  | Union : 'a case list -> 'a w
+
+and _ case =
+  | Case : { encoding : 'a w ;
+             proj : ('t -> 'a option) ;
+             inj : ('a -> 't) } -> 't case
+
+let case encoding proj inj = Case { encoding ; proj ; inj }
+let union cases = Union cases
 
 let rec is_list_type : type a. a w -> bool = function
   | Tup _ -> true
@@ -301,7 +310,13 @@ let rec equal_w : type a b. a w -> b w -> bool = fun a b ->
   | Dict (a, b, s1), Dict (c, d, s2) -> equal_w a c && equal_w b d && s1 = s2
   | Table (a, b, s1), Table (c, d, s2) -> equal_w a c && equal_w b d && s1 = s2
   | Conv (_, _, a), Conv (_, _, b) -> equal_w a b
+  | Union a, Union b ->
+    List.fold_left2 (fun a c1 c2 -> a && equal_case c1 c2) true a b
   | _ -> false
+
+and equal_case : type a b. a case -> b case -> bool =
+  fun (Case { encoding ; _ }) (Case { encoding = e2; _ }) ->
+  equal_w encoding e2
 
 let rec equal : type a b. a w -> a -> b w -> b -> bool = fun aw x bw y ->
   match aw, bw with
@@ -330,6 +345,16 @@ let rec equal : type a b. a w -> a -> b w -> b -> bool = fun aw x bw y ->
     equal a x1 c y1 && equal b x2 d y2 && s1 = s2
   | Conv (p1, _, a), Conv (p2, _, b) ->
     equal a (p1 x) b (p2 y)
+  | Union c1, Union c2 ->
+    equal_w aw bw &&
+    List.fold_left2 begin fun a
+      (Case { encoding; proj ; _ })
+      (Case { encoding = e2; proj = proj2 ; _ }) ->
+      a && match (proj x), (proj2 y) with
+      | None, None -> true
+      | Some a, Some b -> equal encoding a e2 b
+      | _ -> false
+    end true c1 c2
   | _ -> false
 
 let bool      = Boolean
@@ -436,6 +461,7 @@ let pp_print_second ppf ((hh, mm, ss), _) = Format.fprintf ppf "%d:%d:%d" hh mm 
 let pp_print_time ppf { time = ((hh, mm, ss), _) ; ms } = Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ms
 (* let pp_print_symbols ppf syms = Array.iter (fun sym -> Format.fprintf ppf "`%s" sym) syms *)
 let pp_print_timestamp ppf ts = Format.fprintf ppf "%a" (Ptime.pp_rfc3339 ~frac_s:9 ()) ts
+let pp_print_lambda ppf (ctx, lambda) = Format.pp_print_string ppf (ctx ^ lambda)
 
 module type FE = module type of Faraday.BE
 
@@ -456,6 +482,16 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
   let open Faraday in
   let module FE = (val e : FE) in
   match w with
+  | Union cases ->
+    let rec do_cases = function
+      | [] -> invalid_arg "construct: union"
+      | Case { encoding; proj; _ } :: rest ->
+        match proj a with
+        | Some t -> construct e buf encoding t
+        | None -> do_cases rest
+    in
+    do_cases cases
+
   | Err ->
     write_char buf '\x80' ;
     write_string buf a ;
@@ -1091,6 +1127,11 @@ and destruct :
   type a. ?endianness:[`Big | `Little] -> a w -> a Angstrom.t =
   fun ?(endianness = if Sys.big_endian then `Big else `Little) w ->
   match w with
+  | Union cases ->
+    choice ~failure_msg:"union: no more choices"
+      (List.map begin fun (Case { encoding ; inj ; _ }) ->
+          lift inj (destruct ~endianness encoding)
+        end cases)
   | Err -> err_atom
   | List (w, attr) -> general_list endianness attr (destruct ~endianness w)
   | Conv (_, inject, w) -> destruct ~endianness w >>| inject
@@ -1134,14 +1175,12 @@ and destruct :
   | Vect (Boolean, attr) -> bool_vect endianness attr
   | Vect (Guid, attr) -> guid_vect endianness attr
   | Vect (Byte, attr) -> byte_vect endianness attr
-  | String (Byte, attr) -> bytestring_vect endianness attr
   | Vect (Short, attr) -> short_vect endianness attr
   | Vect (Int, attr)  -> int_vect endianness attr
   | Vect (Long, attr) -> long_vect endianness attr
   | Vect (Real, attr) -> real_vect endianness attr
   | Vect (Float, attr) -> float_vect endianness attr
   | Vect (Char, attr) -> char_vect endianness attr
-  | String (Char, attr) -> string_vect endianness attr
   | Vect (Symbol, attr) -> symbol_vect endianness attr
   | Vect (Timestamp, attr) -> timestamp_vect endianness attr
   | Vect (Month, attr) -> month_vect endianness attr
@@ -1152,7 +1191,9 @@ and destruct :
   | Vect (Time, attr) -> time_vect endianness attr
   | Vect (Lambda, attr) -> lambda_vect endianness attr
 
-  | _ -> invalid_arg "destruct"
+  | String (Byte, attr) -> bytestring_vect endianness attr
+  | String (Char, attr) -> string_vect endianness attr
+  | String _ -> invalid_arg "destruct: unsupported string type"
 
 let destruct_stream :
   ?endianness:[`Big | `Little] -> 'a list w -> ('a -> unit) -> unit Angstrom.t =
@@ -1222,18 +1263,17 @@ and pp :
   | Atom Minute -> pp_print_minute ppf v
   | Atom Second -> pp_print_second ppf v
   | Atom Time -> pp_print_time ppf v
+  | Atom Lambda -> pp_print_lambda ppf v
 
   | Vect (Boolean, _) -> Format.pp_print_list ~pp_sep Format.pp_print_bool ppf v
   | Vect (Guid, _) -> Format.pp_print_list ~pp_sep Uuidm.pp ppf v
   | Vect (Byte, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "X%c") ppf v
-  | String (Byte, _) -> Format.pp_print_string ppf v
   | Vect (Short, _) ->Format.pp_print_list ~pp_sep Format.pp_print_int ppf v
   | Vect (Int, _)  -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%ld") ppf v
   | Vect (Long, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%Ld") ppf v
   | Vect (Real, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%g") ppf v
   | Vect (Float, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%g") ppf v
   | Vect (Char, _) -> Format.pp_print_string ppf (String.init (List.length v) (List.nth v))
-  | String (Char, _) -> Format.pp_print_string ppf v
   | Vect (Symbol, _) -> Format.pp_print_list ~pp_sep Format.pp_print_string ppf v
   | Vect (Timestamp, _) -> Format.pp_print_list ~pp_sep pp_print_timestamp ppf v
   | Vect (Month, _) -> Format.pp_print_list ~pp_sep pp_print_month ppf v
@@ -1242,9 +1282,14 @@ and pp :
   | Vect (Minute, _) -> Format.pp_print_list ~pp_sep pp_print_minute ppf v
   | Vect (Second, _) -> Format.pp_print_list ~pp_sep pp_print_second ppf v
   | Vect (Time, _) -> Format.pp_print_list ~pp_sep pp_print_time ppf v
+  | Vect (Lambda, _) -> Format.pp_print_list ~pp_sep pp_print_lambda ppf v
 
-  | _ -> invalid_arg "destruct"
+  | String (Byte, _) -> Format.pp_print_string ppf v
+  | String (Char, _) -> Format.pp_print_string ppf v
+  | String _ -> invalid_arg "pp: unsupported string type"
 
+  | Err -> Format.pp_print_string ppf v
+  | Union _ -> Format.pp_print_string ppf "<union>"
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

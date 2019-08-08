@@ -152,6 +152,18 @@ let pack_unpack_conv () =
     ((1, 2, 3), false, true) ;
   ()
 
+type union =
+  | Int of int
+  | Float of float
+
+let pack_unpack_union () =
+  let w = union [
+      case (a Kx.short) (function Int i -> Some i | _ -> None) (fun i -> Int i) ;
+      case (a Kx.float) (function Float i -> Some i | _ -> None) (fun i -> Float i) ;
+    ] in
+  pack_unpack "int case" w (Int 2) ;
+  pack_unpack "float case" w (Float 4.)
+
 let unpack_buggy () =
   let test = "\001\002\000\0004\000\000\000\245:/home/vb/code/TorQ/hdb/database2019.06.21\000" in
   match Angstrom.parse_string (destruct_exn (a sym)) test with
@@ -208,6 +220,7 @@ let tests_kx = [
   test_case "dict" `Quick pack_unpack_dict ;
   test_case "table" `Quick pack_unpack_table ;
   test_case "conv" `Quick pack_unpack_conv ;
+  test_case "union" `Quick pack_unpack_union ;
   test_case "unpack_buggy" `Quick unpack_buggy ;
 ]
 
