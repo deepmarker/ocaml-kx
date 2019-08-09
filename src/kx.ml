@@ -1237,6 +1237,7 @@ let rec pp_print_list :
 and pp :
   type a. a w -> Format.formatter -> a -> unit = fun w ppf v ->
   let pp_sep ppf () = Format.pp_print_char ppf ' ' in
+  let pp_sep_empty ppf () = Format.pp_print_string ppf "" in
   match w with
   | List (w, _) -> Format.(pp_print_list ~pp_sep (pp w) ppf v)
   | Conv (project, _, w) -> pp w ppf (project v)
@@ -1274,7 +1275,7 @@ and pp :
   | Vect (Real, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%g") ppf v
   | Vect (Float, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%g") ppf v
   | Vect (Char, _) -> Format.pp_print_string ppf (String.init (List.length v) (List.nth v))
-  | Vect (Symbol, _) -> Format.pp_print_list ~pp_sep Format.pp_print_string ppf v
+  | Vect (Symbol, _) -> Format.pp_print_list ~pp_sep:pp_sep_empty Format.pp_print_string ppf v
   | Vect (Timestamp, _) -> Format.pp_print_list ~pp_sep pp_print_timestamp ppf v
   | Vect (Month, _) -> Format.pp_print_list ~pp_sep pp_print_month ppf v
   | Vect (Date, _) -> Format.pp_print_list ~pp_sep pp_print_date ppf v
