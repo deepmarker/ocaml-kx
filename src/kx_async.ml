@@ -69,8 +69,6 @@ let connect_async ?(buf=Faraday.create 4096) url =
       begin try_with begin fun () ->
           let af w =
             Reader.peek r ~len:1 >>= fun _ ->
-            let msg = Reader.peek_available r ~len:4096 in
-            Log.debug (fun m -> m "--> %S" msg) ;
             Angstrom_async.parse (destruct w) r >>| function
             | Ok (Ok v) -> Ok v
             | Ok (Error msg) -> Error (`Q msg)
