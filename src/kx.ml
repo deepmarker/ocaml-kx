@@ -460,7 +460,13 @@ let pp_print_minute ppf ((hh, mm, _), _) = Format.fprintf ppf "%d:%d" hh mm
 let pp_print_second ppf ((hh, mm, ss), _) = Format.fprintf ppf "%d:%d:%d" hh mm ss
 let pp_print_time ppf { time = ((hh, mm, ss), _) ; ms } = Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ms
 (* let pp_print_symbols ppf syms = Array.iter (fun sym -> Format.fprintf ppf "`%s" sym) syms *)
-let pp_print_timestamp ppf ts = Format.fprintf ppf "%a" (Ptime.pp_rfc3339 ~frac_s:9 ()) ts
+
+let pp_print_timestamp ppf = function
+  | ts when ts = Ptime.min -> Format.pp_print_string ppf "0Np"
+  | ts when ts = Ptime.max -> Format.pp_print_string ppf "0Wp"
+  | ts when ts = ptime_neginf -> Format.pp_print_string ppf "-0Wp"
+  | ts -> Format.fprintf ppf "%a" (Ptime.pp_rfc3339 ~frac_s:9 ()) ts
+
 let pp_print_lambda ppf (ctx, lambda) = Format.pp_print_string ppf (ctx ^ lambda)
 
 module type FE = module type of Faraday.BE
@@ -1222,6 +1228,27 @@ let destruct_stream ?endianness v f =
   destruct_stream ?endianness v f >>| fun v ->
   hdr, v
 
+let pp_print_short ppf i =
+  if i = nh then Format.pp_print_string ppf "0Nh" else Format.pp_print_int ppf i
+let pp_print_int ppf i =
+  if i = ni then Format.pp_print_string ppf "0Ni" else Format.fprintf ppf "%ld" i
+let pp_print_long ppf i =
+  if i = nj then Format.pp_print_string ppf "0Nj" else Format.fprintf ppf "%Ld" i
+
+let pp_print_real ppf i =
+  match Float.classify_float i with
+  | FP_nan -> Format.pp_print_string ppf "0Ne"
+  | FP_infinite when i > 0. -> Format.pp_print_string ppf "0We"
+  | FP_infinite -> Format.pp_print_string ppf "0We"
+  | _ -> Format.fprintf ppf "%g" i
+
+let pp_print_float ppf i =
+  match Float.classify_float i with
+  | FP_nan -> Format.pp_print_string ppf "0Nf"
+  | FP_infinite when i > 0. -> Format.pp_print_string ppf "0Wf"
+  | FP_infinite -> Format.pp_print_string ppf "0Wf"
+  | _ -> Format.fprintf ppf "%g" i
+
 let rec pp_print_list :
   type a. Format.formatter -> a w -> a -> unit = fun ppf w v ->
   match w with
@@ -1250,11 +1277,11 @@ and pp :
   | Atom Boolean -> Format.pp_print_bool ppf v
   | Atom Guid -> Uuidm.pp ppf v
   | Atom Byte -> Format.fprintf ppf "X%c" v
-  | Atom Short -> Format.pp_print_int ppf v
-  | Atom Int -> Format.fprintf ppf "%ld" v
-  | Atom Long -> Format.fprintf ppf "%Ld" v
-  | Atom Real -> Format.fprintf ppf "%g" v
-  | Atom Float -> Format.fprintf ppf "%g" v
+  | Atom Short -> pp_print_short ppf v
+  | Atom Int -> pp_print_int ppf v
+  | Atom Long -> pp_print_long ppf v
+  | Atom Real -> pp_print_real ppf v
+  | Atom Float -> pp_print_float ppf v
   | Atom Char -> Format.pp_print_char ppf v
   | Atom Symbol -> Format.fprintf ppf "`%s" v
   | Atom Timestamp -> pp_print_timestamp ppf v
@@ -1269,13 +1296,13 @@ and pp :
   | Vect (Boolean, _) -> Format.pp_print_list ~pp_sep Format.pp_print_bool ppf v
   | Vect (Guid, _) -> Format.pp_print_list ~pp_sep Uuidm.pp ppf v
   | Vect (Byte, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "X%c") ppf v
-  | Vect (Short, _) ->Format.pp_print_list ~pp_sep Format.pp_print_int ppf v
-  | Vect (Int, _)  -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%ld") ppf v
-  | Vect (Long, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%Ld") ppf v
-  | Vect (Real, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%g") ppf v
-  | Vect (Float, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "%g") ppf v
+  | Vect (Short, _) ->Format.pp_print_list ~pp_sep pp_print_short ppf v
+  | Vect (Int, _)  -> Format.pp_print_list ~pp_sep pp_print_int ppf v
+  | Vect (Long, _) -> Format.pp_print_list ~pp_sep pp_print_long ppf v
+  | Vect (Real, _) -> Format.pp_print_list ~pp_sep pp_print_real ppf v
+  | Vect (Float, _) -> Format.pp_print_list ~pp_sep pp_print_float ppf v
   | Vect (Char, _) -> Format.pp_print_string ppf (String.init (List.length v) (List.nth v))
-  | Vect (Symbol, _) -> Format.pp_print_list ~pp_sep:pp_sep_empty Format.pp_print_string ppf v
+  | Vect (Symbol, _) -> Format.pp_print_list ~pp_sep:pp_sep_empty (fun ppf -> Format.fprintf ppf "`%s") ppf v
   | Vect (Timestamp, _) -> Format.pp_print_list ~pp_sep pp_print_timestamp ppf v
   | Vect (Month, _) -> Format.pp_print_list ~pp_sep pp_print_month ppf v
   | Vect (Date, _) -> Format.pp_print_list ~pp_sep pp_print_date ppf v
