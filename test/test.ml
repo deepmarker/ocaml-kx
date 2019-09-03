@@ -196,7 +196,7 @@ let utilities () =
   done
 
 let date ds =
-  let testable = testable pp_print_date Pervasives.(=) in
+  let testable = testable pp_print_date Stdlib.(=) in
   List.iter begin fun d ->
     let d' = date_of_int32 (int32_of_date d) in
     check testable (Format.asprintf "%a" pp_print_date d) d d'
