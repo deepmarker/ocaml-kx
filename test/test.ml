@@ -6,20 +6,17 @@ let make_testable : type a. a w -> a testable = fun a ->
 
 let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
   let tt = make_testable w in
-  let hdr = Faraday.create 8 in
-  let payload = Faraday.create 1024 in
-  construct ~hdr ~payload w a ;
-  let hdr_str = Faraday.serialize_to_string hdr in
-  let serialized = hdr_str ^ Faraday.serialize_to_string payload in
-  let serialized_hex = Hex.of_string serialized in
+  let serialized = construct ~comp:true ~typ:`Async w a in
+  let payload = Bigstringaf.(sub serialized ~off:8 ~len:(length serialized - 8)) in
+  let serialized_hex = Hex.of_bigstring serialized in
   (* Hex.hexdump serialized_hex ; *)
   Format.printf "%a@." Hex.pp serialized_hex ;
-  match Angstrom.parse_string (destruct_exn w) serialized with
-  | Error msg -> fail msg
-  | Ok (hdr', v) ->
-    let buf = Faraday.create 8 in
-    write_hdr buf hdr' ;
-    check string (name ^ "_header") hdr_str (Faraday.serialize_to_string buf) ;
+  match Angstrom.parse_bigstring hdr serialized,
+        Angstrom.parse_bigstring (destruct_exn w) payload with
+  | Error msg, _ | _, Error msg -> fail msg
+  | Ok { big_endian; len; _ }, Ok v ->
+    check bool (name ^ "_big_endian") Sys.big_endian big_endian ;
+    check int32 (name ^ "_msglen") (Int32.of_int (Bigstringaf.length serialized)) len ;
     check tt name a v
 
 let pack_unpack_atom () =
@@ -165,10 +162,15 @@ let pack_unpack_union () =
   pack_unpack "float case" w (Float 4.)
 
 let unpack_buggy () =
-  let test = "\001\002\000\0004\000\000\000\245:/home/vb/code/TorQ/hdb/database2019.06.21\000" in
-  match Angstrom.parse_string (destruct_exn (a sym)) test with
-  | Error msg -> fail msg
-  | Ok (_hdr, v) -> check string "buggy_one" ":/home/vb/code/TorQ/hdb/database2019.06.21" v
+  let test =
+    Cstruct.of_string "\001\002\000\0004\000\000\000\245:/home/vb/code/TorQ/hdb/database2019.06.21\000" in
+  let payload = Cstruct.shift test 8 in
+  match
+    Angstrom.parse_bigstring hdr (Cstruct.to_bigarray test),
+    Angstrom.parse_bigstring (destruct_exn (a sym)) (Cstruct.to_bigarray payload) with
+  | Error msg, _ | _, Error msg -> fail msg
+  | Ok _hdr, Ok v ->
+    check string "buggy_one" ":/home/vb/code/TorQ/hdb/database2019.06.21" v
 
 let test_server () =
   let open Core in
@@ -182,6 +184,48 @@ let test_server () =
   | Error e ->
     failwithf "%s" (Format.asprintf "%a" Kx_async.pp_print_error e) ()
   | Ok () -> Deferred.unit
+
+let eq_bigstring a b =
+  let open Bigstringaf in
+  let len = length a in
+  len = length b &&
+  Bigstringaf.memcmp a 0 b 0 len = 0
+
+let pp_bigstring ppf a =
+  Format.fprintf ppf "%a" Hex.pp (Hex.of_bigstring a)
+
+let bigstring = testable pp_bigstring eq_bigstring
+
+let compress n =
+  let open Bigstringaf in
+  let buf = Cstruct.create 256 in
+  let buf = Cstruct.to_bigarray buf in
+  set buf 0 '\x01' ;
+  set buf 1 '\x00' ;
+  set_int16_le buf 2 0 ;
+  set_int32_le buf 4 256l ;
+  for i = n to 31 do
+    Bigstringaf.set_int64_le buf (i*8) (Random.int64 Int64.max_int)
+  done ;
+  try
+    let buf' = compress buf in
+    Printf.printf "compressed: %S\n" (to_string buf') ;
+    let newlen = length buf' in
+    let oldlen = length buf in
+    Printf.printf "compress successful, ratio %g\n"
+      (Int.to_float newlen /. Int.to_float oldlen) ;
+    let uncompLen = Int32.to_int (get_int32_le buf' 8) in
+    let buf'' = create uncompLen in
+    uncompress buf'' buf' ;
+    blit buf ~src_off:0 buf'' ~dst_off:0 ~len:8 ;
+    check bigstring "compressed" buf buf'' ;
+    ()
+  with Exit -> ()
+
+let compress () =
+  for _ = 0 to 1000 do
+    compress (1+Random.int 30)
+  done
 
 let utilities () =
   check int32 "month1" 0l (int32_of_month (2000, 1, 0)) ;
@@ -212,6 +256,7 @@ let date () =
   ]
 
 let tests_kx = [
+  test_case "compress" `Quick compress ;
   test_case "utilities" `Quick utilities ;
   test_case "date" `Quick date ;
   test_case "atom" `Quick pack_unpack_atom ;

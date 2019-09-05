@@ -6,21 +6,8 @@ let src = Logs.Src.create "kx.async"
 module Log = (val Logs.src_log src : Logs.LOG)
 module Log_async = (val Logs_async.src_log src : Logs_async.LOG)
 
-type t = K : [`Big | `Little] * [`Sync | `Async] * 'a w * 'a -> t
-let create ?(endianness=`Little) ?(typ=`Async) w v = K (endianness, typ, w, v)
-
-let rec flush w buf =
-  match Faraday.operation buf with
-  | `Close -> raise Exit
-  | `Yield -> Deferred.unit
-  | `Writev iovecs ->
-    let nb_written =
-      List.fold_left iovecs ~init:0 ~f:begin fun a { Faraday.buffer ; off ; len } ->
-        Writer.write_bigstring w buffer ~pos:off ~len ;
-        a+len
-      end in
-    Faraday.shift buf nb_written ;
-    flush w buf
+type t = K : bool * [`Sync | `Async] * 'a w * 'a -> t
+let create ?(big_endian=Sys.big_endian) ?(typ=`Async) w v = K (big_endian, typ, w, v)
 
 type error = [
   | `Q of string
@@ -51,11 +38,24 @@ let fail_on_error = function
   | Error e -> fail e
 
 type af = {
-  af: 'a. 'a w -> (hdr * 'a, [`Q of string | `Angstrom of string]) result Deferred.t
+  af: 'a. 'a w -> ('a, [`Q of string | `Angstrom of string]) result Deferred.t
 }
 
-let connect_async ?(buf=Faraday.create 4096) url =
-  let hdr = Faraday.create 8 in
+let parse_compressed ~big_endian ~msglen w r =
+  let module E = (val (getmod big_endian) : ENDIAN) in
+  let open Deferred.Result.Monad_infix in
+  Angstrom_async.parse E.any_int32 r >>= fun uncompLen ->
+  let uncompLen = Int32.to_int_exn uncompLen in
+  Angstrom_async.parse (Angstrom.take_bigstring (msglen-12)) r >>= fun compMsg ->
+  let uncompMsg = Bigstringaf.create uncompLen in
+  uncompress uncompMsg compMsg ;
+  let res =
+    Angstrom.parse_bigstring
+      (destruct ~big_endian w)
+      (Bigstringaf.sub uncompMsg ~off:8 ~len:(uncompLen-8)) in
+  return res
+
+let connect_async ?comp ?(buf=Faraday.create 4096) url =
   let kx_read, client_write = Pipe.create () in
   let connected = Ivar.create () in
   let process _s _tls r w =
@@ -69,16 +69,21 @@ let connect_async ?(buf=Faraday.create 4096) url =
       begin try_with begin fun () ->
           let af w =
             Reader.peek r ~len:1 >>= fun _ ->
-            Angstrom_async.parse (destruct w) r >>| function
-            | Ok (Ok v) -> Ok v
-            | Ok (Error msg) -> Error (`Q msg)
-            | Error msg -> Error (`Angstrom msg)
+            Angstrom_async.parse hdr r >>= function
+            | Error msg -> return (Error (`Angstrom msg))
+            | Ok { big_endian; typ=_; compressed; len } ->
+              begin match compressed with
+                | false -> Angstrom_async.parse (destruct ~big_endian w) r
+                | true -> parse_compressed ~big_endian ~msglen:(Int32.to_int_exn len) w r
+              end >>| function
+              | Ok (Error msg) -> (Error (`Q msg))
+              | Error msg -> Error (`Angstrom msg)
+              | Ok (Ok v) -> Ok v
           in
           Ivar.fill connected (Ok ({ af }, client_write)) ;
-          Pipe.iter kx_read ~f:begin fun (K (endianness, typ, wit, msg)) ->
-            construct ~endianness ~typ ~hdr ~payload:buf wit msg ;
-            flush w hdr >>= fun () ->
-            flush w buf >>= fun () ->
+          Pipe.iter kx_read ~f:begin fun (K (big_endian, typ, wit, msg)) ->
+            let serialized = construct ?comp ~big_endian ~typ ~buf wit msg in
+            Writer.write_bigstring w serialized ;
             Log_async.debug (fun m -> m "@[%a@]" (Kx.pp wit) msg)
           end
         end >>| fun _ ->
@@ -104,19 +109,18 @@ let connect_async ?(buf=Faraday.create 4096) url =
     Ivar.read connected ;
   ]
 
-let with_connection_async ?buf url ~f =
-  connect_async ?buf url >>= function
+let with_connection_async ?comp ?buf url ~f =
+  connect_async ?comp ?buf url >>= function
   | Error _ as e -> return e
   | Ok (f', w) ->
     Monitor.protect (fun () -> f f' w >>| fun v -> Ok v)
       ~finally:(fun () -> Pipe.close w ; Deferred.unit)
 
 type sf = {
-  sf: 'a 'b. ('a w -> 'a -> 'b w -> (hdr * 'b, error) result Deferred.t)
+  sf: 'a 'b. ('a w -> 'a -> 'b w -> ('b, error) result Deferred.t)
 }
 
-let connect_sync ?endianness ?(buf=Faraday.create 4096) url =
-  let hdr = Faraday.create 8 in
+let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
   Async_uri.connect url >>= fun (_s, _tls, r, w) ->
   Writer.write w
     (Printf.sprintf "%s:%s\x03\x00"
@@ -127,23 +131,27 @@ let connect_sync ?endianness ?(buf=Faraday.create 4096) url =
     Monitor.detach (Writer.monitor w) ;
     let f = { sf = fun wq q wr ->
         try_with begin fun () ->
-          construct ?endianness ~typ:`Sync ~hdr ~payload:buf wq q ;
-          flush w hdr >>= fun () ->
-          flush w buf >>= fun () ->
+          let serialized = construct ?comp ?big_endian ~typ:`Sync ~buf wq q in
+          Writer.write_bigstring w serialized ;
           Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
-          Angstrom_async.parse (destruct wr) r
+          let open Deferred.Result.Monad_infix in
+          Angstrom_async.parse hdr r >>= fun { big_endian; typ=_; compressed; len } ->
+          begin match compressed with
+            | false -> Angstrom_async.parse (destruct ~big_endian wr) r
+            | true -> parse_compressed ~big_endian ~msglen:(Int32.to_int_exn len) wr r
+          end
         end >>| function
         | Error e -> Error (`Exn e)
         | Ok (Error msg) -> Error (`Angstrom msg)
+        | Ok (Ok (Error msg)) -> Error (`Q msg)
         | Ok (Ok (Ok v)) -> Ok v
-        | Ok (Ok (Error err)) -> Error (`Q err)
       } in
     return (Ok (f, r, w))
   | `Ok c -> return (Error (`ProtoError (Char.to_int c)))
   | `Eof  -> return (Error (`Eof))
 
-let with_connection_sync ?endianness ?buf url ~f =
-  connect_sync ?endianness ?buf url >>= function
+let with_connection_sync ?comp ?big_endian ?buf url ~f =
+  connect_sync ?comp ?big_endian ?buf url >>= function
   | Error _ as e -> return e
   | Ok (f', r, w) ->
     Monitor.protect (fun () -> f f') ~finally:begin fun () ->

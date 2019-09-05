@@ -10,7 +10,7 @@ let main port =
     Pipe.iter Reader.(pipe @@ Lazy.force stdin) ~f:begin fun expr ->
       let expr = String.chop_suffix_exn expr ~suffix:"\n" in
       sf (s char) expr (a long) >>= function
-      | Ok (hdr, v) -> Logs_async.app (fun m -> m "%a %Ld" Kx.pp_print_hdr hdr v)
+      | Ok v -> Logs_async.app (fun m -> m "%Ld" v)
       | Error e -> Logs_async.err (fun m -> m "%a" Kx_async.pp_print_error e)
     end;
   end >>= fun _ ->

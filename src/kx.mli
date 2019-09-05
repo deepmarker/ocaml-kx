@@ -63,28 +63,29 @@ val case : 'a w -> ('b -> 'a option) -> ('a -> 'b) -> 'b case
 val union : 'a case list -> 'a w
 
 type hdr = {
-  endianness: [`Little | `Big] ;
+  big_endian: bool ;
   typ: [`Async | `Sync | `Response] ;
+  compressed: bool ;
   len: int32 ;
 } [@@deriving sexp]
 
 val pp_print_hdr : Format.formatter -> hdr -> unit
-val write_hdr : Faraday.t -> hdr -> unit
+val hdr : hdr Angstrom.t
+(* val write_hdr : Faraday.t -> hdr -> unit *)
 
 val construct :
-  ?endianness:[< `Big | `Little] ->
-  ?typ:[< `Async | `Sync | `Response] ->
-  hdr:Faraday.t -> payload:Faraday.t ->
-  'a w -> 'a -> unit
+  ?comp:bool ->
+  ?big_endian:bool ->
+  typ:[< `Async | `Sync | `Response] ->
+  ?buf:Faraday.t -> 'a w -> 'a -> Bigstringaf.t
 
 val destruct :
-  ?endianness:[`Big | `Little] -> 'a w -> (hdr * 'a, string) result Angstrom.t
+  ?big_endian:bool -> 'a w -> ('a, string) result Angstrom.t
 val destruct_exn :
-  ?endianness:[`Big | `Little] -> 'a w -> (hdr * 'a) Angstrom.t
-
+  ?big_endian:bool -> 'a w -> 'a Angstrom.t
 val destruct_stream :
-  ?endianness:[`Big | `Little] ->
-  'a list w -> ('a -> unit) -> (hdr * unit) Angstrom.t
+  ?big_endian:bool ->
+  'a list w -> ('a -> unit) -> unit Angstrom.t
 
 val nh : int
 val wh : int
@@ -145,6 +146,12 @@ val int32_of_time : time -> int32
 val time_of_int32 : int32 -> time
 
 val pp_print_date : (int * int * int) Fmt.t
+
+val compress   : ?big_endian:bool -> Bigstringaf.t -> Bigstringaf.t
+val uncompress : Bigstringaf.t -> Bigstringaf.t -> unit
+
+module type ENDIAN = module type of Angstrom.BE
+val getmod : bool -> (module ENDIAN)
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff

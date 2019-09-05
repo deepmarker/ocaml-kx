@@ -767,57 +767,108 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
 
   | String _ -> assert false
 
-let int_of_endianness = function
-  | `Big -> 0
-  | `Little -> 1
-
-let int_of_endianness_opt = function
-  | Some `Big -> 0
-  | Some `Little -> 1
-  | None -> match Sys.big_endian with
-    | true -> 0
-    | false -> 1
-
-let int_of_msgtyp = function
-  | `Async -> 0
-  | `Sync -> 1
-  | `Response -> 2
-
-let int_of_msgtyp_opt = function
-  | None -> 0
-  | Some `Async -> 0
-  | Some `Sync -> 1
-  | Some `Response -> 2
+let char_of_msgtyp = function
+  | `Async -> '\x00'
+  | `Sync -> '\x01'
+  | `Response -> '\x02'
 
 type hdr = {
-  endianness: [`Little | `Big] ;
+  big_endian: bool ;
   typ: [`Async | `Sync | `Response] ;
+  compressed: bool ;
   len: int32 ;
 } [@@deriving sexp]
 
 let pp_print_hdr ppf t =
   Format.fprintf ppf "%a" Sexplib.Sexp.pp (sexp_of_hdr t)
 
-let write_hdr buf { endianness; typ; len } =
-  let open Faraday in
-  let module FE = (val (match endianness with
-      | `Big -> (module BE) | `Little -> (module LE)) : FE) in
-  write_uint8 buf (int_of_endianness endianness) ;
-  write_uint8 buf (int_of_msgtyp typ) ;
-  FE.write_uint16 buf 0 ;
-  FE.write_uint32 buf len
+let set_int32 ~big_endian =
+  Bigstringaf.(if big_endian then set_int32_be else set_int32_le)
+let ppincr x = incr x; !x
+let incrpp x = let v = !x in incr x; v
+let set_int8 t p i = Bigstringaf.set t p (Char.chr (0xff land i))
+let get_int8 t p = Char.code (Bigstringaf.get t p)
 
-let construct ?endianness ?typ ~hdr ~payload w x =
-  let open Faraday in
-  let module FE = (val (match endianness with
-      | None -> if Sys.big_endian then (module BE) else (module LE)
-      | Some `Big -> (module BE)
-      | Some `Little -> (module LE)) : FE) in
-  construct (module FE) payload w x ;
-  write_uint8 hdr (int_of_endianness_opt endianness) ;
-  write_uint8 hdr (int_of_msgtyp_opt typ) ;
-  FE.write_uint16 hdr 0 ;
-  FE.write_uint32 hdr (Int32.of_int (8 + pending_bytes payload))
+let compress ?(big_endian=Sys.big_endian) uncompressed =
+  let uncompLen = Bigstringaf.length uncompressed in
+  let compLen = uncompLen / 2 in
+  let compressed = Bigstringaf.create compLen in
+  let i = ref 0 in
+  let g = ref false in
+  let f = ref 0 in
+  let h0 = ref 0 in
+  let h = ref 0 in
+  let c = ref 12 in
+  let d = ref !c in
+  let p = ref 0 in
+  let r = ref 0 in
+  let s0 = ref 0 in
+  let s = ref 8 in
+  let a = Array.make 256 0 in
+  Bigstringaf.blit uncompressed ~src_off:0 compressed ~dst_off:0 ~len:4 ;
+  set_int8 compressed 2 1 ;
+  set_int32 ~big_endian compressed 8 (Int32.of_int uncompLen) ;
+  while !s < uncompLen do
+    if 0 = !i then begin
+      if !d > compLen - 17 then raise Exit ;
+      i := 1;
+      set_int8 compressed !c !f ;
+      c := incrpp d ;
+      f := 0
+    end ;
+    let clause2 () =
+      h := get_int8 uncompressed !s lxor get_int8 uncompressed (succ !s) ;
+      p := Array.get a !h ;
+      !p in
+    g := (!s > uncompLen - 3) || (0 = clause2 ()) ||
+         (0 <> get_int8 uncompressed !s lxor get_int8 uncompressed !p) ;
+    if (0 < !s0) then begin
+      Array.set a !h0 !s0 ;
+      s0 := 0
+    end ;
+    if !g then begin
+      h0 := !h ;
+      s0 := !s ;
+      set_int8 compressed (incrpp d) (get_int8 uncompressed (incrpp s))
+    end else begin
+      Array.set a !h !s ;
+      f := !f lor !i ;
+      p := !p + 2 ;
+      s := !s + 2 ;
+      r := !s ;
+      let q = min (!s + 255) uncompLen in
+      while (get_int8 uncompressed !p =
+             get_int8 uncompressed !s && ppincr s < q) do incr p done ;
+      set_int8 compressed (incrpp d) !h ;
+      set_int8 compressed (incrpp d) (!s - !r)
+    end ;
+    i := (!i * 2) mod 256
+  done ;
+  set_int8 compressed !c !f ;
+  set_int32 ~big_endian compressed 4 (Int32.of_int !d) ;
+  Bigstringaf.sub compressed ~off:0 ~len:!d
+
+let construct ?(comp=false) ?(big_endian=Sys.big_endian) ~typ ?(buf=Faraday.create 4096) w x =
+  let module FE =
+    (val Faraday.(if big_endian then (module BE : FE) else (module LE : FE))) in
+  construct (module FE) buf w x ;
+  let len = Faraday.pending_bytes buf in
+  let uncompressed = Bigstringaf.create (8 + len) in
+  Bigstringaf.set uncompressed 0 (if big_endian then '\x00' else '\x01') ;
+  Bigstringaf.set uncompressed 1 (char_of_msgtyp typ) ;
+  Bigstringaf.set_int16_be uncompressed 2 0 ;
+  set_int32 ~big_endian uncompressed 4 (Int32.of_int (8 + len)) ;
+  let _ = Faraday.serialize buf begin fun iovecs ->
+      let dst_off =
+        List.fold_left begin fun dst_off { Faraday.buffer ; off ; len } ->
+          Bigstringaf.blit buffer ~src_off:off uncompressed ~dst_off ~len ;
+          dst_off+len
+        end 8 iovecs in
+      `Ok (dst_off-8)
+    end in
+  if comp && len > 2000 then
+    try compress ~big_endian uncompressed with Exit -> uncompressed
+  else uncompressed
 
 let msgtyp_of_int = function
   | 0 -> `Async
@@ -829,25 +880,26 @@ open Angstrom
 
 let msgtyp = any_uint8 >>| msgtyp_of_int
 
-let endianness =
+let uint8_flag =
   any_uint8 >>| function
-  | 0 -> `Big
-  | 1 -> `Little
+  | 0 -> true
+  | 1 -> false
   | _ -> invalid_arg "endianness"
 
 module type ENDIAN = module type of BE
 
 let getmod = function
-  | `Big -> (module BE : ENDIAN)
-  | `Little -> (module LE : ENDIAN)
+  | true -> (module BE : ENDIAN)
+  | false -> (module LE : ENDIAN)
 
-let hdr_encoding =
-  endianness >>= fun e ->
+let hdr =
+  uint8_flag >>= fun big_endian ->
   msgtyp >>= fun typ ->
-  let module M = (val getmod e) in
-  M.int16 0 *>
+  uint8_flag >>= fun compressed ->
+  any_uint8 >>= fun _ ->
+  let module M = (val getmod big_endian) in
   M.any_int32 >>| fun len ->
-  { endianness = e ; typ ; len }
+  { big_endian ; compressed ; typ ; len }
 
 let bool_atom =
   char '\xff' *>
@@ -966,8 +1018,8 @@ let time_encoding endianness =
 let time_atom endianness =
   char '\xed' *> time_encoding endianness
 
-let length endianness =
-  let module M = (val getmod endianness) in
+let length big_endian =
+  let module M = (val getmod big_endian) in
   M.any_int32 >>| Int32.to_int
 
 let bool_vect endianness attr =
@@ -1094,10 +1146,10 @@ let lambda_atom endianness =
   string_vect endianness NoAttr >>| fun lam ->
   (sym, lam)
 
-let general_list endianness attr elt =
+let general_list big_endian attr elt =
   char '\x00' *>
   attribute attr >>= fun () ->
-  length endianness >>= fun len ->
+  length big_endian >>= fun len ->
   count len elt
 
 let stream n p f =
@@ -1118,115 +1170,148 @@ let general_list_stream endianness attr elt f =
 let lambda_vect endianness attr =
   general_list endianness attr (lambda_atom endianness)
 
+let uncompress msg compressed =
+  let n = ref 0 in
+  let r = ref 0 in
+  let f = ref 0 in
+  let s = ref 8 in
+  let p = ref !s in
+  let i = ref 0 in
+  let d = ref 12 in
+  let aa = Array.make 256 0 in
+  let msglen = Bigstringaf.length msg in
+  while !s < msglen do
+    if !i = 0 then begin
+      f := get_int8 compressed (incrpp d) ;
+      i := 1
+    end ;
+    if (!f land !i <> 0) then begin
+      r := Array.get aa (get_int8 compressed (incrpp d)) ;
+      set_int8 msg (incrpp s) (get_int8 msg (incrpp r)) ;
+      set_int8 msg (incrpp s) (get_int8 msg (incrpp r)) ;
+      n := get_int8 compressed (incrpp d) ;
+      for m = 0 to !n - 1 do
+        let rm = get_int8 msg (!r + m) in
+        set_int8 msg (!s + m) rm
+      done ;
+    end else begin
+      set_int8 msg (incrpp s) (get_int8 compressed (incrpp d)) ;
+    end ;
+    while !p < pred !s do
+      let i1 = get_int8 msg !p in
+      let i2 = get_int8 msg (succ !p) in
+      Array.set aa (i1 lxor i2) (incrpp p)
+    done ;
+    if !f land !i <> 0 then begin
+      s := !s + !n ;
+      p := !s
+    end ;
+    i := (!i * 2) mod (0xffff+1) ;
+    if !i = 256 then i := 0 ;
+  done
+
 let rec destruct_list :
-  type a. [`Big | `Little] -> a w -> a Angstrom.t = fun endianness w ->
+  type a. bool -> a w -> a Angstrom.t = fun big_endian w ->
   match w with
-  | Tup (ww, _) -> destruct ~endianness ww
+  | Tup (ww, _) -> destruct ~big_endian ww
   | Tups (h, t, _) ->
-    destruct_list endianness h >>= fun a ->
-    destruct_list endianness t >>| fun b ->
+    destruct_list big_endian h >>= fun a ->
+    destruct_list big_endian t >>| fun b ->
     (a, b)
-  | Conv (_, f, ww) -> lift f (destruct_list endianness ww)
+  | Conv (_, f, ww) -> lift f (destruct_list big_endian ww)
   | _ -> assert false
 
 and destruct :
-  type a. ?endianness:[`Big | `Little] -> a w -> a Angstrom.t =
-  fun ?(endianness = if Sys.big_endian then `Big else `Little) w ->
+  type a. ?big_endian:bool -> a w -> a Angstrom.t =
+  fun ?(big_endian=Sys.big_endian) w ->
   match w with
   | Union cases ->
     choice ~failure_msg:"union: no more choices"
       (List.map begin fun (Case { encoding ; inj ; _ }) ->
-          lift inj (destruct ~endianness encoding)
+          lift inj (destruct ~big_endian encoding)
         end cases)
   | Err -> err_atom
-  | List (w, attr) -> general_list endianness attr (destruct ~endianness w)
-  | Conv (_, inject, w) -> destruct ~endianness w >>| inject
-  | Tup (w, attr) -> general_list endianness attr (destruct ~endianness w) >>| List.hd
+  | List (w, attr) -> general_list big_endian attr (destruct ~big_endian w)
+  | Conv (_, inject, w) -> destruct ~big_endian w >>| inject
+  | Tup (w, attr) -> general_list big_endian attr (destruct ~big_endian w) >>| List.hd
   | Tups (_, _, attr) as t ->
     char '\x00' *>
     attribute attr >>= fun () ->
-    length endianness >>= fun _len ->
-    destruct_list endianness t
+    length big_endian >>= fun _len ->
+    destruct_list big_endian t
 
   | Dict (kw, vw, sorted) ->
     char (if sorted then '\x7f' else '\x63') *>
-    destruct ~endianness kw >>= fun k ->
-    destruct ~endianness vw >>| fun v ->
+    destruct ~big_endian kw >>= fun k ->
+    destruct ~big_endian vw >>| fun v ->
     k, v
 
   | Table (kw, vw, sorted) ->
     char '\x62' *>
     char (if sorted then '\x01' else '\x00') *>
-    destruct ~endianness (Dict (kw, vw, false))
+    destruct ~big_endian (Dict (kw, vw, false))
 
   | Atom Boolean -> bool_atom
   | Atom Guid -> guid_atom
   | Atom Byte -> byte_atom
-  | Atom Short -> short_atom endianness
-  | Atom Int -> int_atom endianness
-  | Atom Long -> long_atom endianness
-  | Atom Real -> real_atom endianness
-  | Atom Float -> float_atom endianness
+  | Atom Short -> short_atom big_endian
+  | Atom Int -> int_atom big_endian
+  | Atom Long -> long_atom big_endian
+  | Atom Real -> real_atom big_endian
+  | Atom Float -> float_atom big_endian
   | Atom Char -> char_atom
   | Atom Symbol -> symbol_atom
-  | Atom Timestamp -> timestamp_atom endianness
-  | Atom Month -> month_atom endianness
-  | Atom Date -> date_atom endianness
-  | Atom Timespan -> timespan_atom endianness
-  | Atom Minute -> minute_atom endianness
-  | Atom Second -> second_atom endianness
-  | Atom Time -> time_atom endianness
-  | Atom Lambda -> lambda_atom endianness
+  | Atom Timestamp -> timestamp_atom big_endian
+  | Atom Month -> month_atom big_endian
+  | Atom Date -> date_atom big_endian
+  | Atom Timespan -> timespan_atom big_endian
+  | Atom Minute -> minute_atom big_endian
+  | Atom Second -> second_atom big_endian
+  | Atom Time -> time_atom big_endian
+  | Atom Lambda -> lambda_atom big_endian
 
-  | Vect (Boolean, attr) -> bool_vect endianness attr
-  | Vect (Guid, attr) -> guid_vect endianness attr
-  | Vect (Byte, attr) -> byte_vect endianness attr
-  | Vect (Short, attr) -> short_vect endianness attr
-  | Vect (Int, attr)  -> int_vect endianness attr
-  | Vect (Long, attr) -> long_vect endianness attr
-  | Vect (Real, attr) -> real_vect endianness attr
-  | Vect (Float, attr) -> float_vect endianness attr
-  | Vect (Char, attr) -> char_vect endianness attr
-  | Vect (Symbol, attr) -> symbol_vect endianness attr
-  | Vect (Timestamp, attr) -> timestamp_vect endianness attr
-  | Vect (Month, attr) -> month_vect endianness attr
-  | Vect (Date, attr) -> date_vect endianness attr
-  | Vect (Timespan, attr) -> timespan_vect endianness attr
-  | Vect (Minute, attr) -> minute_vect endianness attr
-  | Vect (Second, attr) -> second_vect endianness attr
-  | Vect (Time, attr) -> time_vect endianness attr
-  | Vect (Lambda, attr) -> lambda_vect endianness attr
+  | Vect (Boolean, attr) -> bool_vect big_endian attr
+  | Vect (Guid, attr) -> guid_vect big_endian attr
+  | Vect (Byte, attr) -> byte_vect big_endian attr
+  | Vect (Short, attr) -> short_vect big_endian attr
+  | Vect (Int, attr)  -> int_vect big_endian attr
+  | Vect (Long, attr) -> long_vect big_endian attr
+  | Vect (Real, attr) -> real_vect big_endian attr
+  | Vect (Float, attr) -> float_vect big_endian attr
+  | Vect (Char, attr) -> char_vect big_endian attr
+  | Vect (Symbol, attr) -> symbol_vect big_endian attr
+  | Vect (Timestamp, attr) -> timestamp_vect big_endian attr
+  | Vect (Month, attr) -> month_vect big_endian attr
+  | Vect (Date, attr) -> date_vect big_endian attr
+  | Vect (Timespan, attr) -> timespan_vect big_endian attr
+  | Vect (Minute, attr) -> minute_vect big_endian attr
+  | Vect (Second, attr) -> second_vect big_endian attr
+  | Vect (Time, attr) -> time_vect big_endian attr
+  | Vect (Lambda, attr) -> lambda_vect big_endian attr
 
-  | String (Byte, attr) -> bytestring_vect endianness attr
-  | String (Char, attr) -> string_vect endianness attr
+  | String (Byte, attr) -> bytestring_vect big_endian attr
+  | String (Char, attr) -> string_vect big_endian attr
   | String _ -> invalid_arg "destruct: unsupported string type"
 
 let destruct_stream :
-  ?endianness:[`Big | `Little] -> 'a list w -> ('a -> unit) -> unit Angstrom.t =
-  fun ?(endianness = if Sys.big_endian then `Big else `Little) w f ->
+  ?big_endian:bool -> 'a list w -> ('a -> unit) -> unit Angstrom.t =
+  fun ?(big_endian=Sys.big_endian) w f ->
   match w with
   | List (w, attr) ->
-    general_list_stream endianness attr (destruct ~endianness w) f
+    general_list_stream big_endian attr (destruct ~big_endian w) f
   | _ -> invalid_arg "destruct_stream: not a general list"
 
-let destruct_exn ?endianness v =
-  hdr_encoding >>= fun hdr ->
+let destruct_exn ?big_endian v =
   choice [
-    (destruct ?endianness v >>| fun v -> hdr, v) ;
-    (destruct ?endianness err >>| fun msg -> failwith msg) ;
+    (destruct ?big_endian v) ;
+    (destruct ?big_endian err >>| fun msg -> failwith msg) ;
   ]
 
-let destruct ?endianness v =
-  hdr_encoding >>= fun hdr ->
+let destruct ?big_endian v =
   choice [
-    (destruct ?endianness v >>| fun v -> Ok (hdr, v)) ;
-    (destruct ?endianness err >>| fun msg -> Error msg) ;
+    (destruct ?big_endian v >>| fun v -> Ok v) ;
+    (destruct ?big_endian err >>| fun msg -> Error msg) ;
   ]
-
-let destruct_stream ?endianness v f =
-  hdr_encoding >>= fun hdr ->
-  destruct_stream ?endianness v f >>| fun v ->
-  hdr, v
 
 let pp_print_short ppf i =
   if i = nh then Format.pp_print_string ppf "0Nh" else Format.pp_print_int ppf i
