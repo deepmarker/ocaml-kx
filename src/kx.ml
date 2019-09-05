@@ -807,6 +807,111 @@ let write_hdr buf { endianness; typ; len } =
   FE.write_uint16 buf 0 ;
   FE.write_uint32 buf len
 
+  (* private void compress(){
+   *   byte i=0;
+   *   boolean g;
+   *   int j=J, f=0, h0=0, h=0;
+   *   byte[] y=B;
+   *   B=new byte[y.length/2];
+   *   int c=12, d=c, e=B.length, p=0, q, r, s0=0, s=8, t=J, a[]=new int[256];
+   *   System.arraycopy(y,0,B,0,4);
+   *   B[2]=1;
+   *   J=8;
+   *   w(j);
+   *   for(;s<t;i*=2){
+   *     if(0==i){
+   *       if(d>e-17){
+   *         J=j;
+   *         B=y;
+   *         return;
+   *       }
+   *       i=1;
+   *       B[c]=(byte)f;
+   *       c=d++;
+   *       f=0;
+   *     }
+   *     g=(s>t-3)||(0==(p=a[h=0xFF&(y[s]^y[s+1])]))||(0!=(y[s]^y[p]));
+   *     if(0<s0){
+   *       a[h0]=s0;
+   *       s0=0;
+   *     }
+   *     if(g){
+   *       h0=h;
+   *       s0=s;
+   *       B[d++]=y[s++];
+   *     }else{
+   *       a[h]=s;
+   *       f|=i;
+   *       p+=2;
+   *       r=s+=2;
+   *       q=Math.min(s+255,t);
+   *       for(;y[p]==y[s]&&++s<q;)
+   *         ++p;
+   *       B[d++]=(byte)h;
+   *       B[d++]=(byte)(s-r);
+   *     }
+   *   }
+   *   B[c]=(byte)f;
+   *   J=4;
+   *   w(d);
+   *   J=d;
+   *   y=null;
+   *   B=Arrays.copyOf(B,J);
+   * } *)
+
+let compress ?(pos=0) buf =
+  (* let incrpp x = incr x; !x in *)
+  let ppincr x = let v = x in incr x; v in
+  let compressed = Bytes.create (String.length buf / 2) in
+  let i = ref 0 in
+  let g = ref false in
+  let j = pos in
+  let f = ref 0 in
+  let h0 = ref 0 in
+  let h = ref 0 in
+  let c = ref 12 in
+  let d = ref !c in
+  let p = ref 0 in
+  let s = ref 0 in
+  let s0 = ref 0 in
+  let t = 0 in (* beginning of the serializer's write buffer *)
+  let e = String.length buf in
+  let a = Array.create 256 0 in
+  while !s<t do
+    if !i = 0 then begin
+      if !d > e-17 then raise Exit ;
+      i := 1;
+      Bytes.set_int8 compressed !c !f ;
+      incr d ;
+      c := !d ;
+      f := 0
+    end ;
+    h := 0xff land (Bytes.get_int8 buf !s lxor Bytes.get_int8 buf (succ !s)) ;
+    p := Array.get a !h ;
+    g := (!s > t - 3) || (0 = !p) || (0 <> Bytes.get_int8 buf !s lxor Bytes.get_int8 buf !p) ;
+    if (0 < !s0) then begin
+      Array.set a !h0 !s0 ;
+      s0 := 0
+    end ;
+    if !g then begin
+      h0 := !h ;
+      s0 := !s ;
+      incr d ;
+      incr s ;
+      Bytes.set_int8 compressed !d (Bytes.get_int8 buf !s)
+    end else begin
+      Array.set a !h !s ;
+      f := !f lor !i ;
+      p := !p + 2 ;
+      s := !s + 2 ;
+      r := !s ;
+      let q = min (!s + 255) t in
+      while (Bytes.get_int8 buf !p = Bytes.get_int8 buf !s && ppincr s < !q) incr p ;
+    end ;
+    i := !i * 2
+  done
+
+
 let construct ?endianness ?typ ~hdr ~payload w x =
   let open Faraday in
   let module FE = (val (match endianness with
