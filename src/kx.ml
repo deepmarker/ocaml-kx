@@ -859,36 +859,39 @@ let write_hdr buf { endianness; typ; len } =
    *   B=Arrays.copyOf(B,J);
    * } *)
 
-let compress ?(pos=0) buf =
-  (* let incrpp x = incr x; !x in *)
-  let ppincr x = let v = x in incr x; v in
-  let compressed = Bytes.create (String.length buf / 2) in
+let compress (buf : Bigstringaf.t) =
+  let open Bigstringaf in
+  let set_int8 t p i = set t p (Char.chr i) in
+  let get_int8 t p = Char.code (get t p) in
+  let ppincr x = incr x; !x in
+  let incrpp x = let v = x in incr x; !v in
+  let uncompLen = length buf in
+  let len = uncompLen / 2 in
+  let compressed = create len in
   let i = ref 0 in
   let g = ref false in
-  let j = pos in
   let f = ref 0 in
   let h0 = ref 0 in
   let h = ref 0 in
   let c = ref 12 in
   let d = ref !c in
   let p = ref 0 in
+  let r = ref 0 in
   let s = ref 0 in
   let s0 = ref 0 in
-  let t = 0 in (* beginning of the serializer's write buffer *)
-  let e = String.length buf in
-  let a = Array.create 256 0 in
+  (* let t = 0 in (\* beginning of the serializer's write buffer *\) *)
+  let a = Array.make 256 0 in
   while !s<t do
-    if !i = 0 then begin
-      if !d > e-17 then raise Exit ;
+    if 0 = !i then begin
+      if !d > len - 17 then raise Exit ;
       i := 1;
-      Bytes.set_int8 compressed !c !f ;
-      incr d ;
-      c := !d ;
+      set_int8 compressed !c !f ;
+      c := incrpp d ;
       f := 0
     end ;
-    h := 0xff land (Bytes.get_int8 buf !s lxor Bytes.get_int8 buf (succ !s)) ;
+    h := 0xff land (get_int8 buf !s lxor get_int8 buf (succ !s)) ;
     p := Array.get a !h ;
-    g := (!s > t - 3) || (0 = !p) || (0 <> Bytes.get_int8 buf !s lxor Bytes.get_int8 buf !p) ;
+    g := (!s > t - 3) || (0 = !p) || (0 <> get_int8 buf !s lxor get_int8 buf !p) ;
     if (0 < !s0) then begin
       Array.set a !h0 !s0 ;
       s0 := 0
@@ -896,9 +899,7 @@ let compress ?(pos=0) buf =
     if !g then begin
       h0 := !h ;
       s0 := !s ;
-      incr d ;
-      incr s ;
-      Bytes.set_int8 compressed !d (Bytes.get_int8 buf !s)
+      set_int8 compressed (incrpp d) (get_int8 buf (incrpp s))
     end else begin
       Array.set a !h !s ;
       f := !f lor !i ;
@@ -906,22 +907,28 @@ let compress ?(pos=0) buf =
       s := !s + 2 ;
       r := !s ;
       let q = min (!s + 255) t in
-      while (Bytes.get_int8 buf !p = Bytes.get_int8 buf !s && ppincr s < !q) incr p ;
+      while (get_int8 buf !p = get_int8 buf !s && ppincr s < q) do incr p done ;
+      set_int8 compressed (incrpp d) !h ;
+      set_int8 compressed (incrpp d) (!s - !r)
     end ;
     i := !i * 2
-  done
+  done ;
+  set_int8 compressed !c !f ;
+  sub compressed ~off:0 ~len:!d
 
-
-let construct ?endianness ?typ ~hdr ~payload w x =
+let construct ?endianness buf w x =
   let open Faraday in
   let module FE = (val (match endianness with
       | None -> if Sys.big_endian then (module BE) else (module LE)
       | Some `Big -> (module BE)
       | Some `Little -> (module LE)) : FE) in
-  construct (module FE) payload w x ;
-  write_uint8 hdr (int_of_endianness_opt endianness) ;
-  write_uint8 hdr (int_of_msgtyp_opt typ) ;
-  FE.write_uint16 hdr 0 ;
+  construct (module FE) buf w x ;
+  let uncompressed = serialize_to_bigstring buf in
+  let compressed =
+    try compress uncompressed with Exit -> uncompressed in
+  write_uint8 buf (int_of_endianness_opt endianness) ;
+  write_uint8 buf (int_of_msgtyp_opt typ) ;
+  FE.write_uint16 buf 0 ;
   FE.write_uint32 hdr (Int32.of_int (8 + pending_bytes payload))
 
 let msgtyp_of_int = function
