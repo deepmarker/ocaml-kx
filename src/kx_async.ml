@@ -6,21 +6,8 @@ let src = Logs.Src.create "kx.async"
 module Log = (val Logs.src_log src : Logs.LOG)
 module Log_async = (val Logs_async.src_log src : Logs_async.LOG)
 
-type t = K : [`Big | `Little] * [`Sync | `Async] * 'a w * 'a -> t
-let create ?(endianness=`Little) ?(typ=`Async) w v = K (endianness, typ, w, v)
-
-let rec flush w buf =
-  match Faraday.operation buf with
-  | `Close -> raise Exit
-  | `Yield -> Deferred.unit
-  | `Writev iovecs ->
-    let nb_written =
-      List.fold_left iovecs ~init:0 ~f:begin fun a { Faraday.buffer ; off ; len } ->
-        Writer.write_bigstring w buffer ~pos:off ~len ;
-        a+len
-      end in
-    Faraday.shift buf nb_written ;
-    flush w buf
+type t = K : bool * [`Sync | `Async] * 'a w * 'a -> t
+let create ?(big_endian=Sys.big_endian) ?(typ=`Async) w v = K (big_endian, typ, w, v)
 
 type error = [
   | `Q of string
@@ -55,7 +42,6 @@ type af = {
 }
 
 let connect_async ?(buf=Faraday.create 4096) url =
-  let hdr = Faraday.create 8 in
   let kx_read, client_write = Pipe.create () in
   let connected = Ivar.create () in
   let process _s _tls r w =
@@ -75,10 +61,9 @@ let connect_async ?(buf=Faraday.create 4096) url =
             | Error msg -> Error (`Angstrom msg)
           in
           Ivar.fill connected (Ok ({ af }, client_write)) ;
-          Pipe.iter kx_read ~f:begin fun (K (endianness, typ, wit, msg)) ->
-            construct ~endianness ~typ ~hdr ~payload:buf wit msg ;
-            flush w hdr >>= fun () ->
-            flush w buf >>= fun () ->
+          Pipe.iter kx_read ~f:begin fun (K (big_endian, typ, wit, msg)) ->
+            let serialized = construct ~big_endian ~typ ~buf wit msg in
+            Writer.write_bigstring w serialized ;
             Log_async.debug (fun m -> m "@[%a@]" (Kx.pp wit) msg)
           end
         end >>| fun _ ->
@@ -115,8 +100,7 @@ type sf = {
   sf: 'a 'b. ('a w -> 'a -> 'b w -> (hdr * 'b, error) result Deferred.t)
 }
 
-let connect_sync ?endianness ?(buf=Faraday.create 4096) url =
-  let hdr = Faraday.create 8 in
+let connect_sync ?big_endian ?(buf=Faraday.create 4096) url =
   Async_uri.connect url >>= fun (_s, _tls, r, w) ->
   Writer.write w
     (Printf.sprintf "%s:%s\x03\x00"
@@ -127,9 +111,8 @@ let connect_sync ?endianness ?(buf=Faraday.create 4096) url =
     Monitor.detach (Writer.monitor w) ;
     let f = { sf = fun wq q wr ->
         try_with begin fun () ->
-          construct ?endianness ~typ:`Sync ~hdr ~payload:buf wq q ;
-          flush w hdr >>= fun () ->
-          flush w buf >>= fun () ->
+          let serialized = construct ?big_endian ~typ:`Sync ~buf wq q in
+          Writer.write_bigstring w serialized ;
           Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
           Angstrom_async.parse (destruct wr) r
         end >>| function
@@ -142,8 +125,8 @@ let connect_sync ?endianness ?(buf=Faraday.create 4096) url =
   | `Ok c -> return (Error (`ProtoError (Char.to_int c)))
   | `Eof  -> return (Error (`Eof))
 
-let with_connection_sync ?endianness ?buf url ~f =
-  connect_sync ?endianness ?buf url >>= function
+let with_connection_sync ?big_endian ?buf url ~f =
+  connect_sync ?big_endian ?buf url >>= function
   | Error _ as e -> return e
   | Ok (f', r, w) ->
     Monitor.protect (fun () -> f f') ~finally:begin fun () ->

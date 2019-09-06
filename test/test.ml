@@ -6,20 +6,15 @@ let make_testable : type a. a w -> a testable = fun a ->
 
 let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
   let tt = make_testable w in
-  let hdr = Faraday.create 8 in
-  let payload = Faraday.create 1024 in
-  construct ~hdr ~payload w a ;
-  let hdr_str = Faraday.serialize_to_string hdr in
-  let serialized = hdr_str ^ Faraday.serialize_to_string payload in
-  let serialized_hex = Hex.of_string serialized in
+  let serialized = construct ~typ:`Async w a in
+  let serialized_hex = Hex.of_bigstring serialized in
   (* Hex.hexdump serialized_hex ; *)
   Format.printf "%a@." Hex.pp serialized_hex ;
-  match Angstrom.parse_string (destruct_exn w) serialized with
+  match Angstrom.parse_bigstring (destruct_exn w) serialized with
   | Error msg -> fail msg
-  | Ok (hdr', v) ->
-    let buf = Faraday.create 8 in
-    write_hdr buf hdr' ;
-    check string (name ^ "_header") hdr_str (Faraday.serialize_to_string buf) ;
+  | Ok ({ big_endian; typ=_; len }, v) ->
+    check bool (name ^ "_big_endian") Sys.big_endian big_endian ;
+    check int32 (name ^ "_msglen") (Int32.of_int (Bigstringaf.length serialized)) len ;
     check tt name a v
 
 let pack_unpack_atom () =

@@ -4,7 +4,7 @@ open Kx
 type t
 
 val create :
-  ?endianness:[`Big | `Little] ->
+  ?big_endian:bool ->
   ?typ:[`Sync | `Async] ->
   'a w -> 'a -> t
 
@@ -38,11 +38,11 @@ type sf = {
 }
 
 val connect_sync :
-  ?endianness:[`Big | `Little] ->
+  ?big_endian:bool ->
   ?buf:Faraday.t -> Uri.t ->
   (sf * Reader.t * Writer.t, error) result Deferred.t
 
 val with_connection_sync :
-  ?endianness:[`Big | `Little] ->
+  ?big_endian:bool ->
   ?buf:Faraday.t -> Uri.t ->
   f:(sf -> 'a Deferred.t) -> ('a, error) result Deferred.t

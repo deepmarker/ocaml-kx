@@ -63,27 +63,26 @@ val case : 'a w -> ('b -> 'a option) -> ('a -> 'b) -> 'b case
 val union : 'a case list -> 'a w
 
 type hdr = {
-  endianness: [`Little | `Big] ;
+  big_endian: bool ;
   typ: [`Async | `Sync | `Response] ;
   len: int32 ;
 } [@@deriving sexp]
 
 val pp_print_hdr : Format.formatter -> hdr -> unit
-val write_hdr : Faraday.t -> hdr -> unit
+(* val write_hdr : Faraday.t -> hdr -> unit *)
 
 val construct :
-  ?endianness:[< `Big | `Little] ->
-  ?typ:[< `Async | `Sync | `Response] ->
-  hdr:Faraday.t -> payload:Faraday.t ->
-  'a w -> 'a -> unit
+  ?big_endian:bool ->
+  typ:[< `Async | `Sync | `Response] ->
+  ?buf:Faraday.t -> 'a w -> 'a -> Bigstringaf.t
 
 val destruct :
-  ?endianness:[`Big | `Little] -> 'a w -> (hdr * 'a, string) result Angstrom.t
+  ?big_endian:bool -> 'a w -> (hdr * 'a, string) result Angstrom.t
 val destruct_exn :
-  ?endianness:[`Big | `Little] -> 'a w -> (hdr * 'a) Angstrom.t
+  ?big_endian:bool -> 'a w -> (hdr * 'a) Angstrom.t
 
 val destruct_stream :
-  ?endianness:[`Big | `Little] ->
+  ?big_endian:bool ->
   'a list w -> ('a -> unit) -> (hdr * unit) Angstrom.t
 
 val nh : int
