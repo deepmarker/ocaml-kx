@@ -145,6 +145,9 @@ val time_of_int32 : int32 -> time
 
 val pp_print_date : (int * int * int) Fmt.t
 
+val compress   : ?big_endian:bool -> Bigstringaf.t -> Bigstringaf.t
+val uncompress : ?big_endian:bool -> Bigstringaf.t -> Bigstringaf.t
+
 (*---------------------------------------------------------------------------
    Copyright (c) 2018 Vincent Bernardoff
 

@@ -178,6 +178,34 @@ let test_server () =
     failwithf "%s" (Format.asprintf "%a" Kx_async.pp_print_error e) ()
   | Ok () -> Deferred.unit
 
+let eq_bigstring a b =
+  let open Bigstringaf in
+  let len = length a in
+  len = length b &&
+  Bigstringaf.memcmp a 0 b 0 len = 0
+
+let pp_bigstring ppf a =
+  Format.fprintf ppf "%a" Hex.pp (Hex.of_bigstring a)
+
+let bigstring = testable pp_bigstring eq_bigstring
+
+let compress () =
+  let open Bigstringaf in
+  let buf = Cstruct.create 256 in
+  let buf = Cstruct.to_bigarray buf in
+  set buf 0 '\x01' ;
+  set buf 1 '\x00' ;
+  set_int16_le buf 2 0 ;
+  set_int32_le buf 4 256l ;
+  let buf' = compress buf in
+  Printf.printf "compressed: %S\n" (Bigstringaf.to_string buf') ;
+  (* Hex.(hexdump (of_bigstring buf')) ; *)
+  Printf.printf "compress successful, ratio %g\n"
+    (Int.to_float (length buf') /. Int.to_float (length buf)) ;
+  let buf'' = uncompress buf' in
+  check bigstring "compressed" buf buf'' ;
+  ()
+
 let utilities () =
   check int32 "month1" 0l (int32_of_month (2000, 1, 0)) ;
   check int32 "month2" 4l (int32_of_month (2000, 5, 0)) ;
@@ -207,6 +235,7 @@ let date () =
   ]
 
 let tests_kx = [
+  test_case "compress" `Quick compress ;
   test_case "utilities" `Quick utilities ;
   test_case "date" `Quick date ;
   test_case "atom" `Quick pack_unpack_atom ;
