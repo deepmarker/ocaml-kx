@@ -209,10 +209,15 @@ let compress n =
   done ;
   try
     let buf' = compress buf in
-    Printf.printf "compressed: %S\n" (Bigstringaf.to_string buf') ;
+    Printf.printf "compressed: %S\n" (to_string buf') ;
+    let newlen = length buf' in
+    let oldlen = length buf in
     Printf.printf "compress successful, ratio %g\n"
-      (Int.to_float (length buf') /. Int.to_float (length buf)) ;
-    let buf'' = uncompress buf' in
+      (Int.to_float newlen /. Int.to_float oldlen) ;
+    let uncompLen = Int32.to_int (get_int32_le buf' 8) in
+    let buf'' = create uncompLen in
+    uncompress buf'' buf' ;
+    blit buf ~src_off:0 buf'' ~dst_off:0 ~len:8 ;
     check bigstring "compressed" buf buf'' ;
     ()
   with Exit -> ()

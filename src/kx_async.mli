@@ -38,7 +38,7 @@ val with_connection_async :
   ('b, error) result Deferred.t
 
 type sf = {
-  sf: 'a 'b. ('a w -> 'a -> 'b w -> (hdr * 'b, error) result Deferred.t)
+  sf: 'a 'b. ('a w -> 'a -> 'b w -> ('b, error) result Deferred.t)
 }
 
 val connect_sync :

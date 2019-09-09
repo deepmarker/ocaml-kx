@@ -1267,9 +1267,7 @@ let lambda_vect endianness attr =
    *   j=8;
    * } *)
 
-let uncompress ?(big_endian=Sys.big_endian) compressed =
-  let get_int32 =
-    Bigstringaf.(if big_endian then get_int32_be else get_int32_le) in
+let uncompress msg compressed =
   let n = ref 0 in
   let r = ref 0 in
   let f = ref 0 in
@@ -1277,13 +1275,8 @@ let uncompress ?(big_endian=Sys.big_endian) compressed =
   let p = ref !s in
   let i = ref 0 in
   let d = ref 12 in
-  let msglen32 = get_int32 compressed 8 in
-  let msglen = Int32.to_int msglen32 in
-  let msg = Bigstringaf.create msglen in
-  Bigstringaf.blit compressed ~src_off:0 msg ~dst_off:0 ~len:4 ;
-  set_int32 ~big_endian msg 4 msglen32 ;
-  Bigstringaf.set msg 2 '\x00' ;
   let aa = Array.make 256 0 in
+  let msglen = Bigstringaf.length msg in
   Printf.printf "msglen = %d\n" msglen ;
   while !s < msglen do
     Printf.printf "i = %d\n" !i ;
@@ -1301,8 +1294,10 @@ let uncompress ?(big_endian=Sys.big_endian) compressed =
         let rm = get_int8 msg (!r + m) in
         set_int8 msg (!s + m) rm
       done ;
-    end else
+    end else begin
+      Printf.printf "uncomp2 %d\n" !d ;
       set_int8 msg (incrpp s) (get_int8 compressed (incrpp d)) ;
+    end ;
     while !p < pred !s do
       let i1 = get_int8 msg !p in
       let i2 = get_int8 msg (succ !p) in
@@ -1315,8 +1310,7 @@ let uncompress ?(big_endian=Sys.big_endian) compressed =
     end ;
     i := (!i * 2) mod (0xffff+1) ;
     if !i = 256 then i := 0 ;
-  done ;
-  msg
+  done
 
 let rec destruct_list :
   type a. bool -> a w -> a Angstrom.t = fun big_endian w ->

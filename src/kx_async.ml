@@ -41,6 +41,20 @@ type af = {
   af: 'a. 'a w -> ('a, [`Q of string | `Angstrom of string]) result Deferred.t
 }
 
+let parse_compressed ~big_endian ~msglen w r =
+  let module E = (val (getmod big_endian) : ENDIAN) in
+  let open Deferred.Result.Monad_infix in
+  Angstrom_async.parse E.any_int32 r >>= fun uncompLen ->
+  let uncompLen = Int32.to_int_exn uncompLen in
+  Angstrom_async.parse (Angstrom.take_bigstring (msglen-12)) r >>= fun compMsg ->
+  let uncompMsg = Bigstringaf.create uncompLen in
+  uncompress uncompMsg compMsg ;
+  let res =
+    Angstrom.parse_bigstring
+      (destruct ~big_endian w)
+      (Bigstringaf.sub uncompMsg ~off:8 ~len:(uncompLen-8)) in
+  return res
+
 let connect_async ?comp ?(buf=Faraday.create 4096) url =
   let kx_read, client_write = Pipe.create () in
   let connected = Ivar.create () in
@@ -57,10 +71,10 @@ let connect_async ?comp ?(buf=Faraday.create 4096) url =
             Reader.peek r ~len:1 >>= fun _ ->
             Angstrom_async.parse hdr r >>= function
             | Error msg -> return (Error (`Angstrom msg))
-            | Ok { big_endian; typ=_; compressed; len=_ } ->
+            | Ok { big_endian; typ=_; compressed; len } ->
               begin match compressed with
                 | false -> Angstrom_async.parse (destruct ~big_endian w) r
-                | true -> Angstrom_async.parse (destruct ~big_endian w) r
+                | true -> parse_compressed ~big_endian ~msglen:(Int32.to_int_exn len) w r
               end >>| function
               | Ok (Error msg) -> (Error (`Q msg))
               | Error msg -> Error (`Angstrom msg)
@@ -103,7 +117,7 @@ let with_connection_async ?comp ?buf url ~f =
       ~finally:(fun () -> Pipe.close w ; Deferred.unit)
 
 type sf = {
-  sf: 'a 'b. ('a w -> 'a -> 'b w -> (hdr * 'b, error) result Deferred.t)
+  sf: 'a 'b. ('a w -> 'a -> 'b w -> ('b, error) result Deferred.t)
 }
 
 let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
@@ -120,15 +134,18 @@ let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
           let serialized = construct ?comp ?big_endian ~typ:`Sync ~buf wq q in
           Writer.write_bigstring w serialized ;
           Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
-          Angstrom_async.parse hdr r >>= fun hdr ->
-          Angstrom_async.parse (destruct wr) r >>| fun v ->
-          hdr, v
+          Angstrom_async.parse hdr r >>= function
+          | Error msg -> return (Error msg)
+          | Ok { big_endian; typ=_; compressed; len } ->
+            begin match compressed with
+              | false -> Angstrom_async.parse (destruct ~big_endian wr) r
+              | true -> parse_compressed ~big_endian ~msglen:(Int32.to_int_exn len) wr r
+            end
         end >>| function
         | Error e -> Error (`Exn e)
-        | Ok (Error msg, _) -> Error (`Angstrom msg)
-        | Ok (_, Error msg) -> Error (`Angstrom msg)
-        | Ok (Ok _, Ok (Error err)) -> Error (`Q err)
-        | Ok (Ok hdr, Ok (Ok v)) -> Ok (hdr, v)
+        | Ok (Error msg) -> Error (`Angstrom msg)
+        | Ok (Ok (Error msg)) -> Error (`Q msg)
+        | Ok (Ok (Ok v)) -> Ok v
       } in
     return (Ok (f, r, w))
   | `Ok c -> return (Error (`ProtoError (Char.to_int c)))
