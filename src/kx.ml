@@ -931,7 +931,7 @@ let construct ?(comp=false) ?(big_endian=Sys.big_endian) ~typ ?(buf=Faraday.crea
         end 8 iovecs in
       `Ok (dst_off-8)
     end in
-  if comp then
+  if comp && len > 2000 then
     try compress ~big_endian uncompressed with Exit -> uncompressed
   else uncompressed
 

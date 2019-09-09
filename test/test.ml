@@ -6,7 +6,7 @@ let make_testable : type a. a w -> a testable = fun a ->
 
 let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
   let tt = make_testable w in
-  let serialized = construct ~typ:`Async w a in
+  let serialized = construct ~comp:true ~typ:`Async w a in
   let payload = Bigstringaf.(sub serialized ~off:8 ~len:(length serialized - 8)) in
   let serialized_hex = Hex.of_bigstring serialized in
   (* Hex.hexdump serialized_hex ; *)

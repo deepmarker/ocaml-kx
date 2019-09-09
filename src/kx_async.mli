@@ -23,14 +23,18 @@ val fail : error -> 'a
 val fail_on_error : ('a, error) result -> 'a
 
 type af = {
-  af: 'a. 'a w -> (hdr * 'a, [`Q of string | `Angstrom of string]) result Deferred.t
+  af: 'a. 'a w -> ('a, [`Q of string | `Angstrom of string]) result Deferred.t
 }
 
 val connect_async :
-  ?buf:Faraday.t -> Uri.t -> (af * t Pipe.Writer.t, error) result Deferred.t
+  ?comp:bool ->
+  ?buf:Faraday.t ->
+  Uri.t -> (af * t Pipe.Writer.t, error) result Deferred.t
 
 val with_connection_async :
-  ?buf:Faraday.t -> Uri.t -> f:(af -> t Pipe.Writer.t -> 'b Deferred.t) ->
+  ?comp:bool ->
+  ?buf:Faraday.t ->
+  Uri.t -> f:(af -> t Pipe.Writer.t -> 'b Deferred.t) ->
   ('b, error) result Deferred.t
 
 type sf = {
@@ -38,11 +42,13 @@ type sf = {
 }
 
 val connect_sync :
+  ?comp:bool ->
   ?big_endian:bool ->
   ?buf:Faraday.t -> Uri.t ->
   (sf * Reader.t * Writer.t, error) result Deferred.t
 
 val with_connection_sync :
+  ?comp:bool ->
   ?big_endian:bool ->
   ?buf:Faraday.t -> Uri.t ->
   f:(sf -> 'a Deferred.t) -> ('a, error) result Deferred.t

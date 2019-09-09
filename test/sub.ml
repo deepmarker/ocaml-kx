@@ -55,10 +55,8 @@ let main port =
       af updmsg >>= function
       | Error `Angstrom msg -> failwithf "Parsing error: %s" msg ()
       | Error `Q err -> failwithf "Q error: %s" err ()
-      | Ok (hdr, a) ->
-        Logs.app begin fun m ->
-          m "%a %a" Kx.pp_print_hdr hdr (Kx.pp updmsg) a
-        end ;
+      | Ok a ->
+        Logs.app (fun m ->   m "%a" (Kx.pp updmsg) a) ;
         inner ()
     in
     inner ()
