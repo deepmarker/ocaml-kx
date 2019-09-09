@@ -871,7 +871,7 @@ let compress ?(big_endian=Sys.big_endian) uncompressed =
   set_int8 compressed 2 1 ;
   set_int32 ~big_endian compressed 8 (Int32.of_int uncompLen) ;
   while !s < uncompLen do
-    Printf.printf "while i = %d\n" !i ;
+    Printf.printf "while i,s = %d,%d\n" !i !s;
     if 0 = !i then begin
       if !d > compLen - 17 then raise Exit ;
       i := 1;
@@ -879,9 +879,11 @@ let compress ?(big_endian=Sys.big_endian) uncompressed =
       c := incrpp ~log:"0 = i" d ;
       f := 0
     end ;
-    h := get_int8 uncompressed !s lxor get_int8 uncompressed (succ !s) ;
-    p := Array.get a !h ;
-    g := (!s > uncompLen - 3) || (0 = !p) ||
+    let clause2 () =
+      h := get_int8 uncompressed !s lxor get_int8 uncompressed (succ !s) ;
+      p := Array.get a !h ;
+      !p in
+    g := (!s > uncompLen - 3) || (0 = clause2 ()) ||
          (0 <> get_int8 uncompressed !s lxor get_int8 uncompressed !p) ;
     if (0 < !s0) then begin
       Array.set a !h0 !s0 ;
@@ -895,6 +897,7 @@ let compress ?(big_endian=Sys.big_endian) uncompressed =
       Array.set a !h !s ;
       f := !f lor !i ;
       p := !p + 2 ;
+      Printf.printf "s %d -> %d\n" !s (!s+2) ;
       s := !s + 2 ;
       r := !s ;
       let q = min (!s + 255) uncompLen in

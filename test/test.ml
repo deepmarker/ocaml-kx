@@ -189,7 +189,7 @@ let pp_bigstring ppf a =
 
 let bigstring = testable pp_bigstring eq_bigstring
 
-let compress () =
+let compress n =
   let open Bigstringaf in
   let buf = Cstruct.create 256 in
   let buf = Cstruct.to_bigarray buf in
@@ -197,14 +197,23 @@ let compress () =
   set buf 1 '\x00' ;
   set_int16_le buf 2 0 ;
   set_int32_le buf 4 256l ;
-  let buf' = compress buf in
-  Printf.printf "compressed: %S\n" (Bigstringaf.to_string buf') ;
-  (* Hex.(hexdump (of_bigstring buf')) ; *)
-  Printf.printf "compress successful, ratio %g\n"
-    (Int.to_float (length buf') /. Int.to_float (length buf)) ;
-  let buf'' = uncompress buf' in
-  check bigstring "compressed" buf buf'' ;
-  ()
+  for i = n to 31 do
+    Bigstringaf.set_int64_le buf (i*8) (Random.int64 Int64.max_int)
+  done ;
+  try
+    let buf' = compress buf in
+    Printf.printf "compressed: %S\n" (Bigstringaf.to_string buf') ;
+    Printf.printf "compress successful, ratio %g\n"
+      (Int.to_float (length buf') /. Int.to_float (length buf)) ;
+    let buf'' = uncompress buf' in
+    check bigstring "compressed" buf buf'' ;
+    ()
+  with Exit -> ()
+
+let compress () =
+  for _ = 0 to 1000 do
+    compress (1+Random.int 30)
+  done
 
 let utilities () =
   check int32 "month1" 0l (int32_of_month (2000, 1, 0)) ;
