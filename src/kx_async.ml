@@ -134,13 +134,12 @@ let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
           let serialized = construct ?comp ?big_endian ~typ:`Sync ~buf wq q in
           Writer.write_bigstring w serialized ;
           Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
-          Angstrom_async.parse hdr r >>= function
-          | Error msg -> return (Error msg)
-          | Ok { big_endian; typ=_; compressed; len } ->
-            begin match compressed with
-              | false -> Angstrom_async.parse (destruct ~big_endian wr) r
-              | true -> parse_compressed ~big_endian ~msglen:(Int32.to_int_exn len) wr r
-            end
+          let open Deferred.Result.Monad_infix in
+          Angstrom_async.parse hdr r >>= fun { big_endian; typ=_; compressed; len } ->
+          begin match compressed with
+            | false -> Angstrom_async.parse (destruct ~big_endian wr) r
+            | true -> parse_compressed ~big_endian ~msglen:(Int32.to_int_exn len) wr r
+          end
         end >>| function
         | Error e -> Error (`Exn e)
         | Ok (Error msg) -> Error (`Angstrom msg)
