@@ -7,12 +7,14 @@ let make_testable : type a. a w -> a testable = fun a ->
 let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
   let tt = make_testable w in
   let serialized = construct ~typ:`Async w a in
+  let payload = Bigstringaf.(sub serialized ~off:8 ~len:(length serialized - 8)) in
   let serialized_hex = Hex.of_bigstring serialized in
   (* Hex.hexdump serialized_hex ; *)
   Format.printf "%a@." Hex.pp serialized_hex ;
-  match Angstrom.parse_bigstring (destruct_exn w) serialized with
-  | Error msg -> fail msg
-  | Ok ({ big_endian; typ=_; len }, v) ->
+  match Angstrom.parse_bigstring hdr serialized,
+        Angstrom.parse_bigstring (destruct_exn w) payload with
+  | Error msg, _ | _, Error msg -> fail msg
+  | Ok { big_endian; len; _ }, Ok v ->
     check bool (name ^ "_big_endian") Sys.big_endian big_endian ;
     check int32 (name ^ "_msglen") (Int32.of_int (Bigstringaf.length serialized)) len ;
     check tt name a v
@@ -160,10 +162,15 @@ let pack_unpack_union () =
   pack_unpack "float case" w (Float 4.)
 
 let unpack_buggy () =
-  let test = "\001\002\000\0004\000\000\000\245:/home/vb/code/TorQ/hdb/database2019.06.21\000" in
-  match Angstrom.parse_string (destruct_exn (a sym)) test with
-  | Error msg -> fail msg
-  | Ok (_hdr, v) -> check string "buggy_one" ":/home/vb/code/TorQ/hdb/database2019.06.21" v
+  let test =
+    Cstruct.of_string "\001\002\000\0004\000\000\000\245:/home/vb/code/TorQ/hdb/database2019.06.21\000" in
+  let payload = Cstruct.shift test 8 in
+  match
+    Angstrom.parse_bigstring hdr (Cstruct.to_bigarray test),
+    Angstrom.parse_bigstring (destruct_exn (a sym)) (Cstruct.to_bigarray payload) with
+  | Error msg, _ | _, Error msg -> fail msg
+  | Ok _hdr, Ok v ->
+    check string "buggy_one" ":/home/vb/code/TorQ/hdb/database2019.06.21" v
 
 let test_server () =
   let open Core in

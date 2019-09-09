@@ -775,6 +775,7 @@ let char_of_msgtyp = function
 type hdr = {
   big_endian: bool ;
   typ: [`Async | `Sync | `Response] ;
+  compressed: bool ;
   len: int32 ;
 } [@@deriving sexp]
 
@@ -912,7 +913,7 @@ let compress ?(big_endian=Sys.big_endian) uncompressed =
   set_int32 ~big_endian compressed 4 (Int32.of_int !d) ;
   Bigstringaf.sub compressed ~off:0 ~len:!d
 
-let construct ?(big_endian=Sys.big_endian) ~typ ?(buf=Faraday.create 4096) w x =
+let construct ?(comp=false) ?(big_endian=Sys.big_endian) ~typ ?(buf=Faraday.create 4096) w x =
   let module FE =
     (val Faraday.(if big_endian then (module BE : FE) else (module LE : FE))) in
   construct (module FE) buf w x ;
@@ -930,8 +931,9 @@ let construct ?(big_endian=Sys.big_endian) ~typ ?(buf=Faraday.create 4096) w x =
         end 8 iovecs in
       `Ok (dst_off-8)
     end in
-  uncompressed
-  (* try compress ~big_endian uncompressed with Exit -> uncompressed *)
+  if comp then
+    try compress ~big_endian uncompressed with Exit -> uncompressed
+  else uncompressed
 
 let msgtyp_of_int = function
   | 0 -> `Async
@@ -943,7 +945,7 @@ open Angstrom
 
 let msgtyp = any_uint8 >>| msgtyp_of_int
 
-let big_endian =
+let uint8_flag =
   any_uint8 >>| function
   | 0 -> true
   | 1 -> false
@@ -955,13 +957,14 @@ let getmod = function
   | true -> (module BE : ENDIAN)
   | false -> (module LE : ENDIAN)
 
-let hdr_encoding =
-  big_endian >>= fun big_endian ->
+let hdr =
+  uint8_flag >>= fun big_endian ->
   msgtyp >>= fun typ ->
+  uint8_flag >>= fun compressed ->
+  any_uint8 >>= fun _ ->
   let module M = (val getmod big_endian) in
-  M.int16 0 *>
   M.any_int32 >>| fun len ->
-  { big_endian ; typ ; len }
+  { big_endian ; compressed ; typ ; len }
 
 let bool_atom =
   char '\xff' *>
@@ -1407,23 +1410,16 @@ let destruct_stream :
   | _ -> invalid_arg "destruct_stream: not a general list"
 
 let destruct_exn ?big_endian v =
-  hdr_encoding >>= fun hdr ->
   choice [
-    (destruct ?big_endian v >>| fun v -> hdr, v) ;
+    (destruct ?big_endian v) ;
     (destruct ?big_endian err >>| fun msg -> failwith msg) ;
   ]
 
 let destruct ?big_endian v =
-  hdr_encoding >>= fun hdr ->
   choice [
-    (destruct ?big_endian v >>| fun v -> Ok (hdr, v)) ;
+    (destruct ?big_endian v >>| fun v -> Ok v) ;
     (destruct ?big_endian err >>| fun msg -> Error msg) ;
   ]
-
-let destruct_stream ?big_endian v f =
-  hdr_encoding >>= fun hdr ->
-  destruct_stream ?big_endian v f >>| fun v ->
-  hdr, v
 
 let pp_print_short ppf i =
   if i = nh then Format.pp_print_string ppf "0Nh" else Format.pp_print_int ppf i

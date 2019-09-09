@@ -55,10 +55,13 @@ let connect_async ?(buf=Faraday.create 4096) url =
       begin try_with begin fun () ->
           let af w =
             Reader.peek r ~len:1 >>= fun _ ->
-            Angstrom_async.parse (destruct w) r >>| function
-            | Ok (Ok v) -> Ok v
-            | Ok (Error msg) -> Error (`Q msg)
-            | Error msg -> Error (`Angstrom msg)
+            Angstrom_async.parse hdr r >>= fun hdr ->
+            Angstrom_async.parse (destruct w) r >>| fun v ->
+            match hdr, v with
+            | Error msg, _ -> Error (`Angstrom msg)
+            | _, Ok (Error msg) -> Error (`Q msg)
+            | _, Error msg -> Error (`Angstrom msg)
+            | Ok hdr, Ok (Ok v) -> Ok (hdr, v)
           in
           Ivar.fill connected (Ok ({ af }, client_write)) ;
           Pipe.iter kx_read ~f:begin fun (K (big_endian, typ, wit, msg)) ->
@@ -114,12 +117,15 @@ let connect_sync ?big_endian ?(buf=Faraday.create 4096) url =
           let serialized = construct ?big_endian ~typ:`Sync ~buf wq q in
           Writer.write_bigstring w serialized ;
           Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
-          Angstrom_async.parse (destruct wr) r
+          Angstrom_async.parse hdr r >>= fun hdr ->
+          Angstrom_async.parse (destruct wr) r >>| fun v ->
+          hdr, v
         end >>| function
         | Error e -> Error (`Exn e)
-        | Ok (Error msg) -> Error (`Angstrom msg)
-        | Ok (Ok (Ok v)) -> Ok v
-        | Ok (Ok (Error err)) -> Error (`Q err)
+        | Ok (Error msg, _) -> Error (`Angstrom msg)
+        | Ok (_, Error msg) -> Error (`Angstrom msg)
+        | Ok (Ok _, Ok (Error err)) -> Error (`Q err)
+        | Ok (Ok hdr, Ok (Ok v)) -> Ok (hdr, v)
       } in
     return (Ok (f, r, w))
   | `Ok c -> return (Error (`ProtoError (Char.to_int c)))
