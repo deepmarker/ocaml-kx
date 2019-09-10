@@ -782,80 +782,17 @@ type hdr = {
 let pp_print_hdr ppf t =
   Format.fprintf ppf "%a" Sexplib.Sexp.pp (sexp_of_hdr t)
 
-  (* private void compress(){
-   *   byte i=0;
-   *   boolean g;
-   *   int j=J, f=0, h0=0, h=0;
-   *   byte[] y=B;
-   *   B=new byte[y.length/2];
-   *   int c=12, d=c, e=B.length, p=0, q, r, s0=0, s=8, t=J, a[]=new int[256];
-   *   System.arraycopy(y,0,B,0,4);
-   *   B[2]=1;
-   *   J=8;
-   *   w(j);
-   *   for(;s<t;i*=2){
-   *     if(0==i){
-   *       if(d>e-17){
-   *         J=j;
-   *         B=y;
-   *         return;
-   *       }
-   *       i=1;
-   *       B[c]=(byte)f;
-   *       c=d++;
-   *       f=0;
-   *     }
-   *     g=(s>t-3)||(0==(p=a[h=0xFF&(y[s]^y[s+1])]))||(0!=(y[s]^y[p]));
-   *     if(0<s0){
-   *       a[h0]=s0;
-   *       s0=0;
-   *     }
-   *     if(g){
-   *       h0=h;
-   *       s0=s;
-   *       B[d++]=y[s++];
-   *     }else{
-   *       a[h]=s;
-   *       f|=i;
-   *       p+=2;
-   *       r=s+=2;
-   *       q=Math.min(s+255,t);
-   *       for(;y[p]==y[s]&&++s<q;)
-   *         ++p;
-   *       B[d++]=(byte)h;
-   *       B[d++]=(byte)(s-r);
-   *     }
-   *   }
-   *   B[c]=(byte)f;
-   *   J=4;
-   *   w(d);
-   *   J=d;
-   *   y=null;
-   *   B=Arrays.copyOf(B,J);
-   * } *)
-
 let set_int32 ~big_endian =
   Bigstringaf.(if big_endian then set_int32_be else set_int32_le)
 let ppincr x = incr x; !x
-let incrpp ?log x = let v = !x in
-  begin match log with
-    | None -> ()
-    | Some msg -> Printf.printf "incrpp %s %d -> %d\n" msg v (succ v)
-  end ;
-  incr x; v
-let set_int8 ?log t p i =
-  begin match log with
-    | None -> ()
-    | Some msg -> Printf.printf "set_int8 %s %d\n" msg p
-  end ;
-  Bigstringaf.set t p (Char.chr (0xff land i))
+let incrpp x = let v = !x in incr x; v
+let set_int8 t p i = Bigstringaf.set t p (Char.chr (0xff land i))
 let get_int8 t p = Char.code (Bigstringaf.get t p)
 
 let compress ?(big_endian=Sys.big_endian) uncompressed =
   let uncompLen = Bigstringaf.length uncompressed in
   let compLen = uncompLen / 2 in
   let compressed = Bigstringaf.create compLen in
-  Printf.printf "compLen = %d\n" compLen ;
   let i = ref 0 in
   let g = ref false in
   let f = ref 0 in
@@ -872,12 +809,11 @@ let compress ?(big_endian=Sys.big_endian) uncompressed =
   set_int8 compressed 2 1 ;
   set_int32 ~big_endian compressed 8 (Int32.of_int uncompLen) ;
   while !s < uncompLen do
-    Printf.printf "while i,s = %d,%d\n" !i !s;
     if 0 = !i then begin
       if !d > compLen - 17 then raise Exit ;
       i := 1;
       set_int8 compressed !c !f ;
-      c := incrpp ~log:"0 = i" d ;
+      c := incrpp d ;
       f := 0
     end ;
     let clause2 () =
@@ -893,19 +829,18 @@ let compress ?(big_endian=Sys.big_endian) uncompressed =
     if !g then begin
       h0 := !h ;
       s0 := !s ;
-      set_int8 compressed (incrpp ~log:"g true" d) (get_int8 uncompressed (incrpp s))
+      set_int8 compressed (incrpp d) (get_int8 uncompressed (incrpp s))
     end else begin
       Array.set a !h !s ;
       f := !f lor !i ;
       p := !p + 2 ;
-      Printf.printf "s %d -> %d\n" !s (!s+2) ;
       s := !s + 2 ;
       r := !s ;
       let q = min (!s + 255) uncompLen in
       while (get_int8 uncompressed !p =
              get_int8 uncompressed !s && ppincr s < q) do incr p done ;
-      set_int8 ~log:"else 1" compressed (incrpp ~log:"else 1" d) !h ;
-      set_int8 ~log:"else 2" compressed (incrpp ~log:"else 2" d) (!s - !r)
+      set_int8 compressed (incrpp d) !h ;
+      set_int8 compressed (incrpp d) (!s - !r)
     end ;
     i := (!i * 2) mod 256
   done ;
@@ -1235,38 +1170,6 @@ let general_list_stream endianness attr elt f =
 let lambda_vect endianness attr =
   general_list endianness attr (lambda_atom endianness)
 
-  (* private void uncompress(){
-   *   int n=0, r=0, f=0, s=8, p=s;
-   *   short i=0;
-   *   byte[] dst=new byte[ri()];
-   *   int d=j;
-   *   int[] aa=new int[256];
-   *   while(s<dst.length){
-   *     if(i==0){
-   *       f=0xff&(int)b[d++];
-   *       i=1;
-   *     }
-   *     if((f&i)!=0){
-   *       r=aa[0xff&(int)b[d++]];
-   *       dst[s++]=dst[r++];
-   *       dst[s++]=dst[r++];
-   *       n=0xff&(int)b[d++];
-   *       for(int m=0;m<n;m++)
-   *         dst[s+m]=dst[r+m];
-   *     }else
-   *       dst[s++]=b[d++];
-   *     while(p<s-1)
-   *       aa[(0xff&(int)dst[p])^(0xff&(int)dst[p+1])]=p++;
-   *     if((f&i)!=0)
-   *       p=s+=n;
-   *     i*=2;
-   *     if(i==256)
-   *       i=0;
-   *   }
-   *   b=dst;
-   *   j=8;
-   * } *)
-
 let uncompress msg compressed =
   let n = ref 0 in
   let r = ref 0 in
@@ -1277,9 +1180,7 @@ let uncompress msg compressed =
   let d = ref 12 in
   let aa = Array.make 256 0 in
   let msglen = Bigstringaf.length msg in
-  Printf.printf "msglen = %d\n" msglen ;
   while !s < msglen do
-    Printf.printf "i = %d\n" !i ;
     if !i = 0 then begin
       f := get_int8 compressed (incrpp d) ;
       i := 1
@@ -1288,14 +1189,12 @@ let uncompress msg compressed =
       r := Array.get aa (get_int8 compressed (incrpp d)) ;
       set_int8 msg (incrpp s) (get_int8 msg (incrpp r)) ;
       set_int8 msg (incrpp s) (get_int8 msg (incrpp r)) ;
-      n := get_int8 compressed (incrpp ~log:"uncomp1" d) ;
+      n := get_int8 compressed (incrpp d) ;
       for m = 0 to !n - 1 do
-        Printf.printf "(%d/%d) %d\n" m (!n-1) !s ;
         let rm = get_int8 msg (!r + m) in
         set_int8 msg (!s + m) rm
       done ;
     end else begin
-      Printf.printf "uncomp2 %d\n" !d ;
       set_int8 msg (incrpp s) (get_int8 compressed (incrpp d)) ;
     end ;
     while !p < pred !s do
@@ -1305,7 +1204,6 @@ let uncompress msg compressed =
     done ;
     if !f land !i <> 0 then begin
       s := !s + !n ;
-      Printf.printf "s2: s = %d\n" !s ;
       p := !s
     end ;
     i := (!i * 2) mod (0xffff+1) ;
