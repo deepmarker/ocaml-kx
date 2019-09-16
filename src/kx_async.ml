@@ -55,15 +55,18 @@ let parse_compressed ~big_endian ~msglen w r =
       (Bigstringaf.sub uncompMsg ~off:8 ~len:(uncompLen-8)) in
   return res
 
+let write_handshake w url =
+  Writer.write w
+    (Printf.sprintf "%s:%s\x03\x00"
+       (Option.value ~default:"" (Uri.user url))
+       (Option.value ~default:"" (Uri.password url)))
+
 let connect_async ?comp ?(buf=Faraday.create 4096) url =
   let kx_read, client_write = Pipe.create () in
   let connected = Ivar.create () in
   let process _s _tls r w =
     Monitor.detach (Writer.monitor w) ;
-    Writer.write w
-      (Printf.sprintf "%s:%s\x03\x00"
-         (Option.value ~default:"" (Uri.user url))
-         (Option.value ~default:"" (Uri.password url))) ;
+    write_handshake w url ;
     Reader.read_char r >>= function
     | `Ok '\x03' ->
       begin try_with begin fun () ->
@@ -122,10 +125,7 @@ type sf = {
 
 let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
   Async_uri.connect url >>= fun (_s, _tls, r, w) ->
-  Writer.write w
-    (Printf.sprintf "%s:%s\x03\x00"
-       (Option.value ~default:"" (Uri.user url))
-       (Option.value ~default:"" (Uri.password url))) ;
+  write_handshake w url ;
   Reader.read_char r >>= function
   | `Ok '\x03' ->
     Monitor.detach (Writer.monitor w) ;
