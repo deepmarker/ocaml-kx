@@ -16,7 +16,7 @@ type error = [
   | `Exn of exn
   | `ProtoError of int
   | `Eof
-]
+] [@@deriving sexp_of]
 
 let pp_print_error ppf = function
   | `Q msg ->

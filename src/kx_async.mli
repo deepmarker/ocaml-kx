@@ -15,7 +15,7 @@ type error = [
   | `Exn of exn
   | `ProtoError of int
   | `Eof
-]
+] [@@deriving sexp_of]
 
 val pp_print_error : Format.formatter -> error -> unit
 
