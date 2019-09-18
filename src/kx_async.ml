@@ -74,7 +74,8 @@ let connect_async ?comp ?(buf=Faraday.create 4096) url =
             Reader.peek r ~len:1 >>= fun _ ->
             Angstrom_async.parse hdr r >>= function
             | Error msg -> return (Error (`Angstrom msg))
-            | Ok { big_endian; typ=_; compressed; len } ->
+            | Ok ({ big_endian; typ=_; compressed; len } as hdr) ->
+              Log_async.debug (fun m -> m "%a" Kx.pp_print_hdr hdr) >>= fun () ->
               begin match compressed with
                 | false -> Angstrom_async.parse (destruct ~big_endian w) r
                 | true -> parse_compressed ~big_endian ~msglen:(Int32.to_int_exn len) w r
