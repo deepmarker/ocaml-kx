@@ -180,6 +180,7 @@ let wv = second_of_int32 wi
 let minus_wv = second_of_int32 (Int32.neg wi)
 
 type _ typ =
+  | Nil : unit typ
   | Boolean : bool typ
   | Guid : Uuidm.t typ
   | Byte : char typ
@@ -246,18 +247,17 @@ let eq_typ_val : type a b. a typ -> a -> b typ -> b -> (a, b) eq option = fun a 
   | _ -> None
 
 type attribute =
-  | NoAttr
   | Sorted
   | Unique
   | Parted
   | Grouped
 
 let char_of_attribute = function
-  | NoAttr -> '\x00'
-  | Sorted -> '\x01'
-  | Unique -> '\x02'
-  | Parted -> '\x03'
-  | Grouped -> '\x04'
+  | None -> '\x00'
+  | Some Sorted -> '\x01'
+  | Some Unique -> '\x02'
+  | Some Parted -> '\x03'
+  | Some Grouped -> '\x04'
 
 let attribute attr =
   Angstrom.(char (char_of_attribute attr) >>| ignore)
@@ -265,11 +265,11 @@ let attribute attr =
 type _ w =
   | Err : string w
   | Atom : 'a typ -> 'a w
-  | Vect : 'a typ * attribute -> 'a list w
-  | String : char typ * attribute -> string w
-  | List : 'a w * attribute -> 'a list w
-  | Tup : 'a w * attribute -> 'a w
-  | Tups : 'a w * 'b w * attribute -> ('a * 'b) w
+  | Vect : 'a typ * attribute option -> 'a list w
+  | String : char typ * attribute option -> string w
+  | List : 'a w * attribute option -> 'a list w
+  | Tup : 'a w * attribute option -> 'a w
+  | Tups : 'a w * 'b w * attribute option -> ('a * 'b) w
   | Dict : 'a w * 'b w * bool -> ('a * 'b) w
   | Table : 'a w * 'b w * bool -> ('a * 'b) w
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b w -> 'a w
@@ -293,10 +293,10 @@ let rec is_list_type : type a. a w -> bool = function
   | _ -> false
 
 let parted : type a. a w -> a w = function
-  | Tup (a, _) -> Tup (a, Parted)
-  | Tups (a, b, _) -> Tups (a, b, Parted)
-  | List (a, _) -> List (a, Parted)
-  | Vect (a, _) -> Vect (a, Parted)
+  | Tup (a, _) -> Tup (a, Some Parted)
+  | Tups (a, b, _) -> Tups (a, b, Some Parted)
+  | List (a, _) -> List (a, Some Parted)
+  | Vect (a, _) -> Vect (a, Some Parted)
   | _ -> invalid_arg "parted"
 
 let rec equal_w : type a b. a w -> b w -> bool = fun a b ->
@@ -357,6 +357,7 @@ let rec equal : type a b. a w -> a -> b w -> b -> bool = fun aw x bw y ->
     end true c1 c2
   | _ -> false
 
+let nil       = Nil
 let bool      = Boolean
 let guid      = Guid
 let byte      = Byte
@@ -381,66 +382,66 @@ let conv project inject a =
 
 let err = Err
 let a a = Atom a
-let v ?(attr=NoAttr) a = Vect (a, attr)
-let s ?(attr=NoAttr) a = String (a, attr)
+let v ?attr a = Vect (a, attr)
+let s ?attr a = String (a, attr)
 
-let list ?(attr=NoAttr) a = List (a, attr)
+let list ?attr a = List (a, attr)
 
 let tup a attr = Tup (a, attr)
 let tups a b attr = Tups (a, b, attr)
 
-let t1 ?(attr=NoAttr) a = tup a attr
-let t2 ?(attr=NoAttr) a b = tups (tup a attr) (tup b attr) attr
-let t3 ?(attr=NoAttr) a b c =
+let t1 ?attr a = tup a attr
+let t2 ?attr a b = tups (tup a attr) (tup b attr) attr
+let t3 ?attr a b c =
   conv
     (fun (a, b, c) -> (a, (b, c)))
     (fun (a, (b, c)) -> (a, b, c))
-    (tups (tup a attr) (t2 ~attr b c) attr)
+    (tups (tup a attr) (t2 ?attr b c) attr)
 
-let t4 ?(attr=NoAttr) a b c d =
+let t4 ?attr a b c d =
   conv
     (fun (a, b, c, d) -> (a, (b, c, d)))
     (fun (a, (b, c, d)) -> (a, b, c, d))
-    (tups (tup a attr) (t3 ~attr b c d) attr)
+    (tups (tup a attr) (t3 ?attr b c d) attr)
 
-let t5 ?(attr=NoAttr) a b c d e =
+let t5 ?attr a b c d e =
   conv
     (fun (a, b, c, d, e) -> (a, (b, c, d, e)))
     (fun (a, (b, c, d, e)) -> (a, b, c, d, e))
-    (tups (tup a attr) (t4 ~attr b c d e) attr)
+    (tups (tup a attr) (t4 ?attr b c d e) attr)
 
-let t6 ?(attr=NoAttr) a b c d e f =
+let t6 ?attr a b c d e f =
   conv
     (fun (a, b, c, d, e, f) -> (a, (b, c, d, e, f)))
     (fun (a, (b, c, d, e, f)) -> (a, b, c, d, e, f))
-    (tups (tup a attr) (t5 ~attr b c d e f) attr)
+    (tups (tup a attr) (t5 ?attr b c d e f) attr)
 
-let t7 ?(attr=NoAttr) a b c d e f g =
+let t7 ?attr a b c d e f g =
   conv
     (fun (a, b, c, d, e, f, g) -> (a, (b, c, d, e, f, g)))
     (fun (a, (b, c, d, e, f, g)) -> (a, b, c, d, e, f, g))
-    (tups (tup a attr) (t6 ~attr b c d e f g) attr)
+    (tups (tup a attr) (t6 ?attr b c d e f g) attr)
 
-let t8 ?(attr=NoAttr) a b c d e f g h =
+let t8 ?attr a b c d e f g h =
   conv
     (fun (a, b, c, d, e, f, g, h) -> (a, (b, c, d, e, f, g, h)))
     (fun (a, (b, c, d, e, f, g, h)) -> (a, b, c, d, e, f, g, h))
-    (tups (tup a attr) (t7 ~attr b c d e f g h) attr)
+    (tups (tup a attr) (t7 ?attr b c d e f g h) attr)
 
-let t9 ?(attr=NoAttr) a b c d e f g h i =
+let t9 ?attr a b c d e f g h i =
   conv
     (fun (a, b, c, d, e, f, g, h, i) -> (a, (b, c, d, e, f, g, h, i)))
     (fun (a, (b, c, d, e, f, g, h, i)) -> (a, b, c, d, e, f, g, h, i))
-    (tups (tup a attr) (t8 ~attr b c d e f g h i) attr)
+    (tups (tup a attr) (t8 ?attr b c d e f g h i) attr)
 
-let t10 ?(attr=NoAttr) a b c d e f g h i j =
+let t10 ?attr a b c d e f g h i j =
   conv
     (fun (a, b, c, d, e, f, g, h, i, j) -> (a, (b, c, d, e, f, g, h, i, j)))
     (fun (a, (b, c, d, e, f, g, h, i, j)) -> (a, b, c, d, e, f, g, h, i, j))
-    (tups (tup a attr) (t9 ~attr b c d e f g h i j) attr)
+    (tups (tup a attr) (t9 ?attr b c d e f g h i j) attr)
 
 let merge_tups t1 t2 =
-  let rec is_tup : type t. t w -> attribute option = function
+  let rec is_tup : type t. t w -> attribute option option = function
     | Tup (_, a) -> Some a
     | Tups (_, _, a)(* by construction *) -> Some a
     | Conv (_, _, t) -> is_tup t
@@ -540,6 +541,10 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
 
   | Conv (project, _, ww) -> construct e buf ww (project a)
 
+  | Atom Nil ->
+    write_char buf '\x65' ;
+    write_char buf '\x00'
+
   | Atom Boolean ->
     write_char buf '\xff' ;
     begin match a with
@@ -616,18 +621,20 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
     write_char buf '\x64' ;
     write_string buf (fst a) ;
     write_char buf '\x00' ;
-    construct e buf (String (Char, NoAttr)) (snd a)
+    construct e buf (String (Char, None)) (snd a)
 
   | Vect (Lambda, attr) ->
     begin match attr with
-    | NoAttr
-    | Grouped -> ()
+    | None
+    | Some Grouped -> ()
     | _ -> invalid_arg "lambda cannot have attr except grouped"
     end ;
     write_char buf '\x00' ;
     write_char buf (char_of_attribute attr) ;
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter (fun lam -> construct e buf (Atom Lambda) lam) a
+
+  | Vect (Nil, _) -> invalid_arg "nil vect is not allowed"
 
   | Vect (Boolean, attr) ->
     write_char buf '\x01' ;
@@ -882,9 +889,9 @@ let msgtyp = any_uint8 >>| msgtyp_of_int
 
 let uint8_flag =
   any_uint8 >>| function
-  | 0 -> true
-  | 1 -> false
-  | _ -> invalid_arg "endianness"
+  | 0 -> false
+  | 1 -> true
+  | _ -> invalid_arg "uint8_flag"
 
 module type ENDIAN = module type of BE
 
@@ -893,13 +900,18 @@ let getmod = function
   | false -> (module LE : ENDIAN)
 
 let hdr =
-  uint8_flag >>= fun big_endian ->
+  uint8_flag >>= fun is_little_endian ->
+  let big_endian = not is_little_endian in
   msgtyp >>= fun typ ->
   uint8_flag >>= fun compressed ->
   any_uint8 >>= fun _ ->
   let module M = (val getmod big_endian) in
   M.any_int32 >>| fun len ->
   { big_endian ; compressed ; typ ; len }
+
+let nil_atom =
+  char '\x65' *>
+  skip (fun c -> c = '\x00')
 
 let bool_atom =
   char '\xff' *>
@@ -1143,7 +1155,7 @@ let time_vect endianness attr =
 
 let lambda_atom endianness =
   char '\x64' *> symbol_encoding >>= fun sym ->
-  string_vect endianness NoAttr >>| fun lam ->
+  string_vect endianness None >>| fun lam ->
   (sym, lam)
 
 let general_list big_endian attr elt =
@@ -1251,6 +1263,7 @@ and destruct :
     char (if sorted then '\x01' else '\x00') *>
     destruct ~big_endian (Dict (kw, vw, false))
 
+  | Atom Nil -> nil_atom
   | Atom Boolean -> bool_atom
   | Atom Guid -> guid_atom
   | Atom Byte -> byte_atom
@@ -1270,6 +1283,7 @@ and destruct :
   | Atom Time -> time_atom big_endian
   | Atom Lambda -> lambda_atom big_endian
 
+  | Vect (Nil, _) -> invalid_arg "nil vect is not allowed"
   | Vect (Boolean, attr) -> bool_vect big_endian attr
   | Vect (Guid, attr) -> guid_vect big_endian attr
   | Vect (Byte, attr) -> byte_vect big_endian attr
@@ -1302,13 +1316,13 @@ let destruct_stream :
   | _ -> invalid_arg "destruct_stream: not a general list"
 
 let destruct_exn ?big_endian v =
-  choice [
+  choice ~failure_msg:"destruct_exn" [
     (destruct ?big_endian v) ;
     (destruct ?big_endian err >>| fun msg -> failwith msg) ;
   ]
 
 let destruct ?big_endian v =
-  choice [
+  choice ~failure_msg:"destruct" [
     (destruct ?big_endian v >>| fun v -> Ok v) ;
     (destruct ?big_endian err >>| fun msg -> Error msg) ;
   ]
@@ -1351,6 +1365,7 @@ and pp :
   let pp_sep ppf () = Format.pp_print_char ppf ' ' in
   let pp_sep_empty ppf () = Format.pp_print_string ppf "" in
   match w with
+  | Atom Nil -> Format.pp_print_string ppf "(::)"
   | List (w, _) -> Format.(pp_print_list ~pp_sep (pp w) ppf v)
   | Conv (project, _, w) -> pp w ppf (project v)
   | Tup (w, _) -> pp w ppf v
@@ -1378,6 +1393,7 @@ and pp :
   | Atom Time -> pp_print_time ppf v
   | Atom Lambda -> pp_print_lambda ppf v
 
+  | Vect (Nil, _) -> invalid_arg "nil vect is not allowed"
   | Vect (Boolean, _) -> Format.pp_print_list ~pp_sep Format.pp_print_bool ppf v
   | Vect (Guid, _) -> Format.pp_print_list ~pp_sep Uuidm.pp ppf v
   | Vect (Byte, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "X%c") ppf v

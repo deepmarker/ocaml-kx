@@ -7,7 +7,6 @@ type time = { time : Ptime.time ; ms : int }
 type timespan = { time : Ptime.time ; ns : int }
 
 type attribute =
-  | NoAttr
   | Sorted
   | Unique
   | Parted
@@ -17,6 +16,7 @@ type _ typ
 type _ w
 type _ case
 
+val nil       : unit typ
 val bool      : bool typ
 val guid      : Uuidm.t typ
 val byte      : char typ
