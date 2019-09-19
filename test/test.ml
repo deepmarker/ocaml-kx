@@ -185,6 +185,31 @@ let test_server () =
     failwithf "%s" (Format.asprintf "%a" Kx_async.pp_print_error e) ()
   | Ok () -> Deferred.unit
 
+let test_async () =
+  let open Core in
+  let open Async in
+  let r =
+    Pipe.create_reader
+      ~close_on_exception:false
+      (fun w -> Pipe.write w "\011\000\003\000\000\000countbysym\000hloc\000search\000") in
+  Reader.of_pipe (Info.of_string "") r >>= fun r ->
+  Angstrom_async.parse Kx.(destruct_exn (v sym)) r >>= function
+  | Ok _v -> Deferred.unit
+  | Error e -> failwith e
+
+let test_vect hex w () =
+  let open Core in
+  let open Async in
+  let r =
+    Pipe.create_reader
+      ~close_on_exception:false
+      (fun w -> Pipe.write w (Hex.to_string hex)) in
+  Reader.of_pipe (Info.of_string "") r >>= fun r ->
+  Angstrom_async.parse Kx.hdr r >>= fun _hdr ->
+  Angstrom_async.parse Kx.(destruct_exn w) r >>= function
+  | Ok _v -> Deferred.unit
+  | Error e -> failwith e
+
 let eq_bigstring a b =
   let open Bigstringaf in
   let len = length a in
@@ -270,12 +295,22 @@ let tests_kx = [
 ]
 
 let tests_kx_async = Alcotest_async.[
-    test_case "server" `Quick test_server ;
+    test_case "basic" `Quick test_async ;
+    test_case "vect bool" `Quick (test_vect (`Hex "0100000011000000010003000000010100") Kx.(v bool));
+    test_case "vect char" `Quick (test_vect (`Hex "01000000110000000a0003000000617569") Kx.(v char));
+    test_case "vect byte" `Quick (test_vect (`Hex "01000000100000000400020000001234") Kx.(v byte));
+    test_case "vect short" `Quick (test_vect (`Hex "0100000014000000050003000000010002000300") Kx.(v short));
+    test_case "vect int" `Quick (test_vect (`Hex "01000000160000000600020000000100000002000000") Kx.(v int));
+    test_case "vect long" `Quick (test_vect (`Hex  "010000001e00000007000200000001000000000000000200000000000000") Kx.(v long));
+    test_case "vect float" `Quick (test_vect (`Hex "010000001e000000090002000000000000000000f03f0000000000000040") Kx.(v float));
+    test_case "atom symbol" `Quick (test_vect (`Hex "010000000b000000f56100") Kx.(a sym));
+    test_case "vect symbol" `Quick (test_vect (`Hex "01000000120000000b000200000061006200") Kx.(v sym));
+    (* test_case "server" `Quick test_server ; *)
   ]
 
 let () =
   Logs.set_level ~all:true (Some Logs.Debug) ;
   run "q" [
     "kx", tests_kx ;
-    (* "kx-async", tests_kx_async ; *)
+    "kx-async", tests_kx_async ;
   ]

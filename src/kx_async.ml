@@ -46,7 +46,7 @@ let parse_compressed ~big_endian ~msglen w r =
   let open Deferred.Result.Monad_infix in
   Angstrom_async.parse E.any_int32 r >>= fun uncompLen ->
   let uncompLen = Int32.to_int_exn uncompLen in
-  Angstrom_async.parse (Angstrom.take_bigstring (msglen-12)) r >>= fun compMsg ->
+  Angstrom_async.parse (Angstrom.take_bigstring (msglen-4)) r >>= fun compMsg ->
   let uncompMsg = Bigstringaf.create uncompLen in
   uncompress uncompMsg compMsg ;
   let res =
@@ -75,10 +75,13 @@ let connect_async ?comp ?(buf=Faraday.create 4096) url =
             Angstrom_async.parse hdr r >>= function
             | Error msg -> return (Error (`Angstrom msg))
             | Ok ({ big_endian; typ=_; compressed; len } as hdr) ->
+              let msglen = Int32.to_int_exn len - 8 in
+              let payload = Reader.peek_available r ~len:msglen in
               Log_async.debug (fun m -> m "%a" Kx.pp_print_hdr hdr) >>= fun () ->
+              Log_async.debug (fun m -> m "%S" payload) >>= fun () ->
               begin match compressed with
                 | false -> Angstrom_async.parse (destruct ~big_endian w) r
-                | true -> parse_compressed ~big_endian ~msglen:(Int32.to_int_exn len) w r
+                | true -> parse_compressed ~big_endian ~msglen w r
               end >>| function
               | Ok (Error msg) -> (Error (`Q msg))
               | Error msg -> Error (`Angstrom msg)
@@ -137,9 +140,10 @@ let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
           Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
           let open Deferred.Result.Monad_infix in
           Angstrom_async.parse hdr r >>= fun { big_endian; typ=_; compressed; len } ->
+          let msglen = Int32.to_int_exn len - 8 in
           begin match compressed with
             | false -> Angstrom_async.parse (destruct ~big_endian wr) r
-            | true -> parse_compressed ~big_endian ~msglen:(Int32.to_int_exn len) wr r
+            | true -> parse_compressed ~big_endian ~msglen wr r
           end
         end >>| function
         | Error e -> Error (`Exn e)
