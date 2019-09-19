@@ -8,9 +8,7 @@ let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
   let tt = make_testable w in
   let serialized = construct ~comp:true ~typ:`Async w a in
   let payload = Bigstringaf.(sub serialized ~off:8 ~len:(length serialized - 8)) in
-  let serialized_hex = Hex.of_bigstring serialized in
-  (* Hex.hexdump serialized_hex ; *)
-  Format.printf "%a@." Hex.pp serialized_hex ;
+  Format.printf "%a@." Hex.pp (Hex.of_bigstring serialized) ;
   match Angstrom.parse_bigstring hdr serialized,
         Angstrom.parse_bigstring (destruct_exn w) payload with
   | Error msg, _ | _, Error msg -> fail msg
@@ -30,7 +28,8 @@ let pack_unpack_atom () =
   pack_unpack "real" (a real) 0. ;
   pack_unpack "float" (a float) 0. ;
   pack_unpack "char" (a char) '\x00' ;
-  pack_unpack "symbol" (a sym) "" ;
+  pack_unpack "empty symbol" (a sym) "" ;
+  pack_unpack "symbol" (a sym) "aiue" ;
   pack_unpack "timestamp" (a timestamp) Ptime.epoch ;
   pack_unpack "month" (a month) (2018, 4, 0) ;
   pack_unpack "month" (a month) (2019, 1, 0) ;
@@ -55,6 +54,7 @@ let pack_unpack_vect () =
   pack_unpack "vect real" (v real) [0.;1.;nan;infinity;neg_infinity] ;
   pack_unpack "vect float" (v float) [0.;1.;nan;infinity;neg_infinity] ;
   pack_unpack "vect char" (s char) "bleh" ;
+  pack_unpack "vect empty symbol" (v sym) [""; ""; ""] ;
   pack_unpack "vect symbol" (v sym) ["machin"; "truc"; "chouette"] ;
   pack_unpack "vect timestamp" (v timestamp) [Ptime.epoch; Ptime.epoch] ;
   pack_unpack "vect month" (v month) [2019, 1, 0 ; 2019, 2, 0] ;
@@ -303,7 +303,8 @@ let tests_kx_async = Alcotest_async.[
     test_case "vect int" `Quick (test_vect (`Hex "01000000160000000600020000000100000002000000") Kx.(v int));
     test_case "vect long" `Quick (test_vect (`Hex  "010000001e00000007000200000001000000000000000200000000000000") Kx.(v long));
     test_case "vect float" `Quick (test_vect (`Hex "010000001e000000090002000000000000000000f03f0000000000000040") Kx.(v float));
-    test_case "atom symbol" `Quick (test_vect (`Hex "010000000b000000f56100") Kx.(a sym));
+    test_case "atom empty symbol" `Quick (test_vect (`Hex "010000000a000000f500") Kx.(a sym));
+    test_case "atom symbol" `Quick (test_vect       (`Hex "010000000b000000f56100") Kx.(a sym));
     test_case "vect symbol" `Quick (test_vect (`Hex "01000000120000000b000200000061006200") Kx.(v sym));
     (* test_case "server" `Quick test_server ; *)
   ]
