@@ -172,6 +172,12 @@ let unpack_buggy () =
   | Ok _hdr, Ok v ->
     check string "buggy_one" ":/home/vb/code/TorQ/hdb/database2019.06.21" v
 
+let test_various () =
+  let sym = "\245a\000" in
+  match Angstrom.parse_string Kx.(destruct_exn (a sym)) sym with
+  | Ok _ -> ()
+  | Error e -> failwith e
+
 let test_server () =
   let open Core in
   let open Async in
@@ -185,15 +191,15 @@ let test_server () =
     failwithf "%s" (Format.asprintf "%a" Kx_async.pp_print_error e) ()
   | Ok () -> Deferred.unit
 
-let test_async () =
+let test_headersless msg w () =
   let open Core in
   let open Async in
   let r =
     Pipe.create_reader
       ~close_on_exception:false
-      (fun w -> Pipe.write w "\011\000\003\000\000\000countbysym\000hloc\000search\000") in
+      (fun w -> Pipe.write w msg) in
   Reader.of_pipe (Info.of_string "") r >>= fun r ->
-  Angstrom_async.parse Kx.(destruct_exn (v sym)) r >>= function
+  Angstrom_async.parse Kx.(destruct_exn w) r >>= function
   | Ok _v -> Deferred.unit
   | Error e -> failwith e
 
@@ -292,10 +298,12 @@ let tests_kx = [
   test_case "conv" `Quick pack_unpack_conv ;
   test_case "union" `Quick pack_unpack_union ;
   test_case "unpack_buggy" `Quick unpack_buggy ;
+  test_case "various" `Quick test_various ;
 ]
 
 let tests_kx_async = Alcotest_async.[
-    test_case "basic" `Quick test_async ;
+    test_case "vect symbol headerless" `Quick (test_headersless "\011\000\003\000\000\000countbysym\000hloc\000search\000" Kx.(v sym)) ;
+    test_case "atom symbol headerless" `Quick (test_headersless "\245a\000" Kx.(a sym)) ;
     test_case "vect bool" `Quick (test_vect (`Hex "0100000011000000010003000000010100") Kx.(v bool));
     test_case "vect char" `Quick (test_vect (`Hex "01000000110000000a0003000000617569") Kx.(v char));
     test_case "vect byte" `Quick (test_vect (`Hex "01000000100000000400020000001234") Kx.(v byte));
