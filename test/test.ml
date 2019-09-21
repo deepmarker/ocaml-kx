@@ -95,50 +95,40 @@ let pack_unpack_dict () =
        (list (t2 (a bool) (a int))))
     ([true, 3l; false, 2l], [false, 1l; true, 2l]) ;
   pack_unpack "keyed table"
-    (dict
-       (table (v sym) (list (v short)))
-       (table (v sym) (list (v short))))
+    (dict (table (list (v short))) (table (list (v short))))
     ((["id"], [[1; 2; 3]]), (["v"], [[4; 5; 6]])) ;
+  pack_unpack "keyed table2"
+    (dict (table1 short) (table1 short))
+    ((["id"], [1; 2; 3]), (["v"], [4; 5; 6])) ;
+  pack_unpack "keyed table3"
+    (dict (table1 sym) (table2 float long))
+    ((["sym"], ["XBTUSD.CBP"]),
+     (["size";"tradecount"], ([794.9728], [8763L]))) ;
   ()
 
 let pack_unpack_table () =
   let open Kx in
-  pack_unpack "simple" (table (v sym) (v long)) (["a"], [1L]);
-  pack_unpack "simple_2" (table (v sym) (t2 (v long) (v long))) (["a"], ([1L], [1L]));
-  pack_unpack "symsym" (table (v sym) (t1 (v sym))) (["a"], ["truc"]);
-  pack_unpack "symsym2" (table (v sym) (t2 (v timespan) (v sym))) (["a"], ([wn], ["truc"]));
-  pack_unpack "symsym3" (table (v sym) (t2 (v timespan) (v long))) (["a"], ([wn], [0L]));
-  pack_unpack "symsym3" (table (v sym) (t3 (v timespan) (v timespan) (v timespan))) (["a"], ([wn], [wn], [wn]));
-  pack_unpack "symsym3" (table (v sym) (t3 (v timespan) (v long) (v sym))) (["a"], ([wn], [0L], ["truc"]));
-  pack_unpack "simple_3" (table (v sym) (t3 (v timespan) (v sym) (v long))) (["a"], ([wn], ["truc"], [1L]));
+  pack_unpack "simple_bool" (table1 bool) (["a"], [true]);
+  pack_unpack "simple_long" (table (t1 (v long))) (["a"], [1L]);
+  pack_unpack "simple_2" (table (t2 (v long) (v long))) (["a";"b"], ([1L], [1L]));
+  pack_unpack "symsym" (table (t1 (v sym))) (["a"], ["truc"]);
+  pack_unpack "symsym2" (table2 timespan sym) (["a";"b"], ([wn], ["truc"]));
+  pack_unpack "symsym3" (table (t2 (v timespan) (v long))) (["a";"b"], ([wn], [0L]));
+  pack_unpack "symsym3" (table (t3 (v timespan) (v timespan) (v timespan))) (["a";"b";"c"], ([wn], [wn], [wn]));
+  pack_unpack "symsym3" (table (t3 (v timespan) (v long) (v sym))) (["a";"b";"c"], ([wn], [0L], ["truc"]));
+  pack_unpack "simple_3" (table3 timespan sym long) (["a";"b";"c"], ([wn], ["truc"], [1L]));
   pack_unpack "trade0" begin
-    let k = (v sym) in
-    let v = t3 (v timespan) (v sym) (v long) in
-    table k v
-  end
-    (["time"; "sym"; "side"; "size" ; "price"],
-     ([wn], ["XBTUSD"], [1L])) ;
+    table (t3 (v timespan) (v sym) (v long))
+  end (["time"; "sym"; "size"], ([wn], ["XBTUSD"], [1L])) ;
   pack_unpack "trade1" begin
-    let k = (v sym) in
-    let v = t4 (v timespan) (v sym) (v long) (v long) in
-    table k v
-  end
-    (["time"; "sym"; "side"; "size" ; "price"],
-     ([wn], ["XBTUSD"], [1L], [1L])) ;
+    table (t4 (v timespan) (v sym) (v long) (v long))
+  end (["time"; "sym"; "size" ; "price"], ([wn], ["XBTUSD"], [1L], [1L])) ;
   pack_unpack "trade1" begin
-    let k = (v sym) in
-    let v = t4 (v timespan) (v sym) (v char) (v long) in
-    table k v
-  end
-    (["time"; "sym"; "side"; "size" ; "price"],
-     ([wn], ["XBTUSD"], ['a'], [1L])) ;
+    (table4 timespan sym char long)
+  end (["time"; "sym"; "side"; "size"], ([wn], ["XBTUSD"], ['a'], [1L])) ;
   pack_unpack "trade" begin
-    let k = (v sym) in
-    let v = t5 (v timespan) (v sym) (v char) (v long) (v float) in
-    table k v
-  end
-    (["time"; "sym"; "side"; "size" ; "price"],
-     ([wn], ["XBTUSD"], ['b'], [1L], [1.])) ;
+    (table5 timespan sym char long float)
+  end (["time"; "sym"; "side"; "size" ; "price"], ([wn], ["XBTUSD"], ['b'], [1L], [1.])) ;
   ()
 
 let pack_unpack_conv () =
@@ -203,7 +193,7 @@ let test_headersless msg w () =
   | Ok _v -> Deferred.unit
   | Error e -> failwith e
 
-let test_vect hex w () =
+let test_async hex w () =
   let open Core in
   let open Async in
   let r =
@@ -214,6 +204,15 @@ let test_vect hex w () =
   Angstrom_async.parse Kx.hdr r >>= fun _hdr ->
   Angstrom_async.parse Kx.(destruct_exn w) r >>= function
   | Ok _v -> Deferred.unit
+  | Error e -> failwith e
+
+let test_nonasync hex w () =
+  let buf = Hex.to_bigstring hex in
+  let buflen = Bigstringaf.length buf in
+  let _hdr = Angstrom.parse_bigstring Kx.hdr buf in
+  match Angstrom.parse_bigstring Kx.(destruct_exn w)
+          (Bigstringaf.sub buf ~off:8 ~len:(buflen-8)) with
+  | Ok _v -> ()
   | Error e -> failwith e
 
 let eq_bigstring a b =
@@ -299,21 +298,27 @@ let tests_kx = [
   test_case "union" `Quick pack_unpack_union ;
   test_case "unpack_buggy" `Quick unpack_buggy ;
   test_case "various" `Quick test_various ;
+  test_case "strange float" `Quick (test_nonasync (`Hex "0100000011000000f759f03b5dc8d78840") Kx.(a float)) ;
+  test_case "strange float vect" `Quick (test_nonasync (`Hex "010000001600000009000100000059f03b5dc8d78840") Kx.(v float)) ;
+  test_case "keyed_table" `Quick (test_nonasync  (`Hex "0100000068000000636200630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000064cc5d4bc8d788400700010000003b22000000000000") Kx.(dict (table1 sym) (table2 float long))) ;
+  test_case "keyed_table2" `Quick (test_nonasync (`Hex "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000") Kx.(dict (table1 sym) (table2 float long))) ;
 ]
 
 let tests_kx_async = Alcotest_async.[
     test_case "vect symbol headerless" `Quick (test_headersless "\011\000\003\000\000\000countbysym\000hloc\000search\000" Kx.(v sym)) ;
     test_case "atom symbol headerless" `Quick (test_headersless "\245a\000" Kx.(a sym)) ;
-    test_case "vect bool" `Quick (test_vect (`Hex "0100000011000000010003000000010100") Kx.(v bool));
-    test_case "vect char" `Quick (test_vect (`Hex "01000000110000000a0003000000617569") Kx.(v char));
-    test_case "vect byte" `Quick (test_vect (`Hex "01000000100000000400020000001234") Kx.(v byte));
-    test_case "vect short" `Quick (test_vect (`Hex "0100000014000000050003000000010002000300") Kx.(v short));
-    test_case "vect int" `Quick (test_vect (`Hex "01000000160000000600020000000100000002000000") Kx.(v int));
-    test_case "vect long" `Quick (test_vect (`Hex  "010000001e00000007000200000001000000000000000200000000000000") Kx.(v long));
-    test_case "vect float" `Quick (test_vect (`Hex "010000001e000000090002000000000000000000f03f0000000000000040") Kx.(v float));
-    test_case "atom empty symbol" `Quick (test_vect (`Hex "010000000a000000f500") Kx.(a sym));
-    test_case "atom symbol" `Quick (test_vect       (`Hex "010000000b000000f56100") Kx.(a sym));
-    test_case "vect symbol" `Quick (test_vect (`Hex "01000000120000000b000200000061006200") Kx.(v sym));
+    test_case "vect bool" `Quick (test_async (`Hex "0100000011000000010003000000010100") Kx.(v bool));
+    test_case "vect char" `Quick (test_async (`Hex "01000000110000000a0003000000617569") Kx.(v char));
+    test_case "vect byte" `Quick (test_async (`Hex "01000000100000000400020000001234") Kx.(v byte));
+    test_case "vect short" `Quick (test_async (`Hex "0100000014000000050003000000010002000300") Kx.(v short));
+    test_case "vect int" `Quick (test_async (`Hex "01000000160000000600020000000100000002000000") Kx.(v int));
+    test_case "vect long" `Quick (test_async (`Hex  "010000001e00000007000200000001000000000000000200000000000000") Kx.(v long));
+    test_case "vect float" `Quick (test_async (`Hex "010000001e000000090002000000000000000000f03f0000000000000040") Kx.(v float));
+    test_case "atom empty symbol" `Quick (test_async (`Hex "010000000a000000f500") Kx.(a sym));
+    test_case "atom symbol" `Quick (test_async       (`Hex "010000000b000000f56100") Kx.(a sym));
+    test_case "vect symbol" `Quick (test_async (`Hex "01000000120000000b000200000061006200") Kx.(v sym));
+    test_case "keyed_table" `Quick (test_async  (`Hex "0100000068000000636200630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000064cc5d4bc8d788400700010000003b22000000000000") Kx.(dict (table1 sym) (table2 float long))) ;
+    test_case "keyed_table2" `Quick (test_async (`Hex "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000") Kx.(dict (table1 sym) (table2 float long))) ;
     (* test_case "server" `Quick test_server ; *)
   ]
 

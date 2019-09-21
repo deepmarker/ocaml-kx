@@ -56,7 +56,21 @@ val t10 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g 
 val merge_tups : 'a w -> 'b w -> ('a * 'b) w
 
 val dict : ?sorted:bool -> 'a w -> 'b w -> ('a * 'b) w
-val table : ?sorted:bool -> 'a w -> 'b w -> ('a * 'b) w
+val table : ?sorted:bool -> 'a w -> (string list * 'a) w
+
+val table1: ?sorted:bool -> 'a typ -> (string list * 'a list) w
+val table2: ?sorted:bool ->
+  'a typ -> 'b typ ->
+  (string list * ('a list * 'b list)) w
+val table3: ?sorted:bool ->
+  'a typ -> 'b typ -> 'c typ ->
+  (string list * ('a list * 'b list * 'c list)) w
+val table4: ?sorted:bool ->
+  'a typ -> 'b typ -> 'c typ -> 'd typ ->
+  (string list * ('a list * 'b list * 'c list * 'd list)) w
+val table5: ?sorted:bool ->
+  'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ ->
+  (string list * ('a list * 'b list * 'c list * 'd list * 'e list)) w
 
 val conv : ('a -> 'b) -> ('b -> 'a) -> 'b w -> 'a w
 val case : 'a w -> ('b -> 'a option) -> ('a -> 'b) -> 'b case

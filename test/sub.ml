@@ -32,9 +32,8 @@ let submsg = Kx.(t3 (a sym) (a sym) (a sym))
 
 let updmsg =
   let open Kx in
-  let k = (v sym) in
   let v = t5 (v timespan) (v sym) (v char) (v long) (v float) in
-  let row = table k v in
+  let row = table v in
   t3 (a sym) (a sym) row
 
 let add_random_trades w =

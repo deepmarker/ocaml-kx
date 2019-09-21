@@ -71,12 +71,16 @@ let connect_async ?comp ?(buf=Faraday.create 4096) url =
     | `Ok '\x03' ->
       begin try_with begin fun () ->
           let af w =
-            Reader.peek r ~len:1 >>= fun _ ->
+            Reader.peek r ~len:8 >>= fun _ ->
+            (* let h = Reader.peek_available r ~len:8 in *)
+            (* Log_async.debug (fun m -> m "%a" Hex.pp (Hex.of_string h)) >>= fun () -> *)
             Angstrom_async.parse hdr r >>= function
             | Error msg -> return (Error (`Angstrom msg))
             | Ok ({ big_endian; typ=_; compressed; len } as hdr) ->
               let msglen = Int32.to_int_exn len - 8 in
               Log_async.debug (fun m -> m "%a" Kx.pp_print_hdr hdr) >>= fun () ->
+              (* let msg = Reader.peek_available r ~len:(msglen - 8) in *)
+              (* Log_async.debug (fun m -> m "%d %a" (String.length msg) Hex.pp (Hex.of_string msg)) >>= fun () -> *)
               begin match compressed with
                 | false -> Angstrom_async.parse (destruct ~big_endian w) r
                 | true -> parse_compressed ~big_endian ~msglen w r

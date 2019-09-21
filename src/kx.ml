@@ -271,7 +271,7 @@ type _ w =
   | Tup : 'a w * attribute option -> 'a w
   | Tups : 'a w * 'b w * attribute option -> ('a * 'b) w
   | Dict : 'a w * 'b w * bool -> ('a * 'b) w
-  | Table : 'a w * 'b w * bool -> ('a * 'b) w
+  | Table : string list w * 'b w * bool -> (string list * 'b) w
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b w -> 'a w
   | Union : 'a case list -> 'a w
 
@@ -450,8 +450,31 @@ let merge_tups t1 t2 =
   | Some a, Some b when a = b -> Tups (t1, t2, a)
   | _ -> invalid_arg "merge_tups"
 
-let dict ?(sorted=false) k v = Dict (k, v, sorted)
-let table ?(sorted=false) k v = Table (k, v, sorted)
+let dict ?(sorted=false) k v =
+  if not (is_list_type k && is_list_type v) then
+    invalid_arg "dict keys and values must be lists" ;
+  Dict (k, v, sorted)
+
+let table ?(sorted=false) vs =
+  if not (is_list_type vs) then
+    invalid_arg "table keys and values must be lists" ;
+  Table (v sym, vs, sorted)
+
+let table1 ?(sorted=false) v1 =
+  let attr = if sorted then Some Parted else None in
+  Table (v sym, t1 (v ?attr v1), sorted)
+let table2 ?(sorted=false) v1 v2 =
+  let attr = if sorted then Some Parted else None in
+  Table (v sym, t2 (v ?attr v1) (v v2), sorted)
+let table3 ?(sorted=false) v1 v2 v3 =
+  let attr = if sorted then Some Parted else None in
+  Table (v sym, t3 (v ?attr v1) (v v2) (v v3), sorted)
+let table4 ?(sorted=false) v1 v2 v3 v4 =
+  let attr = if sorted then Some Parted else None in
+  Table (v sym, t4 (v ?attr v1) (v v2) (v v3) (v v4), sorted)
+let table5 ?(sorted=false) v1 v2 v3 v4 v5 =
+  let attr = if sorted then Some Parted else None in
+  Table (v sym, t5 (v ?attr v1) (v v2) (v v3) (v v4) (v v5), sorted)
 
 (* let string_of_chars a = String.init (Array.length a) (Array.get a) *)
 let pp_print_month ppf (y, m, _) = Format.fprintf ppf "%d.%dm" y m
@@ -525,10 +548,6 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
     (schedule_bigstring buf (serialize_to_bigstring buf'))
 
   | Dict (k, v, sorted) ->
-    if not (is_list_type k) then
-      invalid_arg "dict keys must be a list type" ;
-    if not (is_list_type v) then
-      invalid_arg "dict values must be a list type" ;
     let x, y = a in
     write_char buf (if sorted then '\x7f' else '\x63') ;
     construct e buf k x ;
@@ -537,6 +556,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
   | Table (k, v, sorted) ->
     write_char buf '\x62' ;
     write_char buf (if sorted then '\x01' else '\x00') ;
+    (* Apply parted attr here or not?? *)
     construct e buf (Dict (k, (if sorted then (parted v) else v), sorted)) a
 
   | Conv (project, _, ww) -> construct e buf ww (project a)
