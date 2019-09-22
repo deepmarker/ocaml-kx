@@ -94,6 +94,9 @@ let pack_unpack_dict () =
        (list (t2 (a bool) (a int)))
        (list (t2 (a bool) (a int))))
     ([true, 3l; false, 2l], [false, 1l; true, 2l]) ;
+  pack_unpack "sorted dict atom values"
+    (dict ~sorted:true (v ~attr:Sorted sym) (v bool))
+    ((["a";"b"]), ([true; false])) ;
   pack_unpack "keyed table"
     (dict (table (list (v short))) (table (list (v short))))
     ((["id"], [[1; 2; 3]]), (["v"], [[4; 5; 6]])) ;
@@ -109,6 +112,8 @@ let pack_unpack_dict () =
 let pack_unpack_table () =
   let open Kx in
   pack_unpack "simple_bool" (table1 bool) (["a"], [true]);
+  pack_unpack "simple_sorted_bool1" (table1 ~sorted:true bool) (["a"], [true]);
+  pack_unpack "simple_sorted_bool2" (table2 ~sorted:true bool bool) (["a";"b"], ([true], [false]));
   pack_unpack "simple_long" (table (t1 (v long))) (["a"], [1L]);
   pack_unpack "simple_2" (table (t2 (v long) (v long))) (["a";"b"], ([1L], [1L]));
   pack_unpack "symsym" (table (t1 (v sym))) (["a"], ["truc"]);
@@ -298,10 +303,19 @@ let tests_kx = [
   test_case "union" `Quick pack_unpack_union ;
   test_case "unpack_buggy" `Quick unpack_buggy ;
   test_case "various" `Quick test_various ;
+  test_case "sorted dict atom" `Quick (test_nonasync (`Hex "01000000210000007f0b0102000000610062000600020000000200000003000000") Kx.(dict ~sorted:true (v ~attr:Sorted sym) (v int))) ;
+  test_case "dict vector" `Quick (test_nonasync (`Hex "010000002d000000630b0002000000610062000000020000000600010000000200000006000100000003000000") Kx.(dict (v sym) (list (v int)))) ;
+  test_case "table" `Quick (test_nonasync (`Hex "010000002f0000006200630b0002000000610062000000020000000600010000000200000006000100000003000000") Kx.(table (list (v int)))) ;
+  test_case "sorted table" `Quick (test_nonasync (`Hex "010000002f0000006201630b0002000000610062000000020000000603010000000200000006000100000003000000") Kx.(table ~sorted:true (t2 (v ~attr:Parted int) (v int)))) ;
+  test_case "sorted table2" `Quick (test_nonasync (`Hex "010000002f0000006201630b0002000000610062000000020000000603010000000200000006000100000003000000") Kx.(table2 ~sorted:true int int)) ;
   test_case "strange float" `Quick (test_nonasync (`Hex "0100000011000000f759f03b5dc8d78840") Kx.(a float)) ;
   test_case "strange float vect" `Quick (test_nonasync (`Hex "010000001600000009000100000059f03b5dc8d78840") Kx.(v float)) ;
+  test_case "strange dict" `Quick (test_nonasync (`Hex "0100000028000000630b000100000073697a650000000100000009000100000059f03b5dc8d78840") Kx.(dict (v sym) (list (v float)))) ;
+  test_case "strange table" `Quick (test_nonasync (`Hex "010000002a0000006200630b000100000073697a650000000100000009000100000059f03b5dc8d78840") Kx.(table1 float)) ;
+  test_case "strange table2" `Quick (test_nonasync (`Hex "01000000430000006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000") Kx.(table2 float long)) ;
   test_case "keyed_table" `Quick (test_nonasync  (`Hex "0100000068000000636200630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000064cc5d4bc8d788400700010000003b22000000000000") Kx.(dict (table1 sym) (table2 float long))) ;
-  test_case "keyed_table2" `Quick (test_nonasync (`Hex "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000") Kx.(dict (table1 sym) (table2 float long))) ;
+  test_case "keyed_table2" `Quick (test_nonasync (`Hex "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000") Kx.(dict (table1 ~sorted:true sym) (table2 float long))) ;
+  test_case "keyed_table3" `Quick (test_nonasync (`Hex "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000") Kx.(dict (table1 ~sorted:true sym) (table2 float long))) ;
 ]
 
 let tests_kx_async = Alcotest_async.[
@@ -318,7 +332,7 @@ let tests_kx_async = Alcotest_async.[
     test_case "atom symbol" `Quick (test_async       (`Hex "010000000b000000f56100") Kx.(a sym));
     test_case "vect symbol" `Quick (test_async (`Hex "01000000120000000b000200000061006200") Kx.(v sym));
     test_case "keyed_table" `Quick (test_async  (`Hex "0100000068000000636200630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000064cc5d4bc8d788400700010000003b22000000000000") Kx.(dict (table1 sym) (table2 float long))) ;
-    test_case "keyed_table2" `Quick (test_async (`Hex "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000") Kx.(dict (table1 sym) (table2 float long))) ;
+    test_case "keyed_table2" `Quick (test_async (`Hex "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000") Kx.(dict (table1 ~sorted:true sym) (table2 float long))) ;
     (* test_case "server" `Quick test_server ; *)
   ]
 

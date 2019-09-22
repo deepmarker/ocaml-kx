@@ -292,13 +292,6 @@ let rec is_list_type : type a. a w -> bool = function
   | Conv (_, _, w) -> is_list_type w
   | _ -> false
 
-let parted : type a. a w -> a w = function
-  | Tup (a, _) -> Tup (a, Some Parted)
-  | Tups (a, b, _) -> Tups (a, b, Some Parted)
-  | List (a, _) -> List (a, Some Parted)
-  | Vect (a, _) -> Vect (a, Some Parted)
-  | _ -> invalid_arg "parted"
-
 let rec equal_w : type a b. a w -> b w -> bool = fun a b ->
   match a, b with
   | Atom a, Atom b -> eq_typ a b <> None
@@ -460,9 +453,7 @@ let table ?(sorted=false) vs =
     invalid_arg "table keys and values must be lists" ;
   Table (v sym, vs, sorted)
 
-let table1 ?(sorted=false) v1 =
-  let attr = if sorted then Some Parted else None in
-  Table (v sym, t1 (v ?attr v1), sorted)
+let table1 ?(sorted=false) v1 = Table (v sym, t1 (v v1), sorted)
 let table2 ?(sorted=false) v1 v2 =
   let attr = if sorted then Some Parted else None in
   Table (v sym, t2 (v ?attr v1) (v v2), sorted)
@@ -556,8 +547,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
   | Table (k, v, sorted) ->
     write_char buf '\x62' ;
     write_char buf (if sorted then '\x01' else '\x00') ;
-    (* Apply parted attr here or not?? *)
-    construct e buf (Dict (k, (if sorted then (parted v) else v), sorted)) a
+    construct e buf (Dict (k, v, false)) a
 
   | Conv (project, _, ww) -> construct e buf ww (project a)
 
