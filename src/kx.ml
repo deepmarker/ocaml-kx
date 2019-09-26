@@ -126,34 +126,31 @@ let month_of_int32 m =
   let rem_m = rem m 12l in
   to_int (add 2000l y), to_int (succ rem_m), 0
 
-let int32_of_minute ((hh, mm, _), tz) =
-  if tz = min_int then Int32.min_int
-  else if tz = max_int then Int32.max_int
-  else if tz = min_int + 1 then Int32.(succ min_int)
-  else Int32.of_int (hh * 60 + mm)
+let minute_of_span span =
+  let d, ps = Ptime.Span.to_d_ps span in
+  Int32.(add (of_int (d * 24 * 60))
+           (Int64.(div ps 60_000_000_000_000L |> to_int32)))
 
-let minute_of_int32 i =
-  if i = ni then (0, 0, 0), min_int
-  else if i = wi then (0, 0, 0), max_int
-  else if i = Int32.neg wi then (0, 0, 0), succ min_int
-  else Int32.(to_int (div i 60l), to_int (rem i 60l), 0), 0
+let second_of_span span =
+  let d, ps = Ptime.Span.to_d_ps span in
+  Int32.(add (of_int (d * 24 * 60))
+           (Int64.(div ps 1_000_000_000_000L |> to_int32)))
 
-let int32_of_second ((hh, mm, ss), tz) =
-  if tz = min_int then Int32.min_int
-  else if tz = max_int then Int32.max_int
-  else if tz = min_int + 1 then Int32.(succ min_int)
-  else Int32.of_int (hh * 3600 + mm * 60 + ss)
+let span_of_minute i =
+  let day_in_minutes = Int32.of_int (24 * 60) in
+  let d = Int32.(to_int (div i day_in_minutes)) in
+  let m =
+    let open Int64 in
+    mul (mul 60L 1_000_000_000_000L) (of_int32 (Int32.rem i day_in_minutes)) in
+  Ptime.Span.unsafe_of_d_ps (d, m)
 
-let second_of_int32 i =
-  if i = ni then (0, 0, 0), min_int
-  else if i = wi then (0, 0, 0), max_int
-  else if i = Int32.neg wi then (0, 0, 0), succ min_int
-  else
-    let open Int32 in
-    let hh = div i 3600l in
-    let mm = rem (div i 60l) 60l in
-    let ss = rem i 60l in
-    (to_int hh, to_int mm, to_int ss), 0
+let span_of_second i =
+  let day_in_seconds = Int32.of_int (24 * 3600) in
+  let d = Int32.(to_int (div i day_in_seconds)) in
+  let m =
+    let open Int64 in
+    mul (mul 60L 1_000_000_000_000L) (of_int32 (Int32.rem i day_in_seconds)) in
+  Ptime.Span.unsafe_of_d_ps (d, m)
 
 let nn = timespan_of_int64 nj
 let wn = timespan_of_int64 wj
@@ -171,13 +168,13 @@ let nd = date_of_int32 ni
 let wd = date_of_int32 wi
 let minus_wd = date_of_int32 (Int32.neg wi)
 
-let nu = minute_of_int32 ni
-let wu = minute_of_int32 wi
-let minus_wu = minute_of_int32 (Int32.neg wi)
+let nu = span_of_minute ni
+let wu = span_of_minute wi
+let minus_wu = span_of_minute (Int32.neg wi)
 
-let nv = second_of_int32 ni
-let wv = second_of_int32 wi
-let minus_wv = second_of_int32 (Int32.neg wi)
+let nv = span_of_second ni
+let wv = span_of_second wi
+let minus_wv = span_of_second (Int32.neg wi)
 
 type _ typ =
   | Nil : unit typ
@@ -195,8 +192,8 @@ type _ typ =
   | Month : Ptime.date typ
   | Date : Ptime.date typ
   | Timespan : timespan typ
-  | Minute : Ptime.time typ
-  | Second : Ptime.time typ
+  | Minute : Ptime.Span.t typ
+  | Second : Ptime.Span.t typ
   | Time : time typ
   | Lambda : (string * string) typ
 
@@ -471,8 +468,6 @@ let table5 ?(sorted=false) v1 v2 v3 v4 v5 =
 let pp_print_month ppf (y, m, _) = Format.fprintf ppf "%d.%dm" y m
 let pp_print_date ppf (y, m, d) =  Format.fprintf ppf "%d.%d.%d" y m d
 let pp_print_timespan ppf { time = ((hh, mm, ss), _) ; ns } = Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ns
-let pp_print_minute ppf ((hh, mm, _), _) = Format.fprintf ppf "%d:%d" hh mm
-let pp_print_second ppf ((hh, mm, ss), _) = Format.fprintf ppf "%d:%d:%d" hh mm ss
 let pp_print_time ppf { time = ((hh, mm, ss), _) ; ms } = Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ms
 (* let pp_print_symbols ppf syms = Array.iter (fun sym -> Format.fprintf ppf "`%s" sym) syms *)
 
@@ -617,11 +612,11 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
 
   | Atom Minute ->
     write_char buf '\xef' ;
-    FE.write_uint32 buf (int32_of_minute a)
+    FE.write_uint32 buf (minute_of_span a)
 
   | Atom Second ->
     write_char buf '\xee' ;
-    FE.write_uint32 buf (int32_of_second a)
+    FE.write_uint32 buf (second_of_span a)
 
   | Atom Time ->
     write_char buf '\xed' ;
@@ -763,7 +758,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
     write_char buf (char_of_attribute attr) ;
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter begin fun m ->
-      FE.write_uint32 buf (int32_of_minute m)
+      FE.write_uint32 buf (minute_of_span m)
     end a
 
   | Vect (Second, attr) ->
@@ -771,7 +766,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
     write_char buf (char_of_attribute attr) ;
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter begin fun m ->
-      FE.write_uint32 buf (int32_of_second m)
+      FE.write_uint32 buf (second_of_span m)
     end a
 
   | Vect (Time, attr) ->
@@ -1021,14 +1016,14 @@ let timespan_atom endianness =
 
 let minute_encoding endianness =
   let module M = (val getmod endianness) in
-  M.any_int32 >>| minute_of_int32
+  M.any_int32 >>| span_of_minute
 
 let minute_atom endianness =
   char '\xef' *> minute_encoding endianness
 
 let second_encoding endianness =
   let module M = (val getmod endianness) in
-  M.any_int32 >>| second_of_int32
+  M.any_int32 >>| span_of_second
 
 let second_atom endianness =
   char '\xee' *> second_encoding endianness
@@ -1398,8 +1393,8 @@ and pp :
   | Atom Month -> pp_print_month ppf v
   | Atom Date -> pp_print_date ppf v
   | Atom Timespan -> pp_print_timespan ppf v
-  | Atom Minute -> pp_print_minute ppf v
-  | Atom Second -> pp_print_second ppf v
+  | Atom Minute -> Ptime.Span.pp ppf v
+  | Atom Second -> Ptime.Span.pp ppf v
   | Atom Time -> pp_print_time ppf v
   | Atom Lambda -> pp_print_lambda ppf v
 
@@ -1418,8 +1413,8 @@ and pp :
   | Vect (Month, _) -> Format.pp_print_list ~pp_sep pp_print_month ppf v
   | Vect (Date, _) -> Format.pp_print_list ~pp_sep pp_print_date ppf v
   | Vect (Timespan, _) -> Format.pp_print_list ~pp_sep pp_print_timespan ppf v
-  | Vect (Minute, _) -> Format.pp_print_list ~pp_sep pp_print_minute ppf v
-  | Vect (Second, _) -> Format.pp_print_list ~pp_sep pp_print_second ppf v
+  | Vect (Minute, _) -> Format.pp_print_list ~pp_sep Ptime.Span.pp ppf v
+  | Vect (Second, _) -> Format.pp_print_list ~pp_sep Ptime.Span.pp ppf v
   | Vect (Time, _) -> Format.pp_print_list ~pp_sep pp_print_time ppf v
   | Vect (Lambda, _) -> Format.pp_print_list ~pp_sep pp_print_lambda ppf v
 

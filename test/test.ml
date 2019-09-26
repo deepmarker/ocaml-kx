@@ -36,8 +36,8 @@ let pack_unpack_atom () =
   pack_unpack "month" (a month) (2019, 2, 0) ;
   pack_unpack "date" (a date) (2017, 10, 6) ;
   pack_unpack "timespan" (a timespan) { time = (0, 0, 0), 0 ; ns = 0 } ;
-  pack_unpack "minute" (a minute) ((0, 0, 0), 0) ;
-  pack_unpack "second" (a second) ((0, 0, 0), 0) ;
+  pack_unpack "minute" (a minute) (Ptime.Span.of_int_s 0) ;
+  pack_unpack "second" (a second) (Ptime.Span.of_int_s 0) ;
   pack_unpack "time" (a time) { time = ((0, 0, 0), 0) ; ms = 0 };
   pack_unpack "lambda" (a lambda) ("", "{x+y}");
   pack_unpack "lambda_ctx" (a lambda) ("d", "{x+y}");

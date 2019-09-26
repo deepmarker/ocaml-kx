@@ -31,8 +31,8 @@ val timestamp : Ptime.t typ
 val month     : Ptime.date typ
 val date      : Ptime.date typ
 val timespan  : timespan typ
-val minute    : Ptime.time typ
-val second    : Ptime.time typ
+val minute    : Ptime.Span.t typ
+val second    : Ptime.Span.t typ
 val time      : time typ
 val lambda    : (string * string) typ
 
@@ -135,14 +135,14 @@ val wd : Ptime.date
 val minus_wd : Ptime.date
 
 (** Minute *)
-val nu : Ptime.time
-val wu : Ptime.time
-val minus_wu : Ptime.time
+val nu : Ptime.Span.t
+val wu : Ptime.Span.t
+val minus_wu : Ptime.Span.t
 
 (** Second *)
-val nv : Ptime.time
-val wv : Ptime.time
-val minus_wv : Ptime.time
+val nv : Ptime.Span.t
+val wv : Ptime.Span.t
+val minus_wv : Ptime.Span.t
 
 val equal_w : 'a w -> 'b w -> bool
 val equal : 'a w -> 'a -> 'b w -> 'b -> bool
