@@ -269,8 +269,8 @@ let char_of_attribute = function
   | Some Parted -> '\x03'
   | Some Grouped -> '\x04'
 
-let attribute attr =
-  Angstrom.(char (char_of_attribute attr) >>| ignore)
+let attribute =
+  Angstrom.satisfy (function '\x00'..'\x04' -> true | _ -> false)
 
 type _ w =
   | Err : string w
@@ -1051,16 +1051,16 @@ let length big_endian =
   let module M = (val getmod big_endian) in
   M.any_int32 >>| Int32.to_int
 
-let bool_vect endianness attr =
+let bool_vect endianness =
   char '\x01' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   take len >>| fun str ->
   List.init len (fun i -> str.[i] <> '\x00')
 
-let guid_vect endianness attr =
+let guid_vect endianness =
   char '\x02' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len guid_encoding
 
@@ -1068,116 +1068,116 @@ let char_array len =
   take len >>| fun str ->
   List.init len (fun i -> str.[i])
 
-let byte_vect endianness attr =
+let byte_vect endianness =
   char '\x04' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   char_array len
 
-let bytestring_vect endianness attr =
+let bytestring_vect endianness =
   char '\x04' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   take len
 
-let short_vect endianness attr =
+let short_vect endianness =
   char '\x05' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (short_encoding endianness)
 
-let int_vect endianness attr =
+let int_vect endianness =
   char '\x06' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (int_encoding endianness)
 
-let long_vect endianness attr =
+let long_vect endianness =
   char '\x07' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (long_encoding endianness)
 
-let real_vect endianness attr =
+let real_vect endianness =
   char '\x08' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (real_encoding endianness)
 
-let float_vect endianness attr =
+let float_vect endianness =
   char '\x09' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (float_encoding endianness)
 
-let char_vect endianness attr =
+let char_vect endianness =
   char '\x0a' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   char_array len
 
-let string_vect endianness attr =
+let string_vect endianness =
   char '\x0a' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   take len
 
-let symbol_vect endianness attr =
+let symbol_vect endianness =
   char '\x0b' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len symbol_encoding
 
-let timestamp_vect endianness attr =
+let timestamp_vect endianness =
   char '\x0c' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (timestamp_encoding endianness)
 
-let month_vect endianness attr =
+let month_vect endianness =
   char '\x0d' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (month_encoding endianness)
 
-let date_vect endianness attr =
+let date_vect endianness =
   char '\x0e' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (date_encoding endianness)
 
-let timespan_vect endianness attr =
+let timespan_vect endianness =
   char '\x10' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (timespan_encoding endianness)
 
-let minute_vect endianness attr =
+let minute_vect endianness =
   char '\x11' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (minute_encoding endianness)
 
-let second_vect endianness attr =
+let second_vect endianness =
   char '\x12' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (second_encoding endianness)
 
-let time_vect endianness attr =
+let time_vect endianness =
   char '\x13' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   count len (time_encoding endianness)
 
 let lambda_atom endianness =
   char '\x64' *> symbol_encoding >>= fun sym ->
-  string_vect endianness None >>| fun lam ->
+  string_vect endianness >>| fun lam ->
   (sym, lam)
 
-let general_list big_endian attr elt =
+let general_list big_endian elt =
   char '\x00' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length big_endian >>= fun len ->
   count len elt
 
@@ -1190,14 +1190,14 @@ let stream n p f =
       loop (n - 1) in
   loop n
 
-let general_list_stream endianness attr elt f =
+let general_list_stream endianness elt f =
   char '\x00' *>
-  attribute attr >>= fun () ->
+  attribute >>= fun _ ->
   length endianness >>= fun len ->
   stream len elt f
 
-let lambda_vect endianness attr =
-  general_list endianness attr (lambda_atom endianness)
+let lambda_vect endianness =
+  general_list endianness (lambda_atom endianness)
 
 let uncompress msg compressed =
   let n = ref 0 in
@@ -1260,24 +1260,24 @@ and destruct :
           lift inj (destruct ~big_endian encoding)
         end cases)
   | Err -> err_atom
-  | List (w, attr) -> general_list big_endian attr (destruct ~big_endian w)
+  | List (w, _) -> general_list big_endian (destruct ~big_endian w)
   | Conv (_, inject, w) -> destruct ~big_endian w >>| inject
-  | Tup (w, attr) -> general_list big_endian attr (destruct ~big_endian w) >>| List.hd
-  | Tups (_, _, attr) as t ->
+  | Tup (w, _) -> general_list big_endian (destruct ~big_endian w) >>| List.hd
+  | Tups (_, _, _) as t ->
     char '\x00' *>
-    attribute attr >>= fun () ->
+    attribute >>= fun _ ->
     length big_endian >>= fun _len ->
     destruct_list big_endian t
 
-  | Dict (kw, vw, sorted) ->
-    char (if sorted then '\x7f' else '\x63') *>
+  | Dict (kw, vw, _) ->
+    satisfy (function '\x7f'|'\x63' -> true | _ -> false) *>
     destruct ~big_endian kw >>= fun k ->
     destruct ~big_endian vw >>| fun v ->
     k, v
 
-  | Table (kw, vw, sorted) ->
+  | Table (kw, vw, _) ->
     char '\x62' *>
-    char (if sorted then '\x01' else '\x00') *>
+    satisfy (function '\x00'|'\x01' -> true | _ -> false) *>
     destruct ~big_endian (Dict (kw, vw, false))
 
   | Atom Nil -> nil_atom
@@ -1301,35 +1301,35 @@ and destruct :
   | Atom Lambda -> lambda_atom big_endian
 
   | Vect (Nil, _) -> invalid_arg "nil vect is not allowed"
-  | Vect (Boolean, attr) -> bool_vect big_endian attr
-  | Vect (Guid, attr) -> guid_vect big_endian attr
-  | Vect (Byte, attr) -> byte_vect big_endian attr
-  | Vect (Short, attr) -> short_vect big_endian attr
-  | Vect (Int, attr)  -> int_vect big_endian attr
-  | Vect (Long, attr) -> long_vect big_endian attr
-  | Vect (Real, attr) -> real_vect big_endian attr
-  | Vect (Float, attr) -> float_vect big_endian attr
-  | Vect (Char, attr) -> char_vect big_endian attr
-  | Vect (Symbol, attr) -> symbol_vect big_endian attr
-  | Vect (Timestamp, attr) -> timestamp_vect big_endian attr
-  | Vect (Month, attr) -> month_vect big_endian attr
-  | Vect (Date, attr) -> date_vect big_endian attr
-  | Vect (Timespan, attr) -> timespan_vect big_endian attr
-  | Vect (Minute, attr) -> minute_vect big_endian attr
-  | Vect (Second, attr) -> second_vect big_endian attr
-  | Vect (Time, attr) -> time_vect big_endian attr
-  | Vect (Lambda, attr) -> lambda_vect big_endian attr
+  | Vect (Boolean, _) -> bool_vect big_endian
+  | Vect (Guid, _) -> guid_vect big_endian
+  | Vect (Byte, _) -> byte_vect big_endian
+  | Vect (Short, _) -> short_vect big_endian
+  | Vect (Int, _)  -> int_vect big_endian
+  | Vect (Long, _) -> long_vect big_endian
+  | Vect (Real, _) -> real_vect big_endian
+  | Vect (Float, _) -> float_vect big_endian
+  | Vect (Char, _) -> char_vect big_endian
+  | Vect (Symbol, _) -> symbol_vect big_endian
+  | Vect (Timestamp, _) -> timestamp_vect big_endian
+  | Vect (Month, _) -> month_vect big_endian
+  | Vect (Date, _) -> date_vect big_endian
+  | Vect (Timespan, _) -> timespan_vect big_endian
+  | Vect (Minute, _) -> minute_vect big_endian
+  | Vect (Second, _) -> second_vect big_endian
+  | Vect (Time, _) -> time_vect big_endian
+  | Vect (Lambda, _) -> lambda_vect big_endian
 
-  | String (Byte, attr) -> bytestring_vect big_endian attr
-  | String (Char, attr) -> string_vect big_endian attr
+  | String (Byte, _) -> bytestring_vect big_endian
+  | String (Char, _) -> string_vect big_endian
   | String _ -> invalid_arg "destruct: unsupported string type"
 
 let destruct_stream :
   ?big_endian:bool -> 'a list w -> ('a -> unit) -> unit Angstrom.t =
   fun ?(big_endian=Sys.big_endian) w f ->
   match w with
-  | List (w, attr) ->
-    general_list_stream big_endian attr (destruct ~big_endian w) f
+  | List (w, _) ->
+    general_list_stream big_endian (destruct ~big_endian w) f
   | _ -> invalid_arg "destruct_stream: not a general list"
 
 let destruct_exn ?big_endian v =
