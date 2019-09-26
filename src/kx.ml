@@ -5,9 +5,6 @@
 
 open Sexplib.Std
 
-type time = { time : Ptime.time ; ms : int }
-type timespan = { time : Ptime.time ; ns : int }
-
 let nh = 0xffff_8000
 let wh = 0x7fff
 
@@ -57,32 +54,6 @@ let int32_of_date = function
     | Some t ->
       Int32.of_int (fst Ptime.(Span.to_d_ps (diff t millenium)))
 
-let int32_of_time { time = ((h, m, s), _) ; ms } =
-  Int32.of_int ((h * 3600 + m * 60 + s) * 1_000 + ms)
-
-let time_of_int32 time =
-  let open Int32 in
-  let ms = rem time 1_000l in
-  let s = div time 1_000l in
-  let hh = div s 3600l in
-  let mm = rem (div s 60l) 60l in
-  let ss = rem s 60l in
-  { time = ((to_int hh, to_int mm, to_int ss), 0); ms = to_int ms }
-
-let int64_of_timespan { time = ((h, m, s), _) ; ns } =
-  let open Int64 in
-  add
-    (mul (of_int (h * 3600 + m * 60 + s)) 1_000_000_000L)
-    (of_int ns)
-
-let timespan_of_int64 time =
-  let ns = Int64.(to_int (rem time 1_000_000_000L)) in
-  let s = Int64.(to_int (div time 1_000_000_000L)) in
-  let hh = s / 3600 in
-  let mm = (s / 60) mod 60 in
-  let ss = s mod 60 in
-  { time = (hh, mm, ss), 0 ; ns }
-
 let kx_epoch, kx_epoch_span =
   match Ptime.of_date (2000, 1, 1) with
   | None -> assert false
@@ -90,6 +61,10 @@ let kx_epoch, kx_epoch_span =
 
 let day_in_ns d =
   Int64.(mul (of_int (d * 24 * 3600)) 1_000_000_000L)
+let day_in_ms d =
+  Int32.(mul (of_int (d * 24 * 3600)) 1_000l)
+let day_in_minutes d = Int32.of_int (d * 24 * 60)
+let day_in_seconds d = Int32.of_int (d * 24 * 3600)
 
 let int64_of_timestamp = function
   | ts when Ptime.(equal ts min) -> nj
@@ -117,6 +92,44 @@ let timestamp_of_int64 = function
     | None -> invalid_arg "timestamp_of_int64"
     | Some ts -> ts
 
+let span_of_ns ns =
+  let open Int64 in
+  let is_negative = ns < 0L in
+  let ns = abs ns in
+  let d = div ns (day_in_ns 1) in
+  let ps = rem ns (day_in_ns 1) in
+  let span = Ptime.Span.v (to_int d, div ps 1_000L) in
+  if is_negative then Ptime.Span.neg span else span
+
+let span_of_ns ns =
+  if ns = nj then
+    Ptime.Span.(sub (span_of_ns (Int64.succ nj)) (v (0, 1L)))
+  else span_of_ns ns
+
+let ns_of_span span =
+  let open Int64 in
+  let d, ps = Ptime.Span.to_d_ps span in
+  add (mul (of_int d) (day_in_ns 1)) (div ps 1_000L)
+
+let span_of_ms ms =
+  let open Int32 in
+  let is_negative = ms < 0l in
+  let d = div ms (day_in_ms 1) in
+  let ps = rem ms (day_in_ms 1) in
+  let span =
+    Ptime.Span.v (to_int d, Int64.(div (of_int32 ps) 1_000_000_000L)) in
+  if is_negative then Ptime.Span.neg span else span
+
+let span_of_ms ms =
+  if ms = ni then
+    Ptime.Span.(sub (span_of_ms (Int32.succ ni)) (v (0, 1L)))
+  else span_of_ms ms
+
+let ms_of_span span =
+  let open Int32 in
+  let d, ps = Ptime.Span.to_d_ps span in
+  add (mul (of_int d) (day_in_ms 1)) Int64.(to_int32 (div ps 1_000_000_000L))
+
 let int32_of_month (y, m, _) =
   Int32.of_int ((y - 2000) * 12 + (pred m))
 
@@ -137,28 +150,28 @@ let second_of_span span =
            (Int64.(div ps 1_000_000_000_000L |> to_int32)))
 
 let span_of_minute i =
-  let day_in_minutes = Int32.of_int (24 * 60) in
-  let d = Int32.(to_int (div i day_in_minutes)) in
+  let d = Int32.(to_int (div i (day_in_minutes 1))) in
   let m =
     let open Int64 in
-    mul (mul 60L 1_000_000_000_000L) (of_int32 (Int32.rem i day_in_minutes)) in
+    mul (mul 60L 1_000_000_000_000L)
+      (of_int32 (Int32.rem i (day_in_minutes 1))) in
   Ptime.Span.unsafe_of_d_ps (d, m)
 
 let span_of_second i =
-  let day_in_seconds = Int32.of_int (24 * 3600) in
-  let d = Int32.(to_int (div i day_in_seconds)) in
+  let d = Int32.(to_int (div i (day_in_seconds 1))) in
   let m =
     let open Int64 in
-    mul (mul 60L 1_000_000_000_000L) (of_int32 (Int32.rem i day_in_seconds)) in
+    mul (mul 60L 1_000_000_000_000L)
+      (of_int32 (Int32.rem i (day_in_seconds 1))) in
   Ptime.Span.unsafe_of_d_ps (d, m)
 
-let nn = timespan_of_int64 nj
-let wn = timespan_of_int64 wj
-let minus_wn = timespan_of_int64 (Int64.neg wj)
+let nn = span_of_ns nj
+let wn = span_of_ns wj
+let minus_wn = span_of_ns (Int64.neg wj)
 
-let nt = time_of_int32 ni
-let wt = time_of_int32 wi
-let minus_wt = time_of_int32 (Int32.neg wi)
+let nt = span_of_ms ni
+let wt = span_of_ms wi
+let minus_wt = span_of_ms (Int32.neg wi)
 
 let nm = month_of_int32 ni
 let wm = month_of_int32 wi
@@ -191,10 +204,10 @@ type _ typ =
   | Timestamp : Ptime.t typ
   | Month : Ptime.date typ
   | Date : Ptime.date typ
-  | Timespan : timespan typ
+  | Timespan : Ptime.Span.t typ
   | Minute : Ptime.Span.t typ
   | Second : Ptime.Span.t typ
-  | Time : time typ
+  | Time : Ptime.Span.t typ
   | Lambda : (string * string) typ
 
 type (_, _) eq = Eq : ('a, 'a) eq
@@ -467,8 +480,6 @@ let table5 ?(sorted=false) v1 v2 v3 v4 v5 =
 (* let string_of_chars a = String.init (Array.length a) (Array.get a) *)
 let pp_print_month ppf (y, m, _) = Format.fprintf ppf "%d.%dm" y m
 let pp_print_date ppf (y, m, d) =  Format.fprintf ppf "%d.%d.%d" y m d
-let pp_print_timespan ppf { time = ((hh, mm, ss), _) ; ns } = Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ns
-let pp_print_time ppf { time = ((hh, mm, ss), _) ; ms } = Format.fprintf ppf "%d:%d:%d.%d" hh mm ss ms
 (* let pp_print_symbols ppf syms = Array.iter (fun sym -> Format.fprintf ppf "`%s" sym) syms *)
 
 let pp_print_timestamp ppf = function
@@ -608,7 +619,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
 
   | Atom Timespan ->
     write_char buf '\xf0' ;
-    FE.write_uint64 buf (int64_of_timespan a)
+    FE.write_uint64 buf (ns_of_span a)
 
   | Atom Minute ->
     write_char buf '\xef' ;
@@ -620,7 +631,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
 
   | Atom Time ->
     write_char buf '\xed' ;
-    FE.write_uint32 buf (int32_of_time a)
+    FE.write_uint32 buf (ms_of_span a)
 
   | Atom Lambda ->
     write_char buf '\x64' ;
@@ -750,7 +761,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
     write_char buf (char_of_attribute attr) ;
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter begin fun a ->
-      FE.write_uint64 buf (int64_of_timespan a)
+      FE.write_uint64 buf (ns_of_span a)
     end a
 
   | Vect (Minute, attr) ->
@@ -774,7 +785,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
     write_char buf (char_of_attribute attr) ;
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter begin fun a ->
-      FE.write_uint32 buf (int32_of_time a)
+      FE.write_uint32 buf (ms_of_span a)
     end a
 
   | String _ -> assert false
@@ -1009,7 +1020,7 @@ let date_atom endianness =
 
 let timespan_encoding endianness =
   let module M = (val getmod endianness) in
-  M.any_int64 >>| timespan_of_int64
+  M.any_int64 >>| span_of_ns
 
 let timespan_atom endianness =
   char '\xf0' *> timespan_encoding endianness
@@ -1030,7 +1041,7 @@ let second_atom endianness =
 
 let time_encoding endianness =
   let module M = (val getmod endianness) in
-  M.any_int32 >>| time_of_int32
+  M.any_int32 >>| span_of_ms
 
 let time_atom endianness =
   char '\xed' *> time_encoding endianness
@@ -1392,10 +1403,10 @@ and pp :
   | Atom Timestamp -> pp_print_timestamp ppf v
   | Atom Month -> pp_print_month ppf v
   | Atom Date -> pp_print_date ppf v
-  | Atom Timespan -> pp_print_timespan ppf v
+  | Atom Timespan -> Ptime.Span.pp ppf v
   | Atom Minute -> Ptime.Span.pp ppf v
   | Atom Second -> Ptime.Span.pp ppf v
-  | Atom Time -> pp_print_time ppf v
+  | Atom Time -> Ptime.Span.pp ppf v
   | Atom Lambda -> pp_print_lambda ppf v
 
   | Vect (Nil, _) -> invalid_arg "nil vect is not allowed"
@@ -1412,10 +1423,10 @@ and pp :
   | Vect (Timestamp, _) -> Format.pp_print_list ~pp_sep pp_print_timestamp ppf v
   | Vect (Month, _) -> Format.pp_print_list ~pp_sep pp_print_month ppf v
   | Vect (Date, _) -> Format.pp_print_list ~pp_sep pp_print_date ppf v
-  | Vect (Timespan, _) -> Format.pp_print_list ~pp_sep pp_print_timespan ppf v
+  | Vect (Timespan, _) -> Format.pp_print_list ~pp_sep Ptime.Span.pp ppf v
   | Vect (Minute, _) -> Format.pp_print_list ~pp_sep Ptime.Span.pp ppf v
   | Vect (Second, _) -> Format.pp_print_list ~pp_sep Ptime.Span.pp ppf v
-  | Vect (Time, _) -> Format.pp_print_list ~pp_sep pp_print_time ppf v
+  | Vect (Time, _) -> Format.pp_print_list ~pp_sep Ptime.Span.pp ppf v
   | Vect (Lambda, _) -> Format.pp_print_list ~pp_sep pp_print_lambda ppf v
 
   | String (Byte, _) -> Format.pp_print_string ppf v

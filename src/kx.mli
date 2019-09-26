@@ -3,9 +3,6 @@
    Distributed under the ISC license, see terms at the end of the file.
   ---------------------------------------------------------------------------*)
 
-type time = { time : Ptime.time ; ms : int }
-type timespan = { time : Ptime.time ; ns : int }
-
 type attribute =
   | Sorted
   | Unique
@@ -30,10 +27,10 @@ val sym       : string typ
 val timestamp : Ptime.t typ
 val month     : Ptime.date typ
 val date      : Ptime.date typ
-val timespan  : timespan typ
+val timespan  : Ptime.Span.t typ
 val minute    : Ptime.Span.t typ
 val second    : Ptime.Span.t typ
-val time      : time typ
+val time      : Ptime.Span.t typ
 val lambda    : (string * string) typ
 
 val err : string w
@@ -115,14 +112,14 @@ val wf : float
 val ptime_neginf : Ptime.t
 
 (** Timespan *)
-val nn : timespan
-val wn : timespan
-val minus_wn : timespan
+val nn : Ptime.Span.t
+val wn : Ptime.Span.t
+val minus_wn : Ptime.Span.t
 
 (** Time *)
-val nt : time
-val wt : time
-val minus_wt : time
+val nt : Ptime.Span.t
+val wt : Ptime.Span.t
+val minus_wt : Ptime.Span.t
 
 (** Month *)
 val nm : Ptime.date
@@ -155,9 +152,6 @@ val month_of_int32 : int32 -> Ptime.date
 
 val int32_of_date : Ptime.date -> int32
 val date_of_int32 : int32 -> Ptime.date
-
-val int32_of_time : time -> int32
-val time_of_int32 : int32 -> time
 
 val pp_print_date : (int * int * int) Fmt.t
 
