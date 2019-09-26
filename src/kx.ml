@@ -463,7 +463,8 @@ let table ?(sorted=false) vs =
     invalid_arg "table keys and values must be lists" ;
   Table (v sym, vs, sorted)
 
-let table1 ?(sorted=false) v1 = Table (v sym, t1 (v v1), sorted)
+let table1 ?(sorted=false) ?attr1 ?attr2 v1 =
+  Table (v ?attr:attr1 sym, t1 (v ?attr:attr2 v1), sorted)
 let table2 ?(sorted=false) v1 v2 =
   let attr = if sorted then Some Parted else None in
   Table (v sym, t2 (v ?attr v1) (v v2), sorted)

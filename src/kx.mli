@@ -55,7 +55,9 @@ val merge_tups : 'a w -> 'b w -> ('a * 'b) w
 val dict : ?sorted:bool -> 'a w -> 'b w -> ('a * 'b) w
 val table : ?sorted:bool -> 'a w -> (string list * 'a) w
 
-val table1: ?sorted:bool -> 'a typ -> (string list * 'a list) w
+val table1:
+  ?sorted:bool -> ?attr1:attribute -> ?attr2:attribute ->
+  'a typ -> (string list * 'a list) w
 val table2: ?sorted:bool ->
   'a typ -> 'b typ ->
   (string list * ('a list * 'b list)) w
