@@ -22,19 +22,22 @@ val pp_print_error : Format.formatter -> error -> unit
 val fail : error -> 'a
 val fail_on_error : ('a, error) result -> 'a
 
-type af = {
-  af: 'a. 'a w -> ('a, [`Q of string | `Angstrom of string]) result Deferred.t
+type connection_async = {
+  af: 'a. 'a w -> ('a, [`Q of string | `Angstrom of string]) result Deferred.t;
+  w: t Pipe.Writer.t
 }
+
+val closed_connection_async : connection_async
 
 val connect_async :
   ?comp:bool ->
   ?buf:Faraday.t ->
-  Uri.t -> (af * t Pipe.Writer.t, error) result Deferred.t
+  Uri.t -> (connection_async, error) result Deferred.t
 
 val with_connection_async :
   ?comp:bool ->
   ?buf:Faraday.t ->
-  Uri.t -> f:(af -> t Pipe.Writer.t -> 'b Deferred.t) ->
+  Uri.t -> f:(connection_async -> 'b Deferred.t) ->
   ('b, error) result Deferred.t
 
 type sf = {

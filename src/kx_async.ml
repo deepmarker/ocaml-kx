@@ -37,8 +37,14 @@ let fail_on_error = function
   | Ok v -> v
   | Error e -> fail e
 
-type af = {
-  af: 'a. 'a w -> ('a, [`Q of string | `Angstrom of string]) result Deferred.t
+type connection_async = {
+  af: 'a. 'a w -> ('a, [`Q of string | `Angstrom of string]) result Deferred.t ;
+  w: t Pipe.Writer.t ;
+}
+
+let closed_connection_async = {
+  af = (fun _ -> return (Error (`Q "disconnected"))) ;
+  w = Pipe.create_writer (fun r -> Pipe.close_read r; Deferred.unit) ;
 }
 
 let parse_compressed ~big_endian ~msglen w r =
@@ -89,7 +95,7 @@ let connect_async ?comp ?(buf=Faraday.create 4096) url =
               | Error msg -> Error (`Angstrom msg)
               | Ok (Ok v) -> Ok v
           in
-          Ivar.fill connected (Ok ({ af }, client_write)) ;
+          Ivar.fill connected (Ok { af ; w = client_write }) ;
           Pipe.iter kx_read ~f:begin fun (K (big_endian, typ, wit, msg)) ->
             let serialized = construct ?comp ~big_endian ~typ ~buf wit msg in
             Writer.write_bigstring w serialized ;
@@ -121,9 +127,9 @@ let connect_async ?comp ?(buf=Faraday.create 4096) url =
 let with_connection_async ?comp ?buf url ~f =
   connect_async ?comp ?buf url >>= function
   | Error _ as e -> return e
-  | Ok (f', w) ->
-    Monitor.protect (fun () -> f f' w >>| fun v -> Ok v)
-      ~finally:(fun () -> Pipe.close w ; Deferred.unit)
+  | Ok c ->
+    Monitor.protect (fun () -> f c >>| fun v -> Ok v)
+      ~finally:(fun () -> Pipe.close c.w ; Deferred.unit)
 
 type sf = {
   sf: 'a 'b. ('a w -> 'a -> 'b w -> ('b, error) result Deferred.t)

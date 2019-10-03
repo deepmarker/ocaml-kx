@@ -184,8 +184,8 @@ let test_server () =
   let open Kx_async in
   let t = create (t2 (s Kx.char) (a Kx.bool)) ("upd", false) in
   with_connection_async
-    (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun _ p ->
-    Pipe.write p t
+    (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun { w; _ } ->
+    Pipe.write w t
   end >>= function
   | Error e ->
     failwithf "%s" (Format.asprintf "%a" Kx_async.pp_print_error e) ()
