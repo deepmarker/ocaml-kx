@@ -9,34 +9,6 @@ module Log_async = (val Logs_async.src_log src : Logs_async.LOG)
 type msg = K : { big_endian:bool; typ:'a w;  msg:'a } -> msg
 let create ?(big_endian=Sys.big_endian) typ msg = K { big_endian; typ; msg }
 
-type error = [
-  | `Q of string
-  | `Angstrom of string
-  | `ConnectionTerminated
-  | `Exn of exn
-  | `ProtoError of int
-  | `Eof
-] [@@deriving sexp_of]
-
-let pp_print_error ppf = function
-  | `Q msg ->
-    Format.fprintf ppf "Q error: %s" msg
-  | `Angstrom msg ->
-    Format.fprintf ppf "Parsing error: %s" msg
-  | `ProtoError ver ->
-    Format.fprintf ppf "Remote server only supports protocol version %d" ver
-  | `Eof ->
-    Format.fprintf ppf "Remote server closed connection"
-  | `ConnectionTerminated ->
-    Format.fprintf ppf "Connection terminated"
-  | `Exn exn ->
-    Format.fprintf ppf "%a" Exn.pp exn
-
-let fail err = failwith (Format.asprintf "%a" pp_print_error err)
-let fail_on_error = function
-  | Ok v -> v
-  | Error e -> fail e
-
 let parse_compressed ~big_endian ~msglen w r =
   let module E = (val (getmod big_endian) : ENDIAN) in
   let open Deferred.Result.Monad_infix in
@@ -59,7 +31,7 @@ let write_handshake w url =
 
 module Async = struct
   type connection =  {
-    af: 'a. 'a w -> ('a, [`Q of string | `Angstrom of string]) result Deferred.t ;
+    af: 'a. 'a w -> 'a Deferred.Or_error.t ;
     w: msg Pipe.Writer.t ;
   }
 
@@ -79,7 +51,7 @@ module Async = struct
   include Persistent_connection_kernel.Make(T)
 
   let empty = {
-    af = (fun _ -> return (Error (`Q "disconnected"))) ;
+    af = (fun _ -> return (Error (Error.of_string "disconnected"))) ;
     w = Pipe.create_writer (fun r -> Pipe.close_read r; Deferred.unit) ;
   }
 
@@ -97,7 +69,7 @@ module Async = struct
               (* let h = Reader.peek_available r ~len:8 in *)
               (* Log_async.debug (fun m -> m "%a" Hex.pp (Hex.of_string h)) >>= fun () -> *)
               Angstrom_async.parse hdr r >>= function
-              | Error msg -> return (Error (`Angstrom msg))
+              | Error msg -> return (Error (Error.of_string msg))
               | Ok ({ big_endian; typ=_; compressed; len } as hdr) ->
                 let msglen = Int32.to_int_exn len - 8 in
                 Log_async.debug (fun m -> m "%a" Kx.pp_print_hdr hdr) >>= fun () ->
@@ -107,8 +79,8 @@ module Async = struct
                   | false -> Angstrom_async.parse (destruct ~big_endian w) r
                   | true -> parse_compressed ~big_endian ~msglen w r
                 end >>| function
-                | Ok (Error msg) -> (Error (`Q msg))
-                | Error msg -> Error (`Angstrom msg)
+                | Ok (Error msg) -> (Error (Error.of_string msg))
+                | Error msg -> Error (Error.of_string msg)
                 | Ok (Ok v) -> Ok v
             in
             Ivar.fill connected (Ok { af ; w = client_write }) ;
@@ -121,10 +93,10 @@ module Async = struct
           Pipe.close_read kx_read
         end
       | `Ok c ->
-        Ivar.fill connected (Error (`ProtoError (Char.to_int c))) ;
+        Ivar.fill connected (Error (Error.createf "%d" (Char.to_int c))) ;
         Deferred.unit
       | `Eof ->
-        Ivar.fill connected (Error (`Eof)) ;
+        Ivar.fill connected (Error (Error.of_string "EOF")) ;
         Deferred.unit in
     let th = try_with ~extract_exn:true begin fun () ->
         Async_uri.with_connection url process
@@ -134,9 +106,10 @@ module Async = struct
     Deferred.any [
       (th >>= function
         | Error exn ->
-          Log_async.err (fun m -> m "%a" Exn.pp exn) >>| fun () ->
-          Error (`Exn exn)
-        | Ok () -> return (Error `ConnectionTerminated)) ;
+          Log_async.err (fun m -> m "%a" Exn.pp exn) >>= fun () ->
+          Deferred.Or_error.fail (Error.of_exn exn)
+        | Ok () ->
+          Deferred.Or_error.fail (Error.of_string "Connection terminated")) ;
       Ivar.read connected ;
     ]
 
@@ -149,17 +122,21 @@ module Async = struct
 end
 
 type sf = {
-  sf: 'a 'b. ('a w -> 'a -> 'b w -> ('b, error) result Deferred.t)
+  sf: 'a 'b. ('a w -> 'a -> 'b w -> 'b Deferred.Or_error.t)
 }
 
 let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
   Async_uri.connect url >>= fun (_s, _tls, r, w) ->
   write_handshake w url ;
   Reader.read_char r >>= function
-  | `Ok '\x03' ->
+  | `Eof  ->
+    Deferred.Or_error.fail (Error.of_string "EOF")
+  | `Ok c when c <> '\x03' ->
+    Deferred.Or_error.fail (Error.createf "%d" (Char.to_int c))
+  | `Ok _ ->
     Monitor.detach (Writer.monitor w) ;
     let f = { sf = fun wq q wr ->
-        try_with begin fun () ->
+        Monitor.try_with_or_error begin fun () ->
           let serialized = construct ?comp ?big_endian ~typ:`Sync ~buf wq q in
           Writer.write_bigstring w serialized ;
           Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
@@ -171,14 +148,12 @@ let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
             | true -> parse_compressed ~big_endian ~msglen wr r
           end
         end >>| function
-        | Error e -> Error (`Exn e)
-        | Ok (Error msg) -> Error (`Angstrom msg)
-        | Ok (Ok (Error msg)) -> Error (`Q msg)
+        | Error e -> Error e
+        | Ok (Error msg) -> Error (Error.of_string msg)
+        | Ok (Ok (Error msg)) -> Error (Error.of_string msg)
         | Ok (Ok (Ok v)) -> Ok v
       } in
     return (Ok (f, r, w))
-  | `Ok c -> return (Error (`ProtoError (Char.to_int c)))
-  | `Eof  -> return (Error (`Eof))
 
 let with_connection_sync ?comp ?big_endian ?buf url ~f =
   connect_sync ?comp ?big_endian ?buf url >>= function

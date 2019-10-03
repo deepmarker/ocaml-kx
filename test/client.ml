@@ -11,7 +11,7 @@ let main port =
       let expr = String.chop_suffix_exn expr ~suffix:"\n" in
       sf (s char) expr (a long) >>= function
       | Ok v -> Logs_async.app (fun m -> m "%Ld" v)
-      | Error e -> Logs_async.err (fun m -> m "%a" Kx_async.pp_print_error e)
+      | Error e -> Logs_async.err (fun m -> m "%a" Error.pp e)
     end;
   end >>= fun _ ->
   Deferred.unit
