@@ -1,12 +1,10 @@
+open Core
 open Async
 open Kx
 
-type t
+type msg
 
-val create :
-  ?big_endian:bool ->
-  ?typ:[`Sync | `Async] ->
-  'a w -> 'a -> t
+val create : ?big_endian:bool -> 'a w -> 'a -> msg
 
 type error = [
   | `Q of string
@@ -22,23 +20,25 @@ val pp_print_error : Format.formatter -> error -> unit
 val fail : error -> 'a
 val fail_on_error : ('a, error) result -> 'a
 
-type connection_async = {
-  af: 'a. 'a w -> ('a, [`Q of string | `Angstrom of string]) result Deferred.t;
-  w: t Pipe.Writer.t
-}
+module Async : sig
+  type connection =  {
+    af: 'a. 'a w -> ('a, [`Q of string | `Angstrom of string]) result Deferred.t;
+    w: msg Pipe.Writer.t
+  }
 
-val closed_connection_async : connection_async
+  include Persistent_connection_kernel.S with type conn := connection
 
-val connect_async :
-  ?comp:bool ->
-  ?buf:Faraday.t ->
-  Uri.t -> (connection_async, error) result Deferred.t
+  val empty : connection
 
-val with_connection_async :
-  ?comp:bool ->
-  ?buf:Faraday.t ->
-  Uri.t -> f:(connection_async -> 'b Deferred.t) ->
-  ('b, error) result Deferred.t
+  val connect :
+    ?comp:bool -> ?buf:Faraday.t ->
+    Uri.t -> (connection, error) Deferred.Result.t
+
+  val with_connection :
+    ?comp:bool -> ?buf:Faraday.t ->
+    Uri.t -> f:(connection -> 'b Deferred.t) ->
+    ('b, error) Deferred.Result.t
+end
 
 type sf = {
   sf: 'a 'b. ('a w -> 'a -> 'b w -> ('b, error) result Deferred.t)
