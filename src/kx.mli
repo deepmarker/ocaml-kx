@@ -70,6 +70,9 @@ val table4: ?sorted:bool ->
 val table5: ?sorted:bool ->
   'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ ->
   (string list * ('a list * 'b list * 'c list * 'd list * 'e list)) w
+val table6: ?sorted:bool ->
+  'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ ->
+  (string list * ('a list * 'b list * 'c list * 'd list * 'e list * 'f list)) w
 
 val conv : ('a -> 'b) -> ('b -> 'a) -> 'b w -> 'a w
 val case : 'a w -> ('b -> 'a option) -> ('a -> 'b) -> 'b case

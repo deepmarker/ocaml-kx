@@ -477,6 +477,9 @@ let table4 ?(sorted=false) v1 v2 v3 v4 =
 let table5 ?(sorted=false) v1 v2 v3 v4 v5 =
   let attr = if sorted then Some Parted else None in
   Table (v sym, t5 (v ?attr v1) (v v2) (v v3) (v v4) (v v5), sorted)
+let table6 ?(sorted=false) v1 v2 v3 v4 v5 v6 =
+  let attr = if sorted then Some Parted else None in
+  Table (v sym, t6 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6), sorted)
 
 (* let string_of_chars a = String.init (Array.length a) (Array.get a) *)
 let pp_print_month ppf (y, m, _) = Format.fprintf ppf "%d.%dm" y m
