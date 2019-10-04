@@ -30,25 +30,25 @@ let write_handshake w url =
        (Option.value ~default:"" (Uri.password url)))
 
 module Async = struct
-  type connection =  {
+  type t =  {
     af: 'a. 'a w -> 'a Deferred.Or_error.t ;
     w: msg Pipe.Writer.t ;
   }
 
   module T = struct
     module Address = struct
-      include Socket.Address.Inet
+      include Uri_sexp
       let equal a b = compare a b = 0
     end
 
-    type t = connection
+    type nonrec t = t
 
     let close { w; _ } = Pipe.close w ; Deferred.unit
     let is_closed { w; _ } = Pipe.is_closed w
     let close_finished { w; _ } = Pipe.closed w
   end
 
-  include Persistent_connection_kernel.Make(T)
+  module Persistent = Persistent_connection_kernel.Make(T)
 
   let empty = {
     af = (fun _ -> return (Error (Error.of_string "disconnected"))) ;

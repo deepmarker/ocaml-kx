@@ -5,23 +5,25 @@ type msg
 val create : ?big_endian:bool -> 'a w -> 'a -> msg
 
 module Async : sig
-  type connection =  {
+  type t =  {
     af: 'a. 'a w -> 'a Deferred.Or_error.t;
     w: msg Pipe.Writer.t
   }
 
-  include Persistent_connection_kernel.S with type conn := connection
-
-  val empty : connection
+  val empty : t
 
   val connect :
     ?comp:bool -> ?buf:Faraday.t ->
-    Uri.t -> connection Deferred.Or_error.t
+    Uri.t -> t Deferred.Or_error.t
 
   val with_connection :
     ?comp:bool -> ?buf:Faraday.t ->
-    Uri.t -> f:(connection -> 'b Deferred.t) ->
+    Uri.t -> f:(t -> 'b Deferred.t) ->
     'b Deferred.Or_error.t
+
+  module Persistent : Persistent_connection_kernel.S
+    with type conn := t
+     and type address := Uri.t
 end
 
 type sf = {

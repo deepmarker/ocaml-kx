@@ -21,6 +21,7 @@
  (preprocess (pps ppx_sexp_conv))
  (synopsis "OCaml client for kdb+, for Jane Street's async")
  (libraries
+   uri-sexp
    kx
    core
    async
