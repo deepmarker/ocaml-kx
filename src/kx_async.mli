@@ -6,7 +6,7 @@ val create : ?big_endian:bool -> 'a w -> 'a -> msg
 
 module Async : sig
   type t =  {
-    af: 'a. 'a w -> 'a Deferred.Or_error.t;
+    r: 'a. 'a w -> 'a Deferred.Or_error.t;
     w: msg Pipe.Writer.t
   }
 

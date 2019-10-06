@@ -31,7 +31,7 @@ let write_handshake w url =
 
 module Async = struct
   type t =  {
-    af: 'a. 'a w -> 'a Deferred.Or_error.t ;
+    r: 'a. 'a w -> 'a Deferred.Or_error.t ;
     w: msg Pipe.Writer.t ;
   }
 
@@ -51,9 +51,35 @@ module Async = struct
   module Persistent = Persistent_connection_kernel.Make(T)
 
   let empty = {
-    af = (fun _ -> return (Error (Error.of_string "disconnected"))) ;
+    r = (fun _ -> return (Error (Error.of_string "disconnected"))) ;
     w = Pipe.create_writer (fun r -> Pipe.close_read r; Deferred.unit) ;
   }
+
+  let read r w =
+    Reader.peek r ~len:8 >>= fun _ ->
+    (* let h = Reader.peek_available r ~len:8 in *)
+    (* Log_async.debug (fun m -> m "%a" Hex.pp (Hex.of_string h)) >>= fun () -> *)
+    Angstrom_async.parse hdr r >>= function
+    | Error msg -> return (Error (Error.of_string msg))
+    | Ok ({ big_endian; typ=_; compressed; len } as hdr) ->
+      let msglen = Int32.to_int_exn len - 8 in
+      Log_async.debug (fun m -> m "%a" Kx.pp_print_hdr hdr) >>= fun () ->
+      (* let msg = Reader.peek_available r ~len:(msglen - 8) in *)
+      (* Log_async.debug (fun m -> m "%d %a" (String.length msg) Hex.pp (Hex.of_string msg)) >>= fun () -> *)
+      begin match compressed with
+        | false -> Angstrom_async.parse (destruct ~big_endian w) r
+        | true -> parse_compressed ~big_endian ~msglen w r
+      end >>| function
+      | Ok (Error msg) -> (Error (Error.of_string msg))
+      | Error msg -> Error (Error.of_string msg)
+      | Ok (Ok v) -> Ok v
+
+  let send_client_msgs ?comp ?buf r w =
+    Pipe.iter r ~f:begin fun (K { big_endian; typ; msg }) ->
+      let serialized = construct ?comp ?buf ~big_endian ~typ:`Async typ msg in
+      Writer.write_bigstring w serialized ;
+      Log_async.debug (fun m -> m "@[%a@]" (Kx.pp typ) msg)
+    end
 
   let connect ?comp ?(buf=Faraday.create 4096) url =
     let kx_read, client_write = Pipe.create () in
@@ -62,55 +88,27 @@ module Async = struct
       Monitor.detach (Writer.monitor w) ;
       write_handshake w url ;
       Reader.read_char r >>= function
-      | `Ok '\x03' ->
-        begin try_with begin fun () ->
-            let af w =
-              Reader.peek r ~len:8 >>= fun _ ->
-              (* let h = Reader.peek_available r ~len:8 in *)
-              (* Log_async.debug (fun m -> m "%a" Hex.pp (Hex.of_string h)) >>= fun () -> *)
-              Angstrom_async.parse hdr r >>= function
-              | Error msg -> return (Error (Error.of_string msg))
-              | Ok ({ big_endian; typ=_; compressed; len } as hdr) ->
-                let msglen = Int32.to_int_exn len - 8 in
-                Log_async.debug (fun m -> m "%a" Kx.pp_print_hdr hdr) >>= fun () ->
-                (* let msg = Reader.peek_available r ~len:(msglen - 8) in *)
-                (* Log_async.debug (fun m -> m "%d %a" (String.length msg) Hex.pp (Hex.of_string msg)) >>= fun () -> *)
-                begin match compressed with
-                  | false -> Angstrom_async.parse (destruct ~big_endian w) r
-                  | true -> parse_compressed ~big_endian ~msglen w r
-                end >>| function
-                | Ok (Error msg) -> (Error (Error.of_string msg))
-                | Error msg -> Error (Error.of_string msg)
-                | Ok (Ok v) -> Ok v
-            in
-            Ivar.fill connected (Ok { af ; w = client_write }) ;
-            Pipe.iter kx_read ~f:begin fun (K { big_endian; typ; msg }) ->
-              let serialized = construct ?comp ~big_endian ~typ:`Async ~buf typ msg in
-              Writer.write_bigstring w serialized ;
-              Log_async.debug (fun m -> m "@[%a@]" (Kx.pp typ) msg)
-            end
-          end >>| fun _ ->
-          Pipe.close_read kx_read
-        end
-      | `Ok c ->
-        Ivar.fill connected (Error (Error.createf "%d" (Char.to_int c))) ;
-        Deferred.unit
       | `Eof ->
-        Ivar.fill connected (Error (Error.of_string "EOF")) ;
-        Deferred.unit in
-    let th = try_with ~extract_exn:true begin fun () ->
-        Async_uri.with_connection url process
-      end >>| fun e ->
-      Pipe.close_read kx_read ;
-      e in
+        Ivar.fill connected (Or_error.error_string "EOF") ;
+        Deferred.unit
+      | `Ok c when c <> '\x03'->
+        Ivar.fill connected (Or_error.errorf "Invalid handsharke %C" c) ;
+        Deferred.unit
+      | `Ok _ ->
+        Ivar.fill connected (Ok { r = (fun w -> read r w) ; w = client_write }) ;
+        send_client_msgs ?comp ~buf kx_read w in
     Deferred.any [
-      (th >>= function
-        | Error exn ->
-          Log_async.err (fun m -> m "%a" Exn.pp exn) >>= fun () ->
-          Deferred.Or_error.fail (Error.of_exn exn)
-        | Ok () ->
-          Deferred.Or_error.fail (Error.of_string "Connection terminated")) ;
       Ivar.read connected ;
+      (Monitor.try_with_or_error begin fun () ->
+          Async_uri.with_connection url process
+        end >>= function
+       | Error e ->
+         Pipe.close_read kx_read ;
+         Log_async.err (fun m -> m "%a" Error.pp e) >>= fun () ->
+         Deferred.Or_error.fail e
+       | Ok () ->
+         Pipe.close_read kx_read ;
+         Deferred.Or_error.fail (Error.of_string "Connection terminated")) ;
     ]
 
   let with_connection ?comp ?buf url ~f =
