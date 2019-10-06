@@ -21,9 +21,18 @@ module Async : sig
     Uri.t -> f:(t -> 'b Deferred.t) ->
     'b Deferred.Or_error.t
 
-  module Persistent : Persistent_connection_kernel.S
-    with type conn := t
-     and type address := Uri.t
+  module Persistent : sig
+    include Persistent_connection_kernel.S
+      with type conn := t
+       and type address := Uri.t
+
+    val create' :
+      server_name:string ->
+      ?on_event:(Event.t -> unit Deferred.t) ->
+      ?retry_delay:(unit -> Core_kernel.Time_ns.Span.t) ->
+      ?comp:bool ->
+      ?buf:Faraday.t -> (unit -> Uri.t Deferred.Or_error.t) -> t
+  end
 end
 
 type sf = {

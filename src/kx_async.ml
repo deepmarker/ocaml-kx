@@ -48,8 +48,6 @@ module Async = struct
     let close_finished { w; _ } = Pipe.closed w
   end
 
-  module Persistent = Persistent_connection_kernel.Make(T)
-
   let empty = {
     r = (fun _ -> return (Error (Error.of_string "disconnected"))) ;
     w = Pipe.create_writer (fun r -> Pipe.close_read r; Deferred.unit) ;
@@ -117,6 +115,12 @@ module Async = struct
     | Ok c ->
       Monitor.protect (fun () -> f c >>| fun v -> Ok v)
         ~finally:(fun () -> Pipe.close c.w ; Deferred.unit)
+
+  module Persistent = struct
+    include Persistent_connection_kernel.Make(T)
+    let create' ~server_name ?on_event ?retry_delay ?comp ?buf =
+      create ~server_name ?on_event ?retry_delay ~connect:(connect ?comp ?buf)
+  end
 end
 
 type sf = {
