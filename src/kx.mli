@@ -73,6 +73,15 @@ val table5: ?sorted:bool ->
 val table6: ?sorted:bool ->
   'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ ->
   (string list * ('a list * 'b list * 'c list * 'd list * 'e list * 'f list)) w
+val table7: ?sorted:bool ->
+  'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ ->
+  (string list * ('a list * 'b list * 'c list * 'd list * 'e list * 'f list * 'g list)) w
+val table8: ?sorted:bool ->
+  'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ ->
+  (string list * ('a list * 'b list * 'c list * 'd list * 'e list * 'f list * 'g list * 'h list)) w
+val table9: ?sorted:bool ->
+  'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> 'i typ ->
+  (string list * ('a list * 'b list * 'c list * 'd list * 'e list * 'f list * 'g list * 'h list * 'i list)) w
 
 val conv : ('a -> 'b) -> ('b -> 'a) -> 'b w -> 'a w
 val case : 'a w -> ('b -> 'a option) -> ('a -> 'b) -> 'b case

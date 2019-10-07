@@ -480,6 +480,15 @@ let table5 ?(sorted=false) v1 v2 v3 v4 v5 =
 let table6 ?(sorted=false) v1 v2 v3 v4 v5 v6 =
   let attr = if sorted then Some Parted else None in
   Table (v sym, t6 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6), sorted)
+let table7 ?(sorted=false) v1 v2 v3 v4 v5 v6 v7 =
+  let attr = if sorted then Some Parted else None in
+  Table (v sym, t7 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7), sorted)
+let table8 ?(sorted=false) v1 v2 v3 v4 v5 v6 v7 v8 =
+  let attr = if sorted then Some Parted else None in
+  Table (v sym, t8 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8), sorted)
+let table9 ?(sorted=false) v1 v2 v3 v4 v5 v6 v7 v8 v9 =
+  let attr = if sorted then Some Parted else None in
+  Table (v sym, t9 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8) (v v9), sorted)
 
 (* let string_of_chars a = String.init (Array.length a) (Array.get a) *)
 let pp_print_month ppf (y, m, _) = Format.fprintf ppf "%d.%dm" y m
