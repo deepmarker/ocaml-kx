@@ -118,6 +118,12 @@ module Async = struct
 
   module Persistent = struct
     include Persistent_connection_kernel.Make(T)
+
+    let with_current_connection c ~f =
+      match current_connection c with
+      | None -> Deferred.Or_error.error_string "No current connection available"
+      | Some c -> Monitor.try_with_join_or_error (fun () -> f c)
+
     let create' ~server_name ?on_event ?retry_delay ?comp ?buf =
       create ~server_name ?on_event ?retry_delay ~connect:(connect ?comp ?buf)
   end

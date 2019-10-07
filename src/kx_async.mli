@@ -23,8 +23,11 @@ module Async : sig
 
   module Persistent : sig
     include Persistent_connection_kernel.S
-      with type conn := t
-       and type address := Uri.t
+      with type conn = t
+       and type address = Uri.t
+
+    val with_current_connection :
+      t -> f:(conn -> 'a Deferred.Or_error.t) -> 'a Deferred.Or_error.t
 
     val create' :
       server_name:string ->
