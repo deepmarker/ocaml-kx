@@ -11,17 +11,19 @@ let create ?(big_endian=Sys.big_endian) typ msg = K { big_endian; typ; msg }
 
 let parse_compressed ~big_endian ~msglen w r =
   let module E = (val (getmod big_endian) : ENDIAN) in
-  let open Deferred.Result.Monad_infix in
-  Angstrom_async.parse E.any_int32 r >>= fun uncompLen ->
+  let open Deferred.Or_error.Monad_infix in
+  Deferred.Result.map_error
+    ~f:Error.of_string (Angstrom_async.parse E.any_int32 r) >>= fun uncompLen ->
   let uncompLen = Int32.to_int_exn uncompLen in
-  Angstrom_async.parse (Angstrom.take_bigstring (msglen-4)) r >>= fun compMsg ->
+  Deferred.Result.map_error ~f:Error.of_string
+    (Angstrom_async.parse (Angstrom.take_bigstring (msglen-4)) r) >>= fun compMsg ->
   let uncompMsg = Bigstringaf.create uncompLen in
   uncompress uncompMsg compMsg ;
   let res =
     Angstrom.parse_bigstring
-      (destruct ~big_endian w)
+      Angstrom.(lift (Result.map_error ~f:Error.of_string) (destruct ~big_endian w))
       (Bigstringaf.sub uncompMsg ~off:8 ~len:(uncompLen-8)) in
-  return res
+  return (Result.(join (map_error res ~f:(Error.of_string))))
 
 let write_handshake w url =
   Writer.write w
@@ -65,12 +67,12 @@ module Async = struct
       (* let msg = Reader.peek_available r ~len:(msglen - 8) in *)
       (* Log_async.debug (fun m -> m "%d %a" (String.length msg) Hex.pp (Hex.of_string msg)) >>= fun () -> *)
       begin match compressed with
-        | false -> Angstrom_async.parse (destruct ~big_endian w) r
         | true -> parse_compressed ~big_endian ~msglen w r
-      end >>| function
-      | Ok (Error msg) -> (Error (Error.of_string msg))
-      | Error msg -> Error (Error.of_string msg)
-      | Ok (Ok v) -> Ok v
+        | false ->
+          let w = Angstrom.lift (Result.map_error ~f:Error.of_string) (destruct ~big_endian w) in
+          Angstrom_async.parse w r >>= fun parsed ->
+          return (Or_error.join (Result.map_error ~f:Error.of_string parsed))
+      end
 
   let send_client_msgs ?comp ?buf r w =
     Pipe.iter r ~f:begin fun (K { big_endian; typ; msg }) ->
@@ -93,7 +95,8 @@ module Async = struct
         Ivar.fill connected (Or_error.errorf "Invalid handsharke %C" c) ;
         Deferred.unit
       | `Ok _ ->
-        Ivar.fill connected (Ok { r = (fun w -> read r w) ; w = client_write }) ;
+        Ivar.fill connected (Ok { r = (fun w -> Monitor.try_with_join_or_error (fun () -> read r w)) ;
+                                  w = client_write }) ;
         send_client_msgs ?comp ~buf kx_read w in
     Deferred.any [
       Ivar.read connected ;
@@ -144,23 +147,22 @@ let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
   | `Ok _ ->
     Monitor.detach (Writer.monitor w) ;
     let f = { sf = fun wq q wr ->
-        Monitor.try_with_or_error begin fun () ->
+        Monitor.try_with_join_or_error begin fun () ->
           let serialized = construct ?comp ?big_endian ~typ:`Sync ~buf wq q in
           Writer.write_bigstring w serialized ;
           Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
-          let open Deferred.Result.Monad_infix in
-          Angstrom_async.parse hdr r >>= fun { big_endian; typ=_; compressed; len } ->
+          let open Deferred.Or_error.Monad_infix in
+          Deferred.Result.map_error ~f:Error.of_string (Angstrom_async.parse hdr r) >>=
+          fun { big_endian; typ=_; compressed; len } ->
           let msglen = Int32.to_int_exn len - 8 in
           begin match compressed with
-            | false -> Angstrom_async.parse (destruct ~big_endian wr) r
             | true -> parse_compressed ~big_endian ~msglen wr r
+            | false ->
+              let w = Angstrom.lift (Result.map_error ~f:Error.of_string) (destruct ~big_endian wr) in
+              Deferred.Result.map_error ~f:Error.of_string (Angstrom_async.parse w r) >>= fun parsed ->
+              return parsed
           end
-        end >>| function
-        | Error e -> Error e
-        | Ok (Error msg) -> Error (Error.of_string msg)
-        | Ok (Ok (Error msg)) -> Error (Error.of_string msg)
-        | Ok (Ok (Ok v)) -> Ok v
-      } in
+        end } in
     return (Ok (f, r, w))
 
 let with_connection_sync ?comp ?big_endian ?buf url ~f =
