@@ -10,7 +10,7 @@ let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
   let payload = Bigstringaf.(sub serialized ~off:8 ~len:(length serialized - 8)) in
   Format.printf "%a@." Hex.pp (Hex.of_bigstring serialized) ;
   match Angstrom.parse_bigstring hdr serialized,
-        Angstrom.parse_bigstring (destruct_exn w) payload with
+        Angstrom.parse_bigstring (destruct w) payload with
   | Error msg, _ | _, Error msg -> fail msg
   | Ok { big_endian; len; _ }, Ok v ->
     check bool (name ^ "_big_endian") Sys.big_endian big_endian ;
@@ -167,14 +167,14 @@ let unpack_buggy () =
   let payload = Cstruct.shift test 8 in
   match
     Angstrom.parse_bigstring hdr (Cstruct.to_bigarray test),
-    Angstrom.parse_bigstring (destruct_exn (a sym)) (Cstruct.to_bigarray payload) with
+    Angstrom.parse_bigstring (destruct (a sym)) (Cstruct.to_bigarray payload) with
   | Error msg, _ | _, Error msg -> fail msg
   | Ok _hdr, Ok v ->
     check string "buggy_one" ":/home/vb/code/TorQ/hdb/database2019.06.21" v
 
 let test_various () =
   let sym = "\245a\000" in
-  match Angstrom.parse_string Kx.(destruct_exn (a sym)) sym with
+  match Angstrom.parse_string Kx.(destruct (a sym)) sym with
   | Ok _ -> ()
   | Error e -> failwith e
 
@@ -198,7 +198,7 @@ let test_headersless msg w () =
       ~close_on_exception:false
       (fun w -> Pipe.write w msg) in
   Reader.of_pipe (Info.of_string "") r >>= fun r ->
-  Angstrom_async.parse Kx.(destruct_exn w) r >>= function
+  Angstrom_async.parse Kx.(destruct w) r >>= function
   | Ok _v -> Deferred.unit
   | Error e -> failwith e
 
@@ -211,7 +211,7 @@ let test_async hex w () =
       (fun w -> Pipe.write w (Hex.to_string hex)) in
   Reader.of_pipe (Info.of_string "") r >>= fun r ->
   Angstrom_async.parse Kx.hdr r >>= fun _hdr ->
-  Angstrom_async.parse Kx.(destruct_exn w) r >>= function
+  Angstrom_async.parse Kx.(destruct w) r >>= function
   | Ok _v -> Deferred.unit
   | Error e -> failwith e
 
@@ -219,7 +219,7 @@ let test_nonasync hex w () =
   let buf = Hex.to_bigstring hex in
   let buflen = Bigstringaf.length buf in
   let _hdr = Angstrom.parse_bigstring Kx.hdr buf in
-  match Angstrom.parse_bigstring Kx.(destruct_exn w)
+  match Angstrom.parse_bigstring Kx.(destruct w)
           (Bigstringaf.sub buf ~off:8 ~len:(buflen-8)) with
   | Ok _v -> ()
   | Error e -> failwith e

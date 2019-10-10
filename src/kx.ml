@@ -273,6 +273,7 @@ let attribute =
   Angstrom.satisfy (function '\x00'..'\x04' -> true | _ -> false)
 
 type _ w =
+  | Unit : unit w
   | Err : string w
   | Atom : 'a typ -> 'a w
   | Vect : 'a typ * attribute option -> 'a list w
@@ -360,6 +361,7 @@ let rec equal : type a b. a w -> a -> b w -> b -> bool = fun aw x bw y ->
     end true c1 c2
   | _ -> false
 
+let unit      = Unit
 let nil       = Nil
 let bool      = Boolean
 let guid      = Guid
@@ -570,6 +572,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
 
   | Conv (project, _, ww) -> construct e buf ww (project a)
 
+  | Unit
   | Atom Nil ->
     write_char buf '\x65' ;
     write_char buf '\x00'
@@ -1267,7 +1270,7 @@ and destruct :
   fun ?(big_endian=Sys.big_endian) w ->
   match w with
   | Union cases ->
-    choice ~failure_msg:"union: no more choices"
+    choice
       (List.map begin fun (Case { encoding ; inj ; _ }) ->
           lift inj (destruct ~big_endian encoding)
         end cases)
@@ -1292,6 +1295,7 @@ and destruct :
     satisfy (function '\x00'|'\x01' -> true | _ -> false) *>
     destruct ~big_endian (Dict (kw, vw, false))
 
+  | Unit -> skip_while (fun _ -> true)
   | Atom Nil -> nil_atom
   | Atom Boolean -> bool_atom
   | Atom Guid -> guid_atom
@@ -1344,18 +1348,6 @@ let destruct_stream :
     general_list_stream big_endian (destruct ~big_endian w) f
   | _ -> invalid_arg "destruct_stream: not a general list"
 
-let destruct_exn ?big_endian v =
-  choice ~failure_msg:"destruct_exn" [
-    (destruct ?big_endian v) ;
-    (destruct ?big_endian err >>| fun msg -> failwith msg) ;
-  ]
-
-let destruct ?big_endian v =
-  choice ~failure_msg:"destruct" [
-    (destruct ?big_endian v >>| fun v -> Ok v) ;
-    (destruct ?big_endian err >>| fun msg -> Error msg) ;
-  ]
-
 let pp_print_short ppf i =
   if i = nh then Format.pp_print_string ppf "0Nh" else Format.pp_print_int ppf i
 let pp_print_int ppf i =
@@ -1394,6 +1386,7 @@ and pp :
   let pp_sep ppf () = Format.pp_print_char ppf ' ' in
   let pp_sep_empty ppf () = Format.pp_print_string ppf "" in
   match w with
+  | Unit
   | Atom Nil -> Format.pp_print_string ppf "(::)"
   | List (w, _) -> Format.(pp_print_list ~pp_sep (pp w) ppf v)
   | Conv (project, _, w) -> pp w ppf (project v)

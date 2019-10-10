@@ -37,6 +37,7 @@ val err : string w
 val a : 'a typ -> 'a w
 val v : ?attr:attribute -> 'a typ -> 'a list w
 val s : ?attr:attribute -> char typ -> string w
+val unit : unit w
 
 val list : ?attr:attribute -> 'a w -> 'a list w
 val t1 : ?attr:attribute -> 'a w -> 'a w
@@ -105,8 +106,6 @@ val construct :
   ?buf:Faraday.t -> 'a w -> 'a -> Bigstringaf.t
 
 val destruct :
-  ?big_endian:bool -> 'a w -> ('a, string) result Angstrom.t
-val destruct_exn :
   ?big_endian:bool -> 'a w -> 'a Angstrom.t
 val destruct_stream :
   ?big_endian:bool ->

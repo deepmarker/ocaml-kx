@@ -20,10 +20,9 @@ let parse_compressed ~big_endian ~msglen w r =
   let uncompMsg = Bigstringaf.create uncompLen in
   uncompress uncompMsg compMsg ;
   let res =
-    Angstrom.parse_bigstring
-      Angstrom.(lift (Result.map_error ~f:Error.of_string) (destruct ~big_endian w))
+    Angstrom.parse_bigstring (destruct ~big_endian w)
       (Bigstringaf.sub uncompMsg ~off:8 ~len:(uncompLen-8)) in
-  return (Result.(join (map_error res ~f:(Error.of_string))))
+  return (Result.(map_error res ~f:(Error.of_string)))
 
 let write_handshake w url =
   Writer.write w
@@ -51,7 +50,7 @@ module Async = struct
   end
 
   let empty = {
-    r = (fun _ -> return (Error (Error.of_string "disconnected"))) ;
+    r = (fun _ -> failwith "disconnected") ;
     w = Pipe.create_writer (fun r -> Pipe.close_read r; Deferred.unit) ;
   }
 
@@ -69,9 +68,8 @@ module Async = struct
       begin match compressed with
         | true -> parse_compressed ~big_endian ~msglen w r
         | false ->
-          let w = Angstrom.lift (Result.map_error ~f:Error.of_string) (destruct ~big_endian w) in
-          Angstrom_async.parse w r >>= fun parsed ->
-          return (Or_error.join (Result.map_error ~f:Error.of_string parsed))
+          Angstrom_async.parse (destruct ~big_endian w) r >>= fun parsed ->
+          return (Result.map_error ~f:Error.of_string parsed)
       end
 
   let send_client_msgs ?comp ?buf r w =
@@ -95,7 +93,7 @@ module Async = struct
         Ivar.fill connected (Or_error.errorf "Invalid handsharke %C" c) ;
         Deferred.unit
       | `Ok _ ->
-        Ivar.fill connected (Ok { r = (fun w -> Monitor.try_with_join_or_error (fun () -> read r w)) ;
+        Ivar.fill connected (Ok { r = (fun w -> read r w) ;
                                   w = client_write }) ;
         send_client_msgs ?comp ~buf kx_read w in
     Deferred.any [
@@ -158,9 +156,8 @@ let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
           begin match compressed with
             | true -> parse_compressed ~big_endian ~msglen wr r
             | false ->
-              let w = Angstrom.lift (Result.map_error ~f:Error.of_string) (destruct ~big_endian wr) in
-              Deferred.Result.map_error ~f:Error.of_string (Angstrom_async.parse w r) >>= fun parsed ->
-              return parsed
+              Deferred.Result.map_error ~f:Error.of_string
+                (Angstrom_async.parse (destruct ~big_endian wr) r)
           end
         end } in
     return (Ok (f, r, w))
