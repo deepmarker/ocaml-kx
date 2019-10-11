@@ -11,12 +11,11 @@ let create ?(big_endian=Sys.big_endian) typ msg = K { big_endian; typ; msg }
 
 let parse_compressed ~big_endian ~msglen w r =
   let module E = (val (getmod big_endian) : ENDIAN) in
-  let open Deferred.Or_error.Monad_infix in
   Deferred.Result.map_error
-    ~f:Error.of_string (Angstrom_async.parse E.any_int32 r) >>= fun uncompLen ->
+    ~f:Error.of_string (Angstrom_async.parse E.any_int32 r) >>=? fun uncompLen ->
   let uncompLen = Int32.to_int_exn uncompLen in
   Deferred.Result.map_error ~f:Error.of_string
-    (Angstrom_async.parse (Angstrom.take_bigstring (msglen-4)) r) >>= fun compMsg ->
+    (Angstrom_async.parse (Angstrom.take_bigstring (msglen-4)) r) >>=? fun compMsg ->
   let uncompMsg = Bigstringaf.create uncompLen in
   uncompress uncompMsg compMsg ;
   let res =
@@ -149,8 +148,7 @@ let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
           let serialized = construct ?comp ?big_endian ~typ:`Sync ~buf wq q in
           Writer.write_bigstring w serialized ;
           Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
-          let open Deferred.Or_error.Monad_infix in
-          Deferred.Result.map_error ~f:Error.of_string (Angstrom_async.parse hdr r) >>=
+          Deferred.Result.map_error ~f:Error.of_string (Angstrom_async.parse hdr r) >>=?
           fun { big_endian; typ=_; compressed; len } ->
           let msglen = Int32.to_int_exn len - 8 in
           begin match compressed with
