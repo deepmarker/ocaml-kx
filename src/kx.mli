@@ -111,6 +111,8 @@ val destruct_stream :
   ?big_endian:bool ->
   'a list w -> ('a -> unit) -> unit Angstrom.t
 
+val ng : Uuidm.t
+
 val nh : int
 val wh : int
 
@@ -128,6 +130,11 @@ val ptime_neginf : Ptime.t
 val nn : Ptime.Span.t
 val wn : Ptime.Span.t
 val minus_wn : Ptime.Span.t
+
+(** Timestamp *)
+val np : Ptime.t
+val wp : Ptime.t
+val minus_wp : Ptime.t
 
 (** Time *)
 val nt : Ptime.Span.t

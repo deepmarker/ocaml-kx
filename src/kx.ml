@@ -5,6 +5,8 @@
 
 open Sexplib.Std
 
+let ng = Uuidm.nil
+
 let nh = 0xffff_8000
 let wh = 0x7fff
 
@@ -168,6 +170,10 @@ let span_of_second i =
 let nn = span_of_ns nj
 let wn = span_of_ns wj
 let minus_wn = span_of_ns (Int64.neg wj)
+
+let np = Option.get (Ptime.of_span nn)
+let wp = Option.get (Ptime.of_span wn)
+let minus_wp = Option.get (Ptime.of_span minus_wn)
 
 let nt = span_of_ms ni
 let wt = span_of_ms wi
