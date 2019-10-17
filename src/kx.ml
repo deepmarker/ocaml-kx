@@ -498,6 +498,37 @@ let table9 ?(sorted=false) v1 v2 v3 v4 v5 v6 v7 v8 v9 =
   let attr = if sorted then Some Parted else None in
   Table (v sym, t9 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8) (v v9), sorted)
 
+module Df = struct
+  let conv_df f a = conv (fun _ -> assert false) f a
+
+  let table1 ?(sorted=false) ?attr1 ?attr2 v1 =
+    Table (v ?attr:attr1 sym, conv_df (fun a -> Dataframe.L.t1 a) (t1 (v ?attr:attr2 v1)), sorted)
+  let table2 ?(sorted=false) v1 v2 =
+    let attr = if sorted then Some Parted else None in
+    Table (v sym, conv_df (fun (a, b) -> Dataframe.L.t2 a b) (t2 (v ?attr v1) (v v2)), sorted)
+  let table3 ?(sorted=false) v1 v2 v3 =
+    let attr = if sorted then Some Parted else None in
+    Table (v sym, conv_df (fun (a, b, c) -> Dataframe.L.t3 a b c) (t3 (v ?attr v1) (v v2) (v v3)), sorted)
+  let table4 ?(sorted=false) v1 v2 v3 v4 =
+    let attr = if sorted then Some Parted else None in
+    Table (v sym, conv_df (fun (a, b, c, d) -> Dataframe.L.t4 a b c d) (t4 (v ?attr v1) (v v2) (v v3) (v v4)), sorted)
+  let table5 ?(sorted=false) v1 v2 v3 v4 v5 =
+    let attr = if sorted then Some Parted else None in
+    Table (v sym, conv_df (fun (a, b, c, d, e) -> Dataframe.L.t5 a b c d e) (t5 (v ?attr v1) (v v2) (v v3) (v v4) (v v5)), sorted)
+  let table6 ?(sorted=false) v1 v2 v3 v4 v5 v6 =
+    let attr = if sorted then Some Parted else None in
+    Table (v sym, conv_df (fun (a, b, c, d, e, f) -> Dataframe.L.t6 a b c d e f) (t6 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6)), sorted)
+  let table7 ?(sorted=false) v1 v2 v3 v4 v5 v6 v7 =
+    let attr = if sorted then Some Parted else None in
+    Table (v sym, conv_df (fun (a, b, c, d, e, f, g) -> Dataframe.L.t7 a b c d e f g) (t7 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7)), sorted)
+  let table8 ?(sorted=false) v1 v2 v3 v4 v5 v6 v7 v8 =
+    let attr = if sorted then Some Parted else None in
+    Table (v sym, conv_df (fun (a, b, c, d, e, f, g, h) -> Dataframe.L.t8 a b c d e f g h) (t8 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8)), sorted)
+  let table9 ?(sorted=false) v1 v2 v3 v4 v5 v6 v7 v8 v9 =
+    let attr = if sorted then Some Parted else None in
+    Table (v sym, conv_df (fun (a, b, c, d, e, f, g, h, i) -> Dataframe.L.t9 a b c d e f g h i) (t9 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8) (v v9)), sorted)
+end
+
 (* let string_of_chars a = String.init (Array.length a) (Array.get a) *)
 let pp_print_month ppf (y, m, _) = Format.fprintf ppf "%d.%dm" y m
 let pp_print_date ppf (y, m, d) =  Format.fprintf ppf "%d.%d.%d" y m d
