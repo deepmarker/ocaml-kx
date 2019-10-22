@@ -110,11 +110,10 @@ module Async = struct
     ]
 
   let with_connection ?comp ?buf url ~f =
-    connect ?comp ?buf url >>= function
-    | Error _ as e -> return e
-    | Ok c ->
-      Monitor.protect (fun () -> f c >>| fun v -> Ok v)
-        ~finally:(fun () -> Pipe.close c.w ; Deferred.unit)
+    connect ?comp ?buf url >>=? fun c ->
+    Monitor.try_with_join_or_error (fun () -> f c) >>| fun res ->
+    Pipe.close c.w ;
+    res
 
   module Persistent = struct
     include Persistent_connection_kernel.Make(T)

@@ -18,7 +18,7 @@ module Async : sig
 
   val with_connection :
     ?comp:bool -> ?buf:Faraday.t ->
-    Uri.t -> f:(t -> 'b Deferred.t) ->
+    Uri.t -> f:(t -> 'b Deferred.Or_error.t) ->
     'b Deferred.Or_error.t
 
   module Persistent : sig

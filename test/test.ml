@@ -185,7 +185,8 @@ let test_server () =
   let t = create (t2 (s Kx.char) (a Kx.bool)) ("upd", false) in
   Async.with_connection
     (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun { w; _ } ->
-    Pipe.write w t
+    Pipe.write w t >>= fun () ->
+    Deferred.Or_error.ok_unit
   end >>= function
   | Error e -> Error.raise e
   | Ok () -> Deferred.unit
