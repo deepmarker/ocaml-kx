@@ -5,6 +5,7 @@
  (preprocess (pps ppx_sexp_conv))
  (synopsis "OCaml client for kdb+")
  (libraries
+   hex
    dataframe
    sexplib
    fmt

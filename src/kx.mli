@@ -13,7 +13,6 @@ type _ typ
 type _ w
 type _ case
 
-val nil       : unit typ
 val bool      : bool typ
 val guid      : Uuidm.t typ
 val byte      : char typ
@@ -32,6 +31,24 @@ val minute    : Ptime.Span.t typ
 val second    : Ptime.Span.t typ
 val time      : Ptime.Span.t typ
 val lambda    : (string * string) typ
+val unaryprim : int typ
+val operator  : int typ
+val over      : int typ
+
+module Unary : sig
+  val id  : int
+  val neg : int
+  val sum : int
+  val prd : int
+end
+
+module Op : sig
+  val plus  : int
+  val minus : int
+  val prd   : int
+  val div   : int
+  val join  : int
+end
 
 val err : string w
 val a : 'a typ -> 'a w

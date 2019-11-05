@@ -196,7 +196,6 @@ let wv = span_of_second wi
 let minus_wv = span_of_second (Int32.neg wi)
 
 type _ typ =
-  | Nil : unit typ
   | Boolean : bool typ
   | Guid : Uuidm.t typ
   | Byte : char typ
@@ -215,6 +214,9 @@ type _ typ =
   | Second : Ptime.Span.t typ
   | Time : Ptime.Span.t typ
   | Lambda : (string * string) typ
+  | UnaryPrim : int typ
+  | Operator : int typ
+  | Over : int typ
 
 type (_, _) eq = Eq : ('a, 'a) eq
 
@@ -238,6 +240,9 @@ let eq_typ : type a b. a typ -> b typ -> (a, b) eq option = fun a b ->
   | Second, Second -> Some Eq
   | Time, Time -> Some Eq
   | Lambda, Lambda -> Some Eq
+  | UnaryPrim, UnaryPrim -> Some Eq
+  | Operator, Operator -> Some Eq
+  | Over, Over -> Some Eq
   | _ -> None
 
 let eq_typ_val : type a b. a typ -> a -> b typ -> b -> (a, b) eq option = fun a x b y ->
@@ -260,6 +265,9 @@ let eq_typ_val : type a b. a typ -> a -> b typ -> b -> (a, b) eq option = fun a 
   | Second, Second when x = y -> Some Eq
   | Time, Time when x = y -> Some Eq
   | Lambda, Lambda when String.equal (fst x) (fst y) && String.equal (snd x) (snd y) -> Some Eq
+  | UnaryPrim, UnaryPrim when Int.equal x y -> Some Eq
+  | Operator, Operator when Int.equal x y -> Some Eq
+  | Over, Over when Int.equal x y -> Some Eq
   | _ -> None
 
 type attribute =
@@ -368,7 +376,6 @@ let rec equal : type a b. a w -> a -> b w -> b -> bool = fun aw x bw y ->
   | _ -> false
 
 let unit      = Unit
-let nil       = Nil
 let bool      = Boolean
 let guid      = Guid
 let byte      = Byte
@@ -387,6 +394,24 @@ let minute    = Minute
 let second    = Second
 let time      = Time
 let lambda    = Lambda
+let unaryprim = UnaryPrim
+let operator  = Operator
+let over      = Over
+
+module Unary = struct
+  let id  = 0x00
+  let neg = 0x02
+  let sum = 0x19
+  let prd = 0x1a
+end
+
+module Op = struct
+  let plus = 1
+  let minus = 2
+  let prd = 3
+  let div = 4
+  let join = 0x0c
+end
 
 let conv project inject a =
   Conv (project, inject, a)
@@ -541,6 +566,9 @@ let pp_print_timestamp ppf = function
   | ts -> Format.fprintf ppf "%a" (Ptime.pp_rfc3339 ~frac_s:9 ()) ts
 
 let pp_print_lambda ppf (ctx, lambda) = Format.pp_print_string ppf (ctx ^ lambda)
+let pp_print_unaryprim ppf i = Format.fprintf ppf "<unary %d>" i
+let pp_print_operator ppf i = Format.fprintf ppf "<op %d>" i
+let pp_print_over ppf i = Format.fprintf ppf "<%d/>" i
 
 module type FE = module type of Faraday.BE
 
@@ -609,8 +637,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
 
   | Conv (project, _, ww) -> construct e buf ww (project a)
 
-  | Unit
-  | Atom Nil ->
+  | Unit ->
     write_char buf '\x65' ;
     write_char buf '\x00'
 
@@ -692,6 +719,19 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
     write_char buf '\x00' ;
     construct e buf (String (Char, None)) (snd a)
 
+  | Atom UnaryPrim ->
+    write_char buf '\x65' ;
+    write_char buf (Char.chr a)
+
+  | Atom Operator ->
+    write_char buf '\x66' ;
+    write_char buf (Char.chr a)
+
+  | Atom Over ->
+    write_char buf '\x6b' ;
+    write_char buf '\x66' ;
+    write_char buf (Char.chr a)
+
   | Vect (Lambda, attr) ->
     begin match attr with
     | None
@@ -703,7 +743,38 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
     FE.write_uint32 buf (Int32.of_int (List.length a)) ;
     List.iter (fun lam -> construct e buf (Atom Lambda) lam) a
 
-  | Vect (Nil, _) -> invalid_arg "nil vect is not allowed"
+  | Vect (UnaryPrim, attr) ->
+    begin match attr with
+    | None
+    | Some Grouped -> ()
+    | _ -> invalid_arg "unaryprim cannot have attr except grouped"
+    end ;
+    write_char buf '\x00' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (fun up -> construct e buf (Atom UnaryPrim) up) a
+
+  | Vect (Operator, attr) ->
+    begin match attr with
+    | None
+    | Some Grouped -> ()
+    | _ -> invalid_arg "operator cannot have attr except grouped"
+    end ;
+    write_char buf '\x00' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (fun op -> construct e buf (Atom Operator) op) a
+
+  | Vect (Over, attr) ->
+    begin match attr with
+    | None
+    | Some Grouped -> ()
+    | _ -> invalid_arg "over cannot have attr except grouped"
+    end ;
+    write_char buf '\x00' ;
+    write_char buf (char_of_attribute attr) ;
+    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
+    List.iter (fun op -> construct e buf (Atom Over) op) a
 
   | Vect (Boolean, attr) ->
     write_char buf '\x01' ;
@@ -978,10 +1049,6 @@ let hdr =
   M.any_int32 >>| fun len ->
   { big_endian ; compressed ; typ ; len }
 
-let nil_atom =
-  char '\x65' *>
-  skip (fun c -> c = '\x00')
-
 let bool_atom =
   char '\xff' *>
   any_uint8 >>| fun i ->
@@ -1227,6 +1294,15 @@ let lambda_atom endianness =
   string_vect endianness >>| fun lam ->
   (sym, lam)
 
+let unaryprim_atom =
+  char '\x65' *> any_uint8
+
+let operator_atom =
+  char '\x66' *> any_uint8
+
+let over_atom =
+  char '\x6b' *> char '\x66' *> any_uint8
+
 let general_list big_endian elt =
   char '\x00' *>
   attribute >>= fun _ ->
@@ -1250,6 +1326,15 @@ let general_list_stream endianness elt f =
 
 let lambda_vect endianness =
   general_list endianness (lambda_atom endianness)
+
+let unaryprim_vect endianness =
+  general_list endianness unaryprim_atom
+
+let operator_vect endianness =
+  general_list endianness operator_atom
+
+let over_vect endianness =
+  general_list endianness over_atom
 
 let uncompress msg compressed =
   let n = ref 0 in
@@ -1333,7 +1418,6 @@ and destruct :
     destruct ~big_endian (Dict (kw, vw, false))
 
   | Unit -> skip_while (fun _ -> true)
-  | Atom Nil -> nil_atom
   | Atom Boolean -> bool_atom
   | Atom Guid -> guid_atom
   | Atom Byte -> byte_atom
@@ -1352,8 +1436,10 @@ and destruct :
   | Atom Second -> second_atom big_endian
   | Atom Time -> time_atom big_endian
   | Atom Lambda -> lambda_atom big_endian
+  | Atom UnaryPrim -> unaryprim_atom
+  | Atom Operator -> operator_atom
+  | Atom Over -> over_atom
 
-  | Vect (Nil, _) -> invalid_arg "nil vect is not allowed"
   | Vect (Boolean, _) -> bool_vect big_endian
   | Vect (Guid, _) -> guid_vect big_endian
   | Vect (Byte, _) -> byte_vect big_endian
@@ -1372,6 +1458,9 @@ and destruct :
   | Vect (Second, _) -> second_vect big_endian
   | Vect (Time, _) -> time_vect big_endian
   | Vect (Lambda, _) -> lambda_vect big_endian
+  | Vect (UnaryPrim, _) -> unaryprim_vect big_endian
+  | Vect (Operator, _) -> operator_vect big_endian
+  | Vect (Over, _) -> over_vect big_endian
 
   | String (Byte, _) -> bytestring_vect big_endian
   | String (Char, _) -> string_vect big_endian
@@ -1423,8 +1512,7 @@ and pp :
   let pp_sep ppf () = Format.pp_print_char ppf ' ' in
   let pp_sep_empty ppf () = Format.pp_print_string ppf "" in
   match w with
-  | Unit
-  | Atom Nil -> Format.pp_print_string ppf "(::)"
+  | Unit -> Format.pp_print_string ppf "(::)"
   | List (w, _) -> Format.(pp_print_list ~pp_sep (pp w) ppf v)
   | Conv (project, _, w) -> pp w ppf (project v)
   | Tup (w, _) -> pp w ppf v
@@ -1451,8 +1539,10 @@ and pp :
   | Atom Second -> Ptime.Span.pp ppf v
   | Atom Time -> Ptime.Span.pp ppf v
   | Atom Lambda -> pp_print_lambda ppf v
+  | Atom UnaryPrim -> pp_print_unaryprim ppf v
+  | Atom Operator -> pp_print_operator ppf v
+  | Atom Over -> pp_print_over ppf v
 
-  | Vect (Nil, _) -> invalid_arg "nil vect is not allowed"
   | Vect (Boolean, _) -> Format.pp_print_list ~pp_sep Format.pp_print_bool ppf v
   | Vect (Guid, _) -> Format.pp_print_list ~pp_sep Uuidm.pp ppf v
   | Vect (Byte, _) -> Format.pp_print_list ~pp_sep (fun ppf -> Format.fprintf ppf "X%c") ppf v
@@ -1471,6 +1561,9 @@ and pp :
   | Vect (Second, _) -> Format.pp_print_list ~pp_sep Ptime.Span.pp ppf v
   | Vect (Time, _) -> Format.pp_print_list ~pp_sep Ptime.Span.pp ppf v
   | Vect (Lambda, _) -> Format.pp_print_list ~pp_sep pp_print_lambda ppf v
+  | Vect (UnaryPrim, _) -> Format.pp_print_list ~pp_sep pp_print_unaryprim ppf v
+  | Vect (Operator, _) -> Format.pp_print_list ~pp_sep pp_print_operator ppf v
+  | Vect (Over, _) -> Format.pp_print_list ~pp_sep pp_print_over ppf v
 
   | String (Byte, _) -> Format.pp_print_string ppf v
   | String (Char, _) -> Format.pp_print_string ppf v

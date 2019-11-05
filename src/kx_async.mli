@@ -3,6 +3,7 @@ open Kx
 
 type msg
 val create : ?big_endian:bool -> 'a w -> 'a -> msg
+val pp_serialized : Format.formatter -> msg -> unit
 
 module Async : sig
   type t =  {

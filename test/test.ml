@@ -43,7 +43,11 @@ let pack_unpack_atom =
     pack_unpack "second" (a second) (Ptime.Span.of_int_s 0) ;
     pack_unpack "time" (a time) (Ptime.Span.of_int_s 0) ;
     pack_unpack "lambda" (a lambda) ("", "{x+y}");
-    pack_unpack "lambda_ctx" (a lambda) ("d", "{x+y}")
+    pack_unpack "lambda_ctx" (a lambda) ("d", "{x+y}") ;
+    pack_unpack "unary" (a unaryprim) Unary.neg ;
+    pack_unpack "unary" (a unaryprim) Unary.sum ;
+    pack_unpack "op" (a operator) Op.plus ;
+    pack_unpack "over" (a over) Op.join ;
   ]
 
 let pack_unpack_vect =

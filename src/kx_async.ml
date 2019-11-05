@@ -9,6 +9,10 @@ module Log_async = (val Logs_async.src_log src : Logs_async.LOG)
 type msg = K : { big_endian:bool; typ:'a w;  msg:'a } -> msg
 let create ?(big_endian=Sys.big_endian) typ msg = K { big_endian; typ; msg }
 
+let pp_serialized ppf (K { big_endian; typ; msg }) =
+  let serialized = construct ~big_endian ~typ:`Async typ msg in
+  Format.fprintf ppf "0x%a" Hex.pp (Hex.of_bigstring serialized)
+
 let parse_compressed ~big_endian ~msglen w r =
   let module E = (val (getmod big_endian) : ENDIAN) in
   Deferred.Result.map_error
