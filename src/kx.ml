@@ -491,6 +491,25 @@ let dict ?(sorted=false) k v =
     invalid_arg "dict keys and values must be lists" ;
   Dict (k, v, sorted)
 
+let cd1 ?(sorted=false) ?attr v1 =
+  Dict (v ?attr sym, t1 (a v1),sorted)
+let cd2 ?(sorted=false) ?attr v1 v2 =
+  Dict (v ?attr sym, t2 (a v1) (a v2), sorted)
+let cd3 ?(sorted=false) ?attr v1 v2 v3 =
+  Dict (v ?attr sym, t3 (a v1) (a v2) (a v3), sorted)
+let cd4 ?(sorted=false) ?attr v1 v2 v3 v4 =
+  Dict (v ?attr sym, t4 (a v1) (a v2) (a v3) (a v4), sorted)
+let cd5 ?(sorted=false) ?attr v1 v2 v3 v4 v5 =
+  Dict (v ?attr sym, t5 (a v1) (a v2) (a v3) (a v4) (a v5), sorted)
+let cd6 ?(sorted=false) ?attr v1 v2 v3 v4 v5 v6 =
+  Dict (v ?attr sym, t6 (a v1) (a v2) (a v3) (a v4) (a v5) (a v6), sorted)
+let cd7 ?(sorted=false) ?attr v1 v2 v3 v4 v5 v6 v7 =
+  Dict (v ?attr sym, t7 (a v1) (a v2) (a v3) (a v4) (a v5) (a v6) (a v7), sorted)
+let cd8 ?(sorted=false) ?attr v1 v2 v3 v4 v5 v6 v7 v8 =
+  Dict (v ?attr sym, t8 (a v1) (a v2) (a v3) (a v4) (a v5) (a v6) (a v7) (a v8), sorted)
+let cd9 ?(sorted=false) ?attr v1 v2 v3 v4 v5 v6 v7 v8 v9 =
+  Dict (v ?attr sym, t9 (a v1) (a v2) (a v3) (a v4) (a v5) (a v6) (a v7) (a v8) (a v9), sorted)
+
 let table ?(sorted=false) vs =
   if not (is_list_type vs) then
     invalid_arg "table keys and values must be lists" ;

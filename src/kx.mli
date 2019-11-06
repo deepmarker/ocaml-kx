@@ -71,6 +71,17 @@ val t10 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> 'd w -> 'e w -> 'f w -> 'g 
 val merge_tups : 'a w -> 'b w -> ('a * 'b) w
 
 val dict : ?sorted:bool -> 'a w -> 'b w -> ('a * 'b) w
+
+val cd1 : ?sorted:bool -> ?attr:attribute -> 'a typ -> (string list * 'a) w
+val cd2 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> (string list * ('a * 'b)) w
+val cd3 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> (string list * ('a * 'b * 'c)) w
+val cd4 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> (string list * ('a * 'b * 'c * 'd)) w
+val cd5 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> (string list * ('a * 'b * 'c * 'd * 'e)) w
+val cd6 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f)) w
+val cd7 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f * 'g)) w
+val cd8 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h)) w
+val cd9 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> 'i typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i)) w
+
 val table : ?sorted:bool -> 'a w -> (string list * 'a) w
 
 val table1: ?sorted:bool -> ?attr1:attribute -> ?attr2:attribute -> 'a typ -> (string list * 'a list) w
