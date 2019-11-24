@@ -52,7 +52,7 @@ end
 
 val err : string w
 val a : 'a typ -> 'a w
-val v : ?attr:attribute -> 'a typ -> 'a list w
+val v : ?attr:attribute -> 'a typ -> 'a array w
 val s : ?attr:attribute -> char typ -> string w
 val unit : unit w
 
@@ -72,38 +72,38 @@ val merge_tups : 'a w -> 'b w -> ('a * 'b) w
 
 val dict : ?sorted:bool -> 'a w -> 'b w -> ('a * 'b) w
 
-val cd1 : ?sorted:bool -> ?attr:attribute -> 'a typ -> (string list * 'a) w
-val cd2 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> (string list * ('a * 'b)) w
-val cd3 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> (string list * ('a * 'b * 'c)) w
-val cd4 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> (string list * ('a * 'b * 'c * 'd)) w
-val cd5 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> (string list * ('a * 'b * 'c * 'd * 'e)) w
-val cd6 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f)) w
-val cd7 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f * 'g)) w
-val cd8 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h)) w
-val cd9 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> 'i typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i)) w
+val cd1 : ?sorted:bool -> ?attr:attribute -> 'a typ -> (string array * 'a) w
+val cd2 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> (string array * ('a * 'b)) w
+val cd3 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> (string array * ('a * 'b * 'c)) w
+val cd4 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> (string array * ('a * 'b * 'c * 'd)) w
+val cd5 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> (string array * ('a * 'b * 'c * 'd * 'e)) w
+val cd6 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> (string array * ('a * 'b * 'c * 'd * 'e * 'f)) w
+val cd7 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> (string array * ('a * 'b * 'c * 'd * 'e * 'f * 'g)) w
+val cd8 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> (string array * ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h)) w
+val cd9 : ?sorted:bool -> ?attr:attribute -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> 'i typ -> (string array * ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i)) w
 
-val table : ?sorted:bool -> 'a w -> (string list * 'a) w
+val table : ?sorted:bool -> 'a w -> (string array * 'a) w
 
-val table1: ?sorted:bool -> ?attr1:attribute -> ?attr2:attribute -> 'a typ -> (string list * 'a list) w
-val table2: ?sorted:bool -> 'a typ -> 'b typ -> (string list * ('a list * 'b list)) w
-val table3: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> (string list * ('a list * 'b list * 'c list)) w
-val table4: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> (string list * ('a list * 'b list * 'c list * 'd list)) w
-val table5: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> (string list * ('a list * 'b list * 'c list * 'd list * 'e list)) w
-val table6: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> (string list * ('a list * 'b list * 'c list * 'd list * 'e list * 'f list)) w
-val table7: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> (string list * ('a list * 'b list * 'c list * 'd list * 'e list * 'f list * 'g list)) w
-val table8: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> (string list * ('a list * 'b list * 'c list * 'd list * 'e list * 'f list * 'g list * 'h list)) w
-val table9: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> 'i typ -> (string list * ('a list * 'b list * 'c list * 'd list * 'e list * 'f list * 'g list * 'h list * 'i list)) w
+val table1: ?sorted:bool -> ?attr1:attribute -> ?attr2:attribute -> 'a typ -> (string array * 'a array) w
+val table2: ?sorted:bool -> 'a typ -> 'b typ -> (string array * ('a array * 'b array)) w
+val table3: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> (string array * ('a array * 'b array * 'c array)) w
+val table4: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> (string array * ('a array * 'b array * 'c array * 'd array)) w
+val table5: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> (string array * ('a array * 'b array * 'c array * 'd array * 'e array)) w
+val table6: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> (string array * ('a array * 'b array * 'c array * 'd array * 'e array * 'f array)) w
+val table7: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> (string array * ('a array * 'b array * 'c array * 'd array * 'e array * 'f array * 'g array)) w
+val table8: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> (string array * ('a array * 'b array * 'c array * 'd array * 'e array * 'f array * 'g array * 'h array)) w
+val table9: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> 'i typ -> (string array * ('a array * 'b array * 'c array * 'd array * 'e array * 'f array * 'g array * 'h array * 'i array)) w
 
 module Df : sig
-  val table1: ?sorted:bool -> ?attr1:attribute -> ?attr2:attribute -> 'a typ -> (string list * 'a Dataframe.t) w
-  val table2: ?sorted:bool -> 'a typ -> 'b typ -> (string list * ('a * 'b) Dataframe.t) w
-  val table3: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> (string list * ('a * 'b * 'c) Dataframe.t)  w
-  val table4: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> (string list * ('a * 'b * 'c * 'd) Dataframe.t) w
-  val table5: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> (string list * ('a * 'b * 'c * 'd * 'e) Dataframe.t) w
-  val table6: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f) Dataframe.t) w
-  val table7: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f * 'g) Dataframe.t) w
-  val table8: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) Dataframe.t) w
-  val table9: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> 'i typ -> (string list * ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) Dataframe.t) w
+  val table1: ?sorted:bool -> ?attr1:attribute -> ?attr2:attribute -> 'a typ -> (string array * 'a Dataframe.t) w
+  val table2: ?sorted:bool -> 'a typ -> 'b typ -> (string array * ('a * 'b) Dataframe.t) w
+  val table3: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> (string array * ('a * 'b * 'c) Dataframe.t)  w
+  val table4: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> (string array * ('a * 'b * 'c * 'd) Dataframe.t) w
+  val table5: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> (string array * ('a * 'b * 'c * 'd * 'e) Dataframe.t) w
+  val table6: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> (string array * ('a * 'b * 'c * 'd * 'e * 'f) Dataframe.t) w
+  val table7: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> (string array * ('a * 'b * 'c * 'd * 'e * 'f * 'g) Dataframe.t) w
+  val table8: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> (string array * ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) Dataframe.t) w
+  val table9: ?sorted:bool -> 'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> 'f typ -> 'g typ -> 'h typ -> 'i typ -> (string array * ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) Dataframe.t) w
 end
 
 val conv : ('a -> 'b) -> ('b -> 'a) -> 'b w -> 'a w

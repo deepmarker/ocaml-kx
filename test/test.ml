@@ -52,25 +52,25 @@ let pack_unpack_atom =
 
 let pack_unpack_vect =
   Kx.[
-    pack_unpack "vect bool" (v bool) [true; false] ;
-    pack_unpack "vect guid" (v guid) [Uuidm.nil; Uuidm.nil] ;
+    pack_unpack "vect bool" (v bool) [|true; false|] ;
+    pack_unpack "vect guid" (v guid) [|Uuidm.nil; Uuidm.nil|] ;
     pack_unpack "vect byte" (s byte) "\x00\x01\x02" ;
-    pack_unpack "vect short" (v short) [0;1;2] ;
-    pack_unpack "vect int" (v int) [0l;1l;2l;Int32.max_int;Int32.min_int] ;
-    pack_unpack "vect long" (v long) [0L;1L;2L;Int64.max_int;Int64.min_int] ;
-    pack_unpack "vect real" (v real) [0.;1.;nan;infinity;neg_infinity] ;
-    pack_unpack "vect float" (v float) [0.;1.;nan;infinity;neg_infinity] ;
+    pack_unpack "vect short" (v short) [|0;1;2|] ;
+    pack_unpack "vect int" (v int) [|0l;1l;2l;Int32.max_int;Int32.min_int|] ;
+    pack_unpack "vect long" (v long) [|0L;1L;2L;Int64.max_int;Int64.min_int|] ;
+    pack_unpack "vect real" (v real) [|0.;1.;nan;infinity;neg_infinity|] ;
+    pack_unpack "vect float" (v float) [|0.;1.;nan;infinity;neg_infinity|] ;
     pack_unpack "vect char" (s char) "bleh" ;
-    pack_unpack "vect empty symbol" (v sym) [""; ""; ""] ;
-    pack_unpack "vect symbol" (v sym) ["machin"; "truc"; "chouette"] ;
-    pack_unpack "vect timestamp" (v timestamp) [Ptime.epoch; Ptime.epoch] ;
-    pack_unpack "vect month" (v month) [2019, 1, 0 ; 2019, 2, 0] ;
-    pack_unpack "vect date" (v date) [2019, 1, 1; 2019, 1, 2] ;
-    pack_unpack "vect timespan" (v timespan) [] ;
-    pack_unpack "vect minute" (v minute) [] ;
-    pack_unpack "vect second" (v second) [] ;
-    pack_unpack "vect time" (v time) [] ;
-    pack_unpack "vect lambda" (v lambda) [("", "{x+y}"); ("d", "{x+y}")]
+    pack_unpack "vect empty symbol" (v sym) [|""; ""; ""|] ;
+    pack_unpack "vect symbol" (v sym) [|"machin"; "truc"; "chouette"|] ;
+    pack_unpack "vect timestamp" (v timestamp) [|Ptime.epoch; Ptime.epoch|] ;
+    pack_unpack "vect month" (v month) [|2019, 1, 0 ; 2019, 2, 0|] ;
+    pack_unpack "vect date" (v date) [|2019, 1, 1; 2019, 1, 2|] ;
+    pack_unpack "vect timespan" (v timespan) [||] ;
+    pack_unpack "vect minute" (v minute) [||] ;
+    pack_unpack "vect second" (v second) [||] ;
+    pack_unpack "vect time" (v time) [||] ;
+    pack_unpack "vect lambda" (v lambda) [|("", "{x+y}"); ("d", "{x+y}")|]
   ]
 
 let pack_unpack_list =
@@ -81,12 +81,12 @@ let pack_unpack_list =
     pack_unpack "simple3" (t3 (a int) (a float) (a sym)) (0l, 0., "a") ;
     pack_unpack "vect"
       (t2 (v short) (v timestamp))
-      ([1; 2; 3], ([Ptime.epoch; Ptime.epoch])) ;
+      ([|1; 2; 3|], ([|Ptime.epoch; Ptime.epoch|])) ;
     pack_unpack "vect guid"
-      (t1 (v guid)) [Uuidm.nil; Uuidm.nil] ;
+      (t1 (v guid)) [|Uuidm.nil; Uuidm.nil|] ;
     pack_unpack "nested"
       (t1 (t1 (a bool))) true ;
-    pack_unpack "compound" (list (v short)) [[1;2]; [3;4]] ;
+    pack_unpack "compound" (list (v short)) [[|1;2|]; [|3;4|]] ;
     pack_unpack "string list" (list (s char)) ["machin"; "truc"] ;
     pack_unpack "test" (t2 (a sym) (a bool)) ("auie", true) ;
     pack_unpack "t4" (t4 (a bool) (a bool) (a bool) (a bool)) (true, true, true, true)
@@ -95,7 +95,7 @@ let pack_unpack_list =
 let pack_unpack_dict =
   Kx.[
     pack_unpack "empty" (dict (list (a bool)) (list (a bool))) ([], []);
-    pack_unpack "simple" (dict (v sym) (v long)) (["a";"b";"c"], [1L;2L;3L]);
+    pack_unpack "simple" (dict (v sym) (v long)) ([|"a";"b";"c"|], [|1L;2L;3L|]);
     pack_unpack "compound"
       (dict
          (list (t2 (a bool) (a int)))
@@ -103,44 +103,44 @@ let pack_unpack_dict =
       ([true, 3l; false, 2l], [false, 1l; true, 2l]) ;
     pack_unpack "sorted dict atom values"
       (dict ~sorted:true (v ~attr:Sorted sym) (v bool))
-      ((["a";"b"]), ([true; false])) ;
+      (([|"a";"b"|]), ([|true; false|])) ;
     pack_unpack "keyed table"
       (dict (table (list (v short))) (table (list (v short))))
-      ((["id"], [[1; 2; 3]]), (["v"], [[4; 5; 6]])) ;
+      (([|"id"|], [[|1; 2; 3|]]), ([|"v"|], [[|4; 5; 6|]])) ;
     pack_unpack "keyed table2"
       (dict (table1 short) (table1 short))
-      ((["id"], [1; 2; 3]), (["v"], [4; 5; 6])) ;
+      (([|"id"|], [|1; 2; 3|]), ([|"v"|], [|4; 5; 6|])) ;
     pack_unpack "keyed table3"
       (dict (table1 sym) (table2 float long))
-      ((["sym"], ["XBTUSD.CBP"]),
-       (["size";"tradecount"], ([794.9728], [8763L])))
+      (([|"sym"|], [|"XBTUSD.CBP"|]),
+       ([|"size";"tradecount"|], ([|794.9728|], [|8763L|])))
   ]
 
 let pack_unpack_table =
   Kx.[
-    pack_unpack "simple_bool" (table1 bool) (["a"], [true]);
-    pack_unpack "simple_sorted_bool1" (table1 ~sorted:true bool) (["a"], [true]);
-    pack_unpack "simple_sorted_bool2" (table2 ~sorted:true bool bool) (["a";"b"], ([true], [false]));
-    pack_unpack "simple_long" (table (t1 (v long))) (["a"], [1L]);
-    pack_unpack "simple_2" (table (t2 (v long) (v long))) (["a";"b"], ([1L], [1L]));
-    pack_unpack "symsym" (table (t1 (v sym))) (["a"], ["truc"]);
-    pack_unpack "symsym2" (table2 timespan sym) (["a";"b"], ([wn], ["truc"]));
-    pack_unpack "symsym3" (table (t2 (v timespan) (v long))) (["a";"b"], ([wn], [0L]));
-    pack_unpack "symsym3" (table (t3 (v timespan) (v timespan) (v timespan))) (["a";"b";"c"], ([wn], [wn], [wn]));
-    pack_unpack "symsym3" (table (t3 (v timespan) (v long) (v sym))) (["a";"b";"c"], ([wn], [0L], ["truc"]));
-    pack_unpack "simple_3" (table3 timespan sym long) (["a";"b";"c"], ([wn], ["truc"], [1L]));
+    pack_unpack "simple_bool" (table1 bool) ([|"a"|], [|true|]);
+    pack_unpack "simple_sorted_bool1" (table1 ~sorted:true bool) ([|"a"|], [|true|]);
+    pack_unpack "simple_sorted_bool2" (table2 ~sorted:true bool bool) ([|"a";"b"|], ([|true|], [|false|]));
+    pack_unpack "simple_long" (table (t1 (v long))) ([|"a"|], [|1L|]);
+    pack_unpack "simple_2" (table (t2 (v long) (v long))) ([|"a";"b"|], ([|1L|], [|1L|]));
+    pack_unpack "symsym" (table (t1 (v sym))) ([|"a"|], [|"truc"|]);
+    pack_unpack "symsym2" (table2 timespan sym) ([|"a";"b"|], ([|wn|], [|"truc"|]));
+    pack_unpack "symsym3" (table (t2 (v timespan) (v long))) ([|"a";"b"|], ([|wn|], [|0L|]));
+    pack_unpack "symsym3" (table (t3 (v timespan) (v timespan) (v timespan))) ([|"a";"b";"c"|], ([|wn|], [|wn|], [|wn|]));
+    pack_unpack "symsym3" (table (t3 (v timespan) (v long) (v sym))) ([|"a";"b";"c"|], ([|wn|], [|0L|], [|"truc"|]));
+    pack_unpack "simple_3" (table3 timespan sym long) ([|"a";"b";"c"|], ([|wn|], [|"truc"|], [|1L|]));
     pack_unpack "trade0" begin
       table (t3 (v timespan) (v sym) (v long))
-    end (["time"; "sym"; "size"], ([wn], ["XBTUSD"], [1L])) ;
+    end ([|"time"; "sym"; "size"|], ([|wn|], [|"XBTUSD"|], [|1L|])) ;
     pack_unpack "trade1" begin
       table (t4 (v timespan) (v sym) (v long) (v long))
-    end (["time"; "sym"; "size" ; "price"], ([wn], ["XBTUSD"], [1L], [1L])) ;
+    end ([|"time"; "sym"; "size" ; "price"|], ([|wn|], [|"XBTUSD"|], [|1L|], [|1L|])) ;
     pack_unpack "trade1" begin
       (table4 timespan sym char long)
-    end (["time"; "sym"; "side"; "size"], ([wn], ["XBTUSD"], ['a'], [1L])) ;
+    end ([|"time"; "sym"; "side"; "size"|], ([|wn|], [|"XBTUSD"|], [|'a'|], [|1L|])) ;
     pack_unpack "trade" begin
       (table5 timespan sym char long float)
-    end (["time"; "sym"; "side"; "size" ; "price"], ([wn], ["XBTUSD"], ['b'], [1L], [1.]))
+    end ([|"time"; "sym"; "side"; "size" ; "price"|], ([|wn|], [|"XBTUSD"|], [|'b'|], [|1L|], [|1.|]))
   ]
 
 let pack_unpack_conv =
