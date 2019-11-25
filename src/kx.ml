@@ -292,7 +292,7 @@ type _ w =
   | Atom : 'a typ -> 'a w
   | Vect : 'a typ * attribute option -> 'a array w
   | String : char typ * attribute option -> string w
-  | List : 'a w * attribute option -> 'a list w
+  | List : 'a w * attribute option -> 'a array w
   | Tup : 'a w * attribute option -> 'a w
   | Tups : 'a w * 'b w * attribute option -> ('a * 'b) w
   | Dict : 'a w * 'b w * bool -> ('a * 'b) w
@@ -349,9 +349,9 @@ let rec equal : type a b. a w -> a -> b w -> b -> bool = fun aw x bw y ->
   | String _, String _ -> String.equal x y
   | List (a, aa), List (b, ba) ->
     aa = ba &&
-    List.length x = List.length y &&
+    Array.length x = Array.length y &&
     begin try
-        ListLabels.iter2 ~f:(fun x y -> if not (equal a x b y) then raise Exit) x y ;
+        ArrayLabels.iter2 ~f:(fun x y -> if not (equal a x b y) then raise Exit) x y ;
         true
       with Exit -> false
     end
@@ -633,8 +633,8 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
   | List (w', attr) ->
     write_char buf '\x00' ;
     write_char buf (char_of_attribute attr) ;
-    FE.write_uint32 buf (Int32.of_int (List.length a)) ;
-    List.iter (construct e buf w') a
+    FE.write_uint32 buf (Int32.of_int (Array.length a)) ;
+    Array.iter (construct e buf w') a
 
   | Tup (ww, attr) ->
     write_char buf '\x00' ;
@@ -1401,7 +1401,7 @@ let general_list big_endian elt =
   char '\x00' *>
   attribute >>= fun _ ->
   length big_endian >>= fun len ->
-  count len elt
+  lift Array.of_list (count len elt)
 
 let stream n p f =
   if n < 0 then invalid_arg "stream: n < 0";
@@ -1419,16 +1419,16 @@ let general_list_stream endianness elt f =
   stream len elt f
 
 let lambda_vect endianness =
-  lift Array.of_list (general_list endianness (lambda_atom endianness))
+  general_list endianness (lambda_atom endianness)
 
 let unaryprim_vect endianness =
-  lift Array.of_list (general_list endianness unaryprim_atom)
+  general_list endianness unaryprim_atom
 
 let operator_vect endianness =
-  lift Array.of_list (general_list endianness operator_atom)
+  general_list endianness operator_atom
 
 let over_vect endianness =
-  lift Array.of_list (general_list endianness over_atom)
+  general_list endianness over_atom
 
 let uncompress msg compressed =
   let n = ref 0 in
@@ -1493,7 +1493,7 @@ and destruct :
   | Err -> err_atom
   | List (w, _) -> general_list big_endian (destruct ~big_endian w)
   | Conv (_, inject, w) -> destruct ~big_endian w >>| inject
-  | Tup (w, _) -> general_list big_endian (destruct ~big_endian w) >>| List.hd
+  | Tup (w, _) -> general_list big_endian (destruct ~big_endian w) >>| fun a -> Array.get a 0
   | Tups (_, _, _) as t ->
     char '\x00' *>
     attribute >>= fun _ ->
@@ -1561,7 +1561,7 @@ and destruct :
   | String _ -> invalid_arg "destruct: unsupported string type"
 
 let destruct_stream :
-  ?big_endian:bool -> 'a list w -> ('a -> unit) -> unit Angstrom.t =
+  ?big_endian:bool -> 'a array w -> ('a -> unit) -> unit Angstrom.t =
   fun ?(big_endian=Sys.big_endian) w f ->
   match w with
   | List (w, _) ->
@@ -1607,7 +1607,7 @@ and pp :
   let pp_sep_empty ppf () = Format.pp_print_string ppf "" in
   match w with
   | Unit -> Format.pp_print_string ppf "(::)"
-  | List (w, _) -> Format.(pp_print_list ~pp_sep (pp w) ppf v)
+  | List (w, _) -> Format.(pp_print_list ~pp_sep (pp w) ppf (Array.to_list v))
   | Conv (project, _, w) -> pp w ppf (project v)
   | Tup (w, _) -> pp w ppf v
   | Tups _ -> pp_print_list ppf w v

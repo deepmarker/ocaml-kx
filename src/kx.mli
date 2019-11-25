@@ -56,7 +56,7 @@ val v : ?attr:attribute -> 'a typ -> 'a array w
 val s : ?attr:attribute -> char typ -> string w
 val unit : unit w
 
-val list : ?attr:attribute -> 'a w -> 'a list w
+val list : ?attr:attribute -> 'a w -> 'a array w
 val t1 : ?attr:attribute -> 'a w -> 'a w
 val t2 : ?attr:attribute -> 'a w -> 'b w -> ('a * 'b) w
 val t3 : ?attr:attribute -> 'a w -> 'b w -> 'c w -> ('a * 'b * 'c) w
@@ -131,7 +131,7 @@ val destruct :
   ?big_endian:bool -> 'a w -> 'a Angstrom.t
 val destruct_stream :
   ?big_endian:bool ->
-  'a list w -> ('a -> unit) -> unit Angstrom.t
+  'a array w -> ('a -> unit) -> unit Angstrom.t
 
 val ng : Uuidm.t
 

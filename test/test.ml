@@ -75,7 +75,7 @@ let pack_unpack_vect =
 
 let pack_unpack_list =
   Kx.[
-    pack_unpack "empty" (list (a bool)) [] ;
+    pack_unpack "empty" (list (a bool)) [||] ;
     pack_unpack "simple" (t1 (a bool)) true ;
     pack_unpack "simple2" (t2 (a int) (a float)) (0l, 0.) ;
     pack_unpack "simple3" (t3 (a int) (a float) (a sym)) (0l, 0., "a") ;
@@ -86,27 +86,27 @@ let pack_unpack_list =
       (t1 (v guid)) [|Uuidm.nil; Uuidm.nil|] ;
     pack_unpack "nested"
       (t1 (t1 (a bool))) true ;
-    pack_unpack "compound" (list (v short)) [[|1;2|]; [|3;4|]] ;
-    pack_unpack "string list" (list (s char)) ["machin"; "truc"] ;
+    pack_unpack "compound" (list (v short)) [|[|1;2|]; [|3;4|]|] ;
+    pack_unpack "string list" (list (s char)) [|"machin"; "truc"|] ;
     pack_unpack "test" (t2 (a sym) (a bool)) ("auie", true) ;
     pack_unpack "t4" (t4 (a bool) (a bool) (a bool) (a bool)) (true, true, true, true)
   ]
 
 let pack_unpack_dict =
   Kx.[
-    pack_unpack "empty" (dict (list (a bool)) (list (a bool))) ([], []);
+    pack_unpack "empty" (dict (list (a bool)) (list (a bool))) ([||], [||]);
     pack_unpack "simple" (dict (v sym) (v long)) ([|"a";"b";"c"|], [|1L;2L;3L|]);
     pack_unpack "compound"
       (dict
          (list (t2 (a bool) (a int)))
          (list (t2 (a bool) (a int))))
-      ([true, 3l; false, 2l], [false, 1l; true, 2l]) ;
+      ([|true, 3l; false, 2l|], [|false, 1l; true, 2l|]) ;
     pack_unpack "sorted dict atom values"
       (dict ~sorted:true (v ~attr:Sorted sym) (v bool))
       (([|"a";"b"|]), ([|true; false|])) ;
     pack_unpack "keyed table"
       (dict (table (list (v short))) (table (list (v short))))
-      (([|"id"|], [[|1; 2; 3|]]), ([|"v"|], [[|4; 5; 6|]])) ;
+      (([|"id"|], [|[|1; 2; 3|]|]), ([|"v"|], [|[|4; 5; 6|]|])) ;
     pack_unpack "keyed table2"
       (dict (table1 short) (table1 short))
       (([|"id"|], [|1; 2; 3|]), ([|"v"|], [|4; 5; 6|])) ;
