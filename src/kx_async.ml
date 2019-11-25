@@ -13,13 +13,38 @@ let pp_serialized ppf (K { big_endian; typ; msg }) =
   let serialized = construct ~big_endian ~typ:`Async typ msg in
   Format.fprintf ppf "0x%a" Hex.pp (Hex.of_bigstring serialized)
 
+let parse w r =
+  Deferred.Result.map_error ~f:Error.of_string (Angstrom_async.parse w r)
+
+let handle_chunk wbuf pos nb_to_read =
+  if pos < 0 then invalid_arg "pos" ;
+  if nb_to_read < 1 ||
+     nb_to_read > (Bigstring.length wbuf - pos) then invalid_arg "nb_to_read" ;
+  let nb_to_read = ref nb_to_read in
+  let wpos = ref pos in
+  let inner buf ~pos ~len =
+    let will_read = min len !nb_to_read in
+    Bigstring.blito
+      ~src:buf ~src_pos:pos ~src_len:will_read
+      ~dst:wbuf ~dst_pos:!wpos () ;
+    if will_read = !nb_to_read then
+      return (`Stop_consumed ((), will_read))
+    else begin
+      wpos := !wpos + will_read ;
+      nb_to_read := !nb_to_read - will_read ;
+      return (`Consumed (will_read, `Need !nb_to_read))
+    end
+  in
+  inner
+
 let parse_compressed ~big_endian ~msglen w r =
+  let msglen = Int32.to_int_exn msglen in
   let module E = (val (getmod big_endian) : ENDIAN) in
-  Deferred.Result.map_error
-    ~f:Error.of_string (Angstrom_async.parse E.any_int32 r) >>=? fun uncompLen ->
+  parse E.any_int32 r >>=? fun uncompLen ->
   let uncompLen = Int32.to_int_exn uncompLen in
-  Deferred.Result.map_error ~f:Error.of_string
-    (Angstrom_async.parse (Angstrom.take_bigstring (msglen-4)) r) >>=? fun compMsg ->
+  let compMsg = Bigstring.create msglen in
+  Reader.read_one_chunk_at_a_time r
+    ~handle_chunk:(handle_chunk compMsg 12 (msglen - 12)) >>= fun _ ->
   let uncompMsg = Bigstringaf.create uncompLen in
   uncompress uncompMsg compMsg ;
   let res =
@@ -64,15 +89,13 @@ module Async = struct
     Angstrom_async.parse hdr r >>= function
     | Error msg -> return (Error (Error.of_string msg))
     | Ok ({ big_endian; typ=_; compressed; len } as hdr) ->
-      let msglen = Int32.to_int_exn len - 8 in
       Log_async.debug (fun m -> m "%a" Kx.pp_print_hdr hdr) >>= fun () ->
       (* let msg = Reader.peek_available r ~len:(msglen - 8) in *)
       (* Log_async.debug (fun m -> m "%d %a" (String.length msg) Hex.pp (Hex.of_string msg)) >>= fun () -> *)
       begin match compressed with
-        | true -> parse_compressed ~big_endian ~msglen w r
-        | false ->
-          Angstrom_async.parse (destruct ~big_endian w) r >>= fun parsed ->
-          return (Result.map_error ~f:Error.of_string parsed)
+        | false -> parse (destruct ~big_endian w) r
+        | true ->
+          parse_compressed ~big_endian ~msglen:len w r
       end
 
   let send_client_msgs ?comp ?buf r w =
@@ -151,14 +174,11 @@ let connect_sync ?comp ?big_endian ?(buf=Faraday.create 4096) url =
           let serialized = construct ?comp ?big_endian ~typ:`Sync ~buf wq q in
           Writer.write_bigstring w serialized ;
           Log_async.debug (fun m -> m "-> %a" (Kx.pp wq) q) >>= fun () ->
-          Deferred.Result.map_error ~f:Error.of_string (Angstrom_async.parse hdr r) >>=?
+          parse hdr r >>=?
           fun { big_endian; typ=_; compressed; len } ->
-          let msglen = Int32.to_int_exn len - 8 in
           begin match compressed with
-            | true -> parse_compressed ~big_endian ~msglen wr r
-            | false ->
-              Deferred.Result.map_error ~f:Error.of_string
-                (Angstrom_async.parse (destruct ~big_endian wr) r)
+            | true -> parse_compressed ~big_endian ~msglen:len wr r
+            | false -> parse (destruct ~big_endian wr) r
           end
         end } in
     return (Ok (f, r, w))
