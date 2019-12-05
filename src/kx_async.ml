@@ -103,7 +103,6 @@ module Async = struct
     let kx_read, client_write = Pipe.create () in
     let connected = Ivar.create () in
     let process _s _tls r w =
-      Monitor.detach (Writer.monitor w) ;
       write_handshake w url ;
       Reader.read_char r >>= function
       | `Eof ->
@@ -113,8 +112,18 @@ module Async = struct
         Ivar.fill connected (Or_error.errorf "Invalid handsharke %C" c) ;
         Deferred.unit
       | `Ok _ ->
-        Ivar.fill connected (Ok { r = (fun w -> read r w) ;
-                                  w = client_write }) ;
+        Monitor.detach_and_iter_errors (Writer.monitor w) ~f:begin fun exn ->
+          Writer.close w >>> fun () ->
+          Log.err (fun m -> m "%a" Exn.pp exn)
+        end ;
+        let protected_read wit =
+          Monitor.try_with_join_or_error (fun () -> read r wit) >>= function
+          | Error e -> Writer.close w >>= fun () -> return (Error e)
+          | Ok v -> return (Ok v)
+        in
+        Ivar.fill connected
+          (Ok { r = protected_read ;
+                w = client_write }) ;
         send_client_msgs ?comp ~buf kx_read w in
     Deferred.any [
       Ivar.read connected ;
