@@ -84,19 +84,13 @@ module Async = struct
 
   let read r w =
     Reader.peek r ~len:8 >>= fun _ ->
-    (* let h = Reader.peek_available r ~len:8 in *)
-    (* Log_async.debug (fun m -> m "%a" Hex.pp (Hex.of_string h)) >>= fun () -> *)
-    Angstrom_async.parse hdr r >>= function
-    | Error msg -> return (Error (Error.of_string msg))
-    | Ok ({ big_endian; typ=_; compressed; len } as hdr) ->
-      Log_async.debug (fun m -> m "%a" Kx.pp_print_hdr hdr) >>= fun () ->
-      (* let msg = Reader.peek_available r ~len:(msglen - 8) in *)
-      (* Log_async.debug (fun m -> m "%d %a" (String.length msg) Hex.pp (Hex.of_string msg)) >>= fun () -> *)
-      begin match compressed with
-        | false -> parse (destruct ~big_endian w) r
-        | true ->
-          parse_compressed ~big_endian ~msglen:len w r
-      end
+    Deferred.Result.map_error ~f:Error.of_string
+      (Angstrom_async.parse hdr r) >>=? fun ({ big_endian; typ=_; compressed; len } as hdr) ->
+    Log_async.debug (fun m -> m "%a" Kx.pp_print_hdr hdr) >>= fun () ->
+    begin match compressed with
+      | false -> parse (destruct ~big_endian w) r
+      | true ->  parse_compressed ~big_endian ~msglen:len w r
+    end
 
   let send_client_msgs ?comp ?buf r w =
     Pipe.iter r ~f:begin fun (K { big_endian; typ; msg }) ->
