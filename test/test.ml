@@ -34,14 +34,17 @@ let pack_unpack_atom =
     pack_unpack "empty symbol" (a sym) "" ;
     pack_unpack "symbol" (a sym) "aiue" ;
     pack_unpack "timestamp" (a timestamp) Ptime.epoch ;
+    pack_unpack "timestamp_null" (a timestamp) Kx.np ;
     pack_unpack "month" (a month) (2018, 4, 0) ;
     pack_unpack "month" (a month) (2019, 1, 0) ;
     pack_unpack "month" (a month) (2019, 2, 0) ;
     pack_unpack "date" (a date) (2017, 10, 6) ;
     pack_unpack "timespan" (a timespan) (Ptime.Span.of_int_s 0) ;
+    pack_unpack "timespan_null" (a timespan) Kx.nn ;
     pack_unpack "minute" (a minute) (Ptime.Span.of_int_s 0) ;
     pack_unpack "second" (a second) (Ptime.Span.of_int_s 0) ;
     pack_unpack "time" (a time) (Ptime.Span.of_int_s 0) ;
+    pack_unpack "time_null" (a time) Kx.nt ;
     pack_unpack "lambda" (a lambda) ("", "{x+y}");
     pack_unpack "lambda_ctx" (a lambda) ("d", "{x+y}") ;
     pack_unpack "unary" (a unaryprim) Unary.neg ;
@@ -352,12 +355,12 @@ let () =
   run "q" [
     "utils", tests_utils ;
     "atom", pack_unpack_atom ;
-    "vect", pack_unpack_atom ;
-    "list", pack_unpack_atom ;
-    "dict", pack_unpack_atom ;
-    "table", pack_unpack_atom ;
-    "conv", pack_unpack_atom ;
-    "union", pack_unpack_atom ;
+    "vect", pack_unpack_vect ;
+    "list", pack_unpack_list ;
+    "dict", pack_unpack_dict ;
+    "table", pack_unpack_table ;
+    "conv", pack_unpack_conv ;
+    "union", pack_unpack_union ;
     "kx", tests_kx ;
     "kx-async", tests_kx_async ;
   ]

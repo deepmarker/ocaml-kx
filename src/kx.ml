@@ -61,10 +61,8 @@ let kx_epoch, kx_epoch_span =
   | None -> assert false
   | Some t -> t, Ptime.to_span t
 
-let day_in_ns d =
-  Int64.(mul (of_int (d * 24 * 3600)) 1_000_000_000L)
-let day_in_ms d =
-  Int32.(mul (of_int (d * 24 * 3600)) 1_000l)
+let day_in_ns d = Int64.(mul (of_int (d * 24 * 3600)) 1_000_000_000L)
+let day_in_ms d = Int32.(mul (of_int (d * 24 * 3600)) 1_000l)
 let day_in_minutes d = Int32.of_int (d * 24 * 60)
 let day_in_seconds d = Int32.of_int (d * 24 * 3600)
 
@@ -94,43 +92,54 @@ let timestamp_of_int64 = function
     | None -> invalid_arg "timestamp_of_int64"
     | Some ts -> ts
 
-let span_of_ns ns =
-  let open Int64 in
-  let is_negative = ns < 0L in
-  let ns = abs ns in
-  let d = div ns (day_in_ns 1) in
-  let ps = rem ns (day_in_ns 1) in
-  let span = Ptime.Span.v (to_int d, div ps 1_000L) in
-  if is_negative then Ptime.Span.neg span else span
+let min_span = Ptime.to_span Ptime.min
+let succ_min_span = Ptime.to_span (Option.get Ptime.(add_span min (Span.v (0, 1L))))
 
-let span_of_ns ns =
-  if ns = nj then
-    Ptime.Span.(sub (span_of_ns (Int64.succ nj)) (v (0, 1L)))
-  else span_of_ns ns
+let span_of_ns = function
+  | -9223372036854775808L -> min_span
+  | -9223372036854775807L -> succ_min_span
+  | ns ->
+    let open Int64 in
+    let is_negative = ns < 0L in
+    let ns = abs ns in
+    let d = div ns (day_in_ns 1) in
+    let rem_ns = rem ns (day_in_ns 1) in
+    let span = Ptime.Span.v (to_int d, mul rem_ns 1_000L) in
+    if is_negative then Ptime.Span.neg span else span
+
+let jd_posix_epoch = 2_440_588          (* the Julian day of the POSIX epoch *)
+let jd_ptime_min = 1_721_060                  (* the Julian day of Ptime.min *)
+(* let jd_ptime_max = 5_373_484                  (\* the Julian day of Ptime.max *\) *)
+let day_min = jd_ptime_min - jd_posix_epoch
+(* let day_max = jd_ptime_max - jd_posix_epoch *)
 
 let ns_of_span span =
   let open Int64 in
   let d, ps = Ptime.Span.to_d_ps span in
-  add (mul (of_int d) (day_in_ns 1)) (div ps 1_000L)
+  match d, ps with
+  | _, 0L when d = day_min -> min_int
+  | _, 1L when d = day_min -> succ min_int
+  | _ -> add (mul (of_int d) (day_in_ns 1)) (div ps 1_000L)
 
-let span_of_ms ms =
-  let open Int32 in
-  let is_negative = ms < 0l in
-  let d = div ms (day_in_ms 1) in
-  let ps = rem ms (day_in_ms 1) in
-  let span =
-    Ptime.Span.v (to_int d, Int64.(div (of_int32 ps) 1_000_000_000L)) in
-  if is_negative then Ptime.Span.neg span else span
-
-let span_of_ms ms =
-  if ms = ni then
-    Ptime.Span.(sub (span_of_ms (Int32.succ ni)) (v (0, 1L)))
-  else span_of_ms ms
+let span_of_ms = function
+  | -2147483648l -> min_span
+  | -2147483647l -> succ_min_span
+  | ms ->
+    let open Int32 in
+    let is_negative = ms < 0l in
+    let d = div ms (day_in_ms 1) in
+    let ps = rem ms (day_in_ms 1) in
+    let span =
+      Ptime.Span.v (to_int d, Int64.(div (of_int32 ps) 1_000_000_000L)) in
+    if is_negative then Ptime.Span.neg span else span
 
 let ms_of_span span =
   let open Int32 in
   let d, ps = Ptime.Span.to_d_ps span in
-  add (mul (of_int d) (day_in_ms 1)) Int64.(to_int32 (div ps 1_000_000_000L))
+  match d, ps with
+  | _, 0L when d = day_min -> min_int
+  | _, 1L when d = day_min -> succ min_int
+  | _ -> add (mul (of_int d) (day_in_ms 1)) Int64.(to_int32 (div ps 1_000_000_000L))
 
 let int32_of_month (y, m, _) =
   Int32.of_int ((y - 2000) * 12 + (pred m))
