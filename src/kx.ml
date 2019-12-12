@@ -949,14 +949,26 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit = fun e buf
 
   | String _ -> assert false
 
+type msgtyp =
+  | Async
+  | Sync
+  | Response
+[@@deriving sexp]
+
 let char_of_msgtyp = function
-  | `Async -> '\x00'
-  | `Sync -> '\x01'
-  | `Response -> '\x02'
+  | Async -> '\x00'
+  | Sync -> '\x01'
+  | Response -> '\x02'
+
+let msgtyp_of_int = function
+  | 0 -> Async
+  | 1 -> Sync
+  | 2 -> Response
+  | _ -> invalid_arg "msgtyp_of_int"
 
 type hdr = {
   big_endian: bool ;
-  typ: [`Async | `Sync | `Response] ;
+  typ: msgtyp ;
   compressed: bool ;
   len: int32 ;
 } [@@deriving sexp]
@@ -1030,7 +1042,7 @@ let compress ?(big_endian=Sys.big_endian) uncompressed =
   set_int32 ~big_endian compressed 4 (Int32.of_int !d) ;
   Bigstringaf.sub compressed ~off:0 ~len:!d
 
-let construct ?(comp=false) ?(big_endian=Sys.big_endian) ~typ ?(buf=Faraday.create 4096) w x =
+let construct_bigstring ?(comp=false) ?(big_endian=Sys.big_endian) ~typ ?(buf=Faraday.create 4096) w x =
   let module FE =
     (val Faraday.(if big_endian then (module BE : FE) else (module LE : FE))) in
   construct (module FE) buf w x ;
@@ -1051,12 +1063,6 @@ let construct ?(comp=false) ?(big_endian=Sys.big_endian) ~typ ?(buf=Faraday.crea
   if comp && len > 2000 then
     try compress ~big_endian uncompressed with Exit -> uncompressed
   else uncompressed
-
-let msgtyp_of_int = function
-  | 0 -> `Async
-  | 1 -> `Sync
-  | 2 -> `Response
-  | _ -> invalid_arg "msgtyp_of_int"
 
 open Angstrom
 

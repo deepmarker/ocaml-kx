@@ -29,4 +29,5 @@
    async
    async-uri
    logs-async
+   faraday-async
    angstrom-async))

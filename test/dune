@@ -1,7 +1,7 @@
 (executables
- (names sub client)
- (public_names sub client)
- (modules sub client)
+ (names sub)
+ (public_names sub)
+ (modules sub)
  (preprocess (pps ppx_jane ppx_sexp_conv))
  (package kx-async)
  (libraries

@@ -110,9 +110,16 @@ val conv : ('a -> 'b) -> ('b -> 'a) -> 'b w -> 'a w
 val case : 'a w -> ('b -> 'a option) -> ('a -> 'b) -> 'b case
 val union : 'a case list -> 'a w
 
+type msgtyp =
+  | Async
+  | Sync
+  | Response
+
+val char_of_msgtyp : msgtyp -> char
+
 type hdr = {
   big_endian: bool ;
-  typ: [`Async | `Sync | `Response] ;
+  typ: msgtyp ;
   compressed: bool ;
   len: int32 ;
 } [@@deriving sexp]
@@ -121,10 +128,14 @@ val pp_print_hdr : Format.formatter -> hdr -> unit
 val hdr : hdr Angstrom.t
 (* val write_hdr : Faraday.t -> hdr -> unit *)
 
-val construct :
+module type FE = module type of Faraday.BE
+
+val construct : (module FE) -> Faraday.t -> 'a w -> 'a -> unit
+
+val construct_bigstring :
   ?comp:bool ->
   ?big_endian:bool ->
-  typ:[< `Async | `Sync | `Response] ->
+  typ:msgtyp ->
   ?buf:Faraday.t -> 'a w -> 'a -> Bigstringaf.t
 
 val destruct :

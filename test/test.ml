@@ -6,7 +6,7 @@ let make_testable : type a. a w -> a testable = fun a ->
 
 let pack_unpack : type a. string -> a w -> a -> unit = fun name w a ->
   let tt = make_testable w in
-  let serialized = construct ~comp:true ~typ:`Async w a in
+  let serialized = construct_bigstring ~comp:true ~typ:Async w a in
   let payload = Bigstringaf.(sub serialized ~off:8 ~len:(length serialized - 8)) in
   Format.printf "%a@." Hex.pp (Hex.of_bigstring serialized) ;
   match Angstrom.parse_bigstring hdr serialized,
@@ -67,6 +67,7 @@ let pack_unpack_vect =
     pack_unpack "vect empty symbol" (v sym) [|""; ""; ""|] ;
     pack_unpack "vect symbol" (v sym) [|"machin"; "truc"; "chouette"|] ;
     pack_unpack "vect timestamp" (v timestamp) [|Ptime.epoch; Ptime.epoch|] ;
+    pack_unpack "vect timestamp_null" (v timestamp) [|Kx.np; Kx.np|] ;
     pack_unpack "vect month" (v month) [|2019, 1, 0 ; 2019, 2, 0|] ;
     pack_unpack "vect date" (v date) [|2019, 1, 1; 2019, 1, 2|] ;
     pack_unpack "vect timespan" (v timespan) [||] ;
@@ -189,8 +190,8 @@ let test_server () =
   let open Core in
   let open Async in
   let open Kx_async in
-  let t = create (t2 (s Kx.char) (a Kx.bool)) ("upd", false) in
-  Async.with_connection
+  let t = create (t3 (a Kx.operator) (a Kx.long) (a Kx.long)) (Kx.Op.plus, 1L, 1L) in
+  with_connection
     (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun { w; _ } ->
     Pipe.write w t >>= fun () ->
     Deferred.Or_error.ok_unit
