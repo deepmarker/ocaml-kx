@@ -52,22 +52,34 @@ let parse_compressed ~big_endian ~msglen w r =
       (Bigstringaf.sub uncompMsg ~off:8 ~len:(uncompLen-8)) in
   return (Result.(map_error res ~f:(Error.of_string)))
 
-let _write ?(big_endian=Sys.big_endian) ~typ ?(buf=Faraday.create 4096) writer w x =
+let write ?(big_endian=Sys.big_endian) ?(typ=Async) writer w x =
   let module FE =
     (val Faraday.(if big_endian then (module BE : FE) else (module LE : FE))) in
+  let buf = Faraday.create 4096 in
   construct (module FE) buf w x ;
+  Faraday.close buf ;
   let len = Faraday.pending_bytes buf in
-  let hdrbuf = Bytes.make 8 '\x00' in
-  Bytes.set hdrbuf 0 (if big_endian then '\x00' else '\x01') ;
-  Bytes.set hdrbuf 1 (char_of_msgtyp typ) ;
-  EndianBytes.BigEndian.set_int32 hdrbuf 4 (Int32.of_int_exn (8 + len)) ;
-  Writer.write_bytes writer hdrbuf ;
+  Writer.write_char writer (if big_endian then '\x00' else '\x01') ;
+  Writer.write_char writer (char_of_msgtyp typ) ;
+  Writer.write_char writer '\x00' ;
+  Writer.write_char writer '\x00' ;
+  let lenbuf = Bigstring.create 4 in
+  Bigstring.(if big_endian then set_int32_be else set_int32_le) lenbuf ~pos:0 (8 + len) ;
+  Writer.write_bigstring writer lenbuf ;
   Faraday_async.serialize buf
-    ~writev:(Faraday_async.writev_of_fd (Writer.fd writer))
-    ~yield:(fun _ -> Writer.flushed writer)
+    ~yield:(fun _ -> Scheduler.yield ()) ~writev:begin fun iovecs ->
+    let q = Queue.create () in
+    let len = List.fold_left iovecs ~init:0 ~f:begin fun a iovec ->
+        Queue.enqueue q (Obj.magic iovec) ;
+        a + iovec.len
+      end in
+    Writer.schedule_iovecs writer q ;
+    Writer.flushed writer >>| fun () ->
+    `Ok len
+  end
 
 type t =  {
-  r: 'a. 'a w -> 'a Deferred.Or_error.t ;
+  r: 'a. 'a w option -> 'a Deferred.Or_error.t ;
   w: msg Pipe.Writer.t ;
 }
 
@@ -99,11 +111,9 @@ let read r w =
     | true ->  parse_compressed ~big_endian ~msglen:len w r
   end
 
-let send_client_msgs ?buf w r =
+let send_client_msgs w r =
   Pipe.iter r ~f:begin fun (K { big_endian; typ; msg }) ->
-    (* write ~big_endian ~typ:Async ?buf w typ msg >>= fun () -> *)
-    let serialized = construct_bigstring ?buf ~big_endian ~typ:Async typ msg in
-    Writer.write_bigstring w serialized ;
+    write ~big_endian w typ msg >>= fun () ->
     Log_async.debug (fun m -> m "@[%a@]" (Kx.pp typ) msg)
   end
 
@@ -117,23 +127,31 @@ let handshake url r w =
   | `Ok '\x03' -> Deferred.unit
   | `Ok c -> failwithf "Invalid handsharke %C" c ()
 
-let process ?buf connected url r w =
+let process connected url r w =
   handshake url r w >>= fun () ->
   Monitor.detach_and_iter_errors (Writer.monitor w) ~f:begin fun exn ->
     Writer.close w >>> fun () -> Log.err (fun m -> m "%a" Exn.pp exn)
   end ;
-  let protected_read wit =
-    Monitor.try_with_join_or_error (fun () -> read r wit) >>= function
-    | Error e -> Writer.close w >>= fun () -> return (Error e)
-    | Ok v -> return (Ok v)
+  let reader_closed = Ivar.create () in
+  let protected_read =
+    if Ivar.is_full reader_closed then
+      invalid_arg "Kx_async: Cannot read from closed reader" ;
+    function
+    | None ->
+      Ivar.fill reader_closed () ;
+      Deferred.Or_error.fail (Error.of_exn Exit)
+    | Some wit ->
+      Monitor.try_with_join_or_error (fun () -> read r wit) >>= function
+      | Error e -> Writer.close w >>= fun () -> return (Error e)
+      | Ok v -> return (Ok v)
   in
-  let client_write = Pipe.create_writer (send_client_msgs ?buf w) in
+  let client_write = Pipe.create_writer (send_client_msgs w) in
   Ivar.fill connected { r = protected_read ; w = client_write } ;
-  Pipe.closed client_write
+  Deferred.all_unit [Ivar.read reader_closed; Pipe.closed client_write ]
 
-let connect ?(buf=Faraday.create 4096) url =
+let connect url =
   let connected = Ivar.create () in
-  let p _ _ r w = process ~buf connected url r w in
+  let p _ _ r w = process connected url r w in
   Deferred.any [
     Ivar.read connected >>= Deferred.Or_error.return;
     (Monitor.try_with_or_error
@@ -145,8 +163,8 @@ let connect ?(buf=Faraday.create 4096) url =
        Deferred.Or_error.fail (Error.of_string "Connection terminated")) ;
   ]
 
-let with_connection ?buf url ~f =
-  connect ?buf url >>=? fun c ->
+let with_connection url ~f =
+  connect url >>=? fun c ->
   Monitor.try_with_join_or_error (fun () -> f c) >>| fun res ->
   Pipe.close c.w ;
   res
@@ -159,6 +177,6 @@ module Persistent = struct
     | None -> Deferred.Or_error.error_string "No current connection available"
     | Some c -> Monitor.try_with_join_or_error (fun () -> f c)
 
-  let create' ~server_name ?on_event ?retry_delay ?buf =
-    create ~server_name ?on_event ?retry_delay ~connect:(connect ?buf)
+  let create' ~server_name ?on_event ?retry_delay =
+    create ~server_name ?on_event ?retry_delay ~connect
 end

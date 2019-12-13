@@ -51,7 +51,7 @@ let main port =
       (fun () -> add_random_trades w) ;
     Pipe.write w sub >>= fun () ->
     let rec inner () =
-      r updmsg >>= function
+      r (Some updmsg) >>= function
       | Error e -> Error.raise e
       | Ok a ->
         Logs.app (fun m ->   m "%a" (Kx.pp updmsg) a) ;

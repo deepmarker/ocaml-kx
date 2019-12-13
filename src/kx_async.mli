@@ -6,17 +6,16 @@ val create : ?big_endian:bool -> 'a w -> 'a -> msg
 val pp_serialized : Format.formatter -> msg -> unit
 
 type t =  {
-  r: 'a. 'a w -> 'a Deferred.Or_error.t;
+  r: 'a. 'a w option -> 'a Deferred.Or_error.t;
   w: msg Pipe.Writer.t
 }
 
 val empty : t
 
-val process :
-  ?buf:Faraday.t -> t Ivar.t -> Uri.t ->  Reader.t -> Writer.t -> unit Deferred.t
+val process : t Ivar.t -> Uri.t ->  Reader.t -> Writer.t -> unit Deferred.t
 
-val connect : ?buf:Faraday.t -> Uri.t -> t Deferred.Or_error.t
-val with_connection : ?buf:Faraday.t -> Uri.t -> f:(t -> 'b Deferred.Or_error.t) -> 'b Deferred.Or_error.t
+val connect : Uri.t -> t Deferred.Or_error.t
+val with_connection : Uri.t -> f:(t -> 'b Deferred.Or_error.t) -> 'b Deferred.Or_error.t
 
 module Persistent : sig
   include Persistent_connection_kernel.S
@@ -30,5 +29,5 @@ module Persistent : sig
     server_name:string ->
     ?on_event:(Event.t -> unit Deferred.t) ->
     ?retry_delay:(unit -> Core_kernel.Time_ns.Span.t) ->
-    ?buf:Faraday.t -> (unit -> Uri.t Deferred.Or_error.t) -> t
+    (unit -> Uri.t Deferred.Or_error.t) -> t
 end
