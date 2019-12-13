@@ -52,12 +52,6 @@ let parse_compressed ~big_endian ~msglen w r =
       (Bigstringaf.sub uncompMsg ~off:8 ~len:(uncompLen-8)) in
   return (Result.(map_error res ~f:(Error.of_string)))
 
-let write_handshake w url =
-  Writer.write w
-    (Printf.sprintf "%s:%s\x03\x00"
-       (Option.value ~default:"" (Uri.user url))
-       (Option.value ~default:"" (Uri.password url)))
-
 let _write ?(big_endian=Sys.big_endian) ~typ ?(buf=Faraday.create 4096) writer w x =
   let module FE =
     (val Faraday.(if big_endian then (module BE : FE) else (module LE : FE))) in
@@ -105,7 +99,7 @@ let read r w =
     | true ->  parse_compressed ~big_endian ~msglen:len w r
   end
 
-let send_client_msgs ?buf r w =
+let send_client_msgs ?buf w r =
   Pipe.iter r ~f:begin fun (K { big_endian; typ; msg }) ->
     (* write ~big_endian ~typ:Async ?buf w typ msg >>= fun () -> *)
     let serialized = construct_bigstring ?buf ~big_endian ~typ:Async typ msg in
@@ -113,43 +107,41 @@ let send_client_msgs ?buf r w =
     Log_async.debug (fun m -> m "@[%a@]" (Kx.pp typ) msg)
   end
 
+let handshake url r w =
+  Writer.write w
+    (Printf.sprintf "%s:%s\x03\x00"
+       (Option.value ~default:"" (Uri.user url))
+       (Option.value ~default:"" (Uri.password url))) ;
+  Reader.read_char r >>= function
+  | `Eof -> failwith "EOF"
+  | `Ok '\x03' -> Deferred.unit
+  | `Ok c -> failwithf "Invalid handsharke %C" c ()
+
+let process ?buf connected url r w =
+  handshake url r w >>= fun () ->
+  Monitor.detach_and_iter_errors (Writer.monitor w) ~f:begin fun exn ->
+    Writer.close w >>> fun () -> Log.err (fun m -> m "%a" Exn.pp exn)
+  end ;
+  let protected_read wit =
+    Monitor.try_with_join_or_error (fun () -> read r wit) >>= function
+    | Error e -> Writer.close w >>= fun () -> return (Error e)
+    | Ok v -> return (Ok v)
+  in
+  let client_write = Pipe.create_writer (send_client_msgs ?buf w) in
+  Ivar.fill connected { r = protected_read ; w = client_write } ;
+  Pipe.closed client_write
+
 let connect ?(buf=Faraday.create 4096) url =
-  let kx_read, client_write = Pipe.create () in
   let connected = Ivar.create () in
-  let process _s _tls r w =
-    write_handshake w url ;
-    Reader.read_char r >>= function
-    | `Eof ->
-      Ivar.fill connected (Or_error.error_string "EOF") ;
-      Deferred.unit
-    | `Ok c when c <> '\x03'->
-      Ivar.fill connected (Or_error.errorf "Invalid handsharke %C" c) ;
-      Deferred.unit
-    | `Ok _ ->
-      Monitor.detach_and_iter_errors (Writer.monitor w) ~f:begin fun exn ->
-        Writer.close w >>> fun () ->
-        Log.err (fun m -> m "%a" Exn.pp exn)
-      end ;
-      let protected_read wit =
-        Monitor.try_with_join_or_error (fun () -> read r wit) >>= function
-        | Error e -> Writer.close w >>= fun () -> return (Error e)
-        | Ok v -> return (Ok v)
-      in
-      Ivar.fill connected
-        (Ok { r = protected_read ;
-              w = client_write }) ;
-      send_client_msgs ~buf kx_read w in
+  let p _ _ r w = process ~buf connected url r w in
   Deferred.any [
-    Ivar.read connected ;
-    (Monitor.try_with_or_error begin fun () ->
-        Async_uri.with_connection url process
-      end >>= function
+    Ivar.read connected >>= Deferred.Or_error.return;
+    (Monitor.try_with_or_error
+       (fun () -> Async_uri.with_connection url p) >>= function
      | Error e ->
-       Pipe.close_read kx_read ;
        Log_async.err (fun m -> m "%a" Error.pp e) >>= fun () ->
        Deferred.Or_error.fail e
      | Ok () ->
-       Pipe.close_read kx_read ;
        Deferred.Or_error.fail (Error.of_string "Connection terminated")) ;
   ]
 

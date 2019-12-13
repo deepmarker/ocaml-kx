@@ -12,14 +12,11 @@ type t =  {
 
 val empty : t
 
-val connect :
-  ?buf:Faraday.t ->
-  Uri.t -> t Deferred.Or_error.t
+val process :
+  ?buf:Faraday.t -> t Ivar.t -> Uri.t ->  Reader.t -> Writer.t -> unit Deferred.t
 
-val with_connection :
-  ?buf:Faraday.t ->
-  Uri.t -> f:(t -> 'b Deferred.Or_error.t) ->
-  'b Deferred.Or_error.t
+val connect : ?buf:Faraday.t -> Uri.t -> t Deferred.Or_error.t
+val with_connection : ?buf:Faraday.t -> Uri.t -> f:(t -> 'b Deferred.Or_error.t) -> 'b Deferred.Or_error.t
 
 module Persistent : sig
   include Persistent_connection_kernel.S
