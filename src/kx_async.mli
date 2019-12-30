@@ -1,3 +1,4 @@
+open Core
 open Async
 open Kx
 
@@ -11,11 +12,20 @@ type t =  {
 }
 
 val empty : t
+val process : Uri.t ->  Reader.t -> Writer.t -> t Deferred.t
 
-val process : t Ivar.t -> Uri.t ->  Reader.t -> Writer.t -> unit Deferred.t
-
-val connect : Uri.t -> t Deferred.Or_error.t
-val with_connection : Uri.t -> f:(t -> 'b Deferred.Or_error.t) -> 'b Deferred.Or_error.t
+val with_connection :
+  ?version:Async_ssl.Version.t ->
+  ?options:Async_ssl.Opt.t list ->
+  ?buffer_age_limit:[ `At_most of Time.Span.t | `Unlimited ] ->
+  ?interrupt:unit Deferred.t ->
+  ?reader_buffer_size:int ->
+  ?writer_buffer_size:int ->
+  ?timeout:Time.Span.t ->
+  Uri.t ->
+  (('a w sexp_option -> 'a Deferred.Or_error.t) ->
+   msg Pipe.Writer.t -> 'b Deferred.t) ->
+  'b Deferred.t
 
 module Persistent : sig
   include Persistent_connection_kernel.S

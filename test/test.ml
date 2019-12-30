@@ -192,7 +192,7 @@ let test_server () =
   let open Kx_async in
   let t = create (t3 (a Kx.operator) (a Kx.long) (a Kx.long)) (Kx.Op.plus, 1L, 1L) in
   with_connection
-    (Uri.make ~host:"localhost" ~port:5042 ()) ~f:begin fun { w; _ } ->
+    (Uri.make ~host:"localhost" ~port:5042 ()) begin fun _ w ->
     Pipe.write w t >>= fun () ->
     Deferred.Or_error.ok_unit
   end >>= function

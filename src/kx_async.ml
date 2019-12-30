@@ -78,23 +78,18 @@ let write ?(big_endian=Sys.big_endian) ?(typ=Async) writer w x =
     `Ok len
   end
 
-type t =  {
-  r: 'a. 'a w option -> 'a Deferred.Or_error.t ;
-  w: msg Pipe.Writer.t ;
-}
-
 module T = struct
-  module Address = struct
-    include Uri_sexp
-    let equal a b = compare a b = 0
-  end
-
-  type nonrec t = t
+  module Address = Uri_sexp
+  type t = {
+    r: 'a. 'a w option -> 'a Deferred.Or_error.t ;
+    w: msg Pipe.Writer.t ;
+  }
 
   let close { w; _ } = Pipe.close w ; Deferred.unit
   let is_closed { w; _ } = Pipe.is_closed w
   let close_finished { w; _ } = Pipe.closed w
 end
+include T
 
 let empty = {
   r = (fun _ -> failwith "disconnected") ;
@@ -127,7 +122,7 @@ let handshake url r w =
   | `Ok '\x03' -> Deferred.unit
   | `Ok c -> failwithf "Invalid handsharke %C" c ()
 
-let process connected url r w =
+let process url r w =
   handshake url r w >>= fun () ->
   Monitor.detach_and_iter_errors (Writer.monitor w) ~f:begin fun exn ->
     Writer.close w >>> fun () -> Log.err (fun m -> m "%a" Exn.pp exn)
@@ -143,31 +138,25 @@ let process connected url r w =
     | Some wit ->
       Monitor.try_with_join_or_error (fun () -> read r wit) >>= function
       | Error e -> Writer.close w >>= fun () -> return (Error e)
-      | Ok v -> return (Ok v)
-  in
+      | Ok v -> return (Ok v) in
   let client_write = Pipe.create_writer (send_client_msgs w) in
-  Ivar.fill connected { r = protected_read ; w = client_write } ;
-  Deferred.all_unit [Ivar.read reader_closed; Pipe.closed client_write ]
+  don't_wait_for (Ivar.read reader_closed  >>= fun () -> Reader.close r) ;
+  don't_wait_for (Pipe.closed client_write >>= fun () -> Writer.close w) ;
+  return { r = protected_read ; w = client_write }
 
-let connect url =
-  let connected = Ivar.create () in
-  let p _ _ r w = process connected url r w in
-  Deferred.any [
-    Ivar.read connected >>= Deferred.Or_error.return;
-    (Monitor.try_with_or_error
-       (fun () -> Async_uri.with_connection url p) >>= function
-     | Error e ->
-       Log_async.err (fun m -> m "%a" Error.pp e) >>= fun () ->
-       Deferred.Or_error.fail e
-     | Ok () ->
-       Deferred.Or_error.fail (Error.of_string "Connection terminated")) ;
-  ]
-
-let with_connection url ~f =
-  connect url >>=? fun c ->
-  Monitor.try_with_join_or_error (fun () -> f c) >>| fun res ->
-  Pipe.close c.w ;
-  res
+let with_connection
+    ?version ?options ?buffer_age_limit ?interrupt
+    ?reader_buffer_size ?writer_buffer_size ?timeout url f =
+  Async_uri.with_connection
+    ?version ?options ?buffer_age_limit ?interrupt
+    ?reader_buffer_size ?writer_buffer_size ?timeout
+    url begin fun _ _ r w ->
+    process url r w >>= fun { r; w } ->
+    Monitor.protect (fun () -> f r w) ~finally:begin fun () ->
+      Pipe.close w ;
+      Deferred.ignore (r None)
+    end
+  end
 
 module Persistent = struct
   include Persistent_connection_kernel.Make(T)
@@ -178,5 +167,11 @@ module Persistent = struct
     | Some c -> Monitor.try_with_join_or_error (fun () -> f c)
 
   let create' ~server_name ?on_event ?retry_delay =
-    create ~server_name ?on_event ?retry_delay ~connect
+    create ~server_name ?on_event ?retry_delay
+      ~connect:begin fun addr ->
+        Monitor.try_with_or_error begin fun () ->
+          Async_uri.connect addr >>= fun (_sock, _conn, r, w) ->
+          process addr r w
+        end
+      end
 end
