@@ -13,9 +13,6 @@ let pp_serialized ppf (K { big_endian; typ; msg }) =
   let serialized = construct_bigstring ~big_endian ~typ:Async typ msg in
   Format.fprintf ppf "0x%a" Hex.pp (Hex.of_bigstring serialized)
 
-let parse w r =
-  Deferred.Result.map_error ~f:Error.of_string (Angstrom_async.parse w r)
-
 let handle_chunk wbuf pos nb_to_read =
   if pos < 0 then invalid_arg "pos" ;
   if nb_to_read < 1 ||
@@ -40,17 +37,15 @@ let handle_chunk wbuf pos nb_to_read =
 let parse_compressed ~big_endian ~msglen w r =
   let msglen = Int32.to_int_exn msglen in
   let module E = (val (getmod big_endian) : ENDIAN) in
-  parse E.any_int32 r >>=? fun uncompLen ->
+  Angstrom_async.parse E.any_int32 r >>=? fun uncompLen ->
   let uncompLen = Int32.to_int_exn uncompLen in
   let compMsg = Bigstring.create msglen in
   Reader.read_one_chunk_at_a_time r
-    ~handle_chunk:(handle_chunk compMsg 12 (msglen - 12)) >>= fun _ ->
+    ~handle_chunk:(handle_chunk compMsg 12 (msglen - 12)) >>| fun _ ->
   let uncompMsg = Bigstringaf.create uncompLen in
   uncompress uncompMsg compMsg ;
-  let res =
-    Angstrom.parse_bigstring (destruct ~big_endian w)
-      (Bigstringaf.sub uncompMsg ~off:8 ~len:(uncompLen-8)) in
-  return (Result.(map_error res ~f:(Error.of_string)))
+  Angstrom.parse_bigstring (destruct ~big_endian w)
+    (Bigstringaf.sub uncompMsg ~off:8 ~len:(uncompLen-8))
 
 let write ?(big_endian=Sys.big_endian) ?(typ=Async) writer w x =
   let module FE =
@@ -81,7 +76,7 @@ let write ?(big_endian=Sys.big_endian) ?(typ=Async) writer w x =
 module T = struct
   module Address = Uri_sexp
   type t = {
-    r: 'a. 'a w option -> 'a Deferred.Or_error.t ;
+    r: 'a. 'a w option -> 'a Deferred.t ;
     w: msg Pipe.Writer.t ;
   }
 
@@ -98,11 +93,10 @@ let empty = {
 
 let read r w =
   Reader.peek r ~len:8 >>= fun _ ->
-  Deferred.Result.map_error ~f:Error.of_string
-    (Angstrom_async.parse hdr r) >>=? fun ({ big_endian; typ=_; compressed; len } as hdr) ->
+  Angstrom_async.parse hdr r >>=? fun ({ big_endian; typ=_; compressed; len } as hdr) ->
   Log_async.debug (fun m -> m "%a" Kx.pp_print_hdr hdr) >>= fun () ->
   begin match compressed with
-    | false -> parse (destruct ~big_endian w) r
+    | false -> Angstrom_async.parse (destruct ~big_endian w) r
     | true ->  parse_compressed ~big_endian ~msglen:len w r
   end
 
@@ -134,11 +128,13 @@ let process url r w =
     function
     | None ->
       Ivar.fill reader_closed () ;
-      Deferred.Or_error.fail (Error.of_exn Exit)
+      raise Exit
     | Some wit ->
-      Monitor.try_with_join_or_error (fun () -> read r wit) >>= function
-      | Error e -> Writer.close w >>= fun () -> return (Error e)
-      | Ok v -> return (Ok v) in
+      read r wit >>= function
+      | Error msg ->
+        Writer.close w >>= fun () ->
+        failwith msg
+      | Ok v -> return v in
   let client_write = Pipe.create_writer (send_client_msgs w) in
   don't_wait_for (Ivar.read reader_closed  >>= fun () -> Reader.close r) ;
   don't_wait_for (Pipe.closed client_write >>= fun () -> Writer.close w) ;
@@ -163,8 +159,8 @@ module Persistent = struct
 
   let with_current_connection c ~f =
     match current_connection c with
-    | None -> Deferred.Or_error.error_string "No current connection available"
-    | Some c -> Monitor.try_with_join_or_error (fun () -> f c)
+    | None -> failwith "no current connection available"
+    | Some c -> f c
 
   let create' ~server_name ?on_event ?retry_delay =
     create ~server_name ?on_event ?retry_delay

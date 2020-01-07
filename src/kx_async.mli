@@ -7,7 +7,7 @@ val create : ?big_endian:bool -> 'a w -> 'a -> msg
 val pp_serialized : Format.formatter -> msg -> unit
 
 type t =  {
-  r: 'a. 'a w option -> 'a Deferred.Or_error.t;
+  r: 'a. 'a w option -> 'a Deferred.t;
   w: msg Pipe.Writer.t
 }
 
@@ -23,7 +23,7 @@ val with_connection :
   ?writer_buffer_size:int ->
   ?timeout:Time.Span.t ->
   Uri.t ->
-  (('a w sexp_option -> 'a Deferred.Or_error.t) ->
+  (('a w sexp_option -> 'a Deferred.t) ->
    msg Pipe.Writer.t -> 'b Deferred.t) ->
   'b Deferred.t
 
@@ -33,7 +33,7 @@ module Persistent : sig
      and type address = Uri.t
 
   val with_current_connection :
-    t -> f:(conn -> 'a Deferred.Or_error.t) -> 'a Deferred.Or_error.t
+    t -> f:(conn -> 'a Deferred.t) -> 'a Deferred.t
 
   val create' :
     server_name:string ->
