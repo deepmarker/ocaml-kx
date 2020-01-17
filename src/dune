@@ -5,13 +5,11 @@
  (preprocess (pps ppx_sexp_conv))
  (synopsis "OCaml client for kdb+")
  (libraries
-   hex
+   fmt
    dataframe
    sexplib
-   fmt
    uuidm
    ptime
-   uri
    ocplib-endian
    faraday
    angstrom))
@@ -23,6 +21,7 @@
  (preprocess (pps ppx_sexp_conv))
  (synopsis "OCaml client for kdb+, for Jane Street's async")
  (libraries
+   hex
    uri-sexp
    kx
    core

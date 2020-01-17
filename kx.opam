@@ -7,13 +7,18 @@ dev-repo: "git+https://github.com/vbmithr/ocaml-kx.git"
 bug-reports: "https://github.com/vbmithr/ocaml-kx/issues"
 tags: []
 depends: [
-  "dune" {build & >= "1.1.1"}
+  "dune" {>= "1.11.4"}
+  "fmt" {>= "0.8.8"}
+  "dataframe" {= version}
+  "sexplib" {>= "v0.12.0"}
   "uuidm" {>= "0.9.6"}
-  "bigstring" {>= "0.2"}
   "ptime" {>= "0.8.4"}
+  "ocplib-endian" {>= "1.0"}
+  "faraday" {>= "0.7.0"}
+  "angstrom" {>= "0.12.1"}
 ]
 build: [ "dune" "build" "-j" jobs "-p" name ]
-synopsis: "Bindings to kdb+"
+run-test: [ "dune" "runtest" "-j" jobs "-p" name ]
+synopsis: "OCaml client for KDB+"
 description: """
-kbd+ <> OCaml connector
 """
