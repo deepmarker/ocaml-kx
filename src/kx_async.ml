@@ -123,13 +123,13 @@ let process url r w =
   end ;
   let reader_closed = Ivar.create () in
   let protected_read =
-    if Ivar.is_full reader_closed then
-      invalid_arg "Kx_async: Cannot read from closed reader" ;
     function
     | None ->
-      Ivar.fill reader_closed () ;
+      Ivar.fill_if_empty reader_closed () ;
       raise Exit
     | Some wit ->
+      if Ivar.is_full reader_closed then
+        invalid_arg "Kx_async: Cannot read from closed reader" ;
       read r wit >>= function
       | Error msg ->
         Writer.close w >>= fun () ->
@@ -150,7 +150,11 @@ let with_connection
     process url r w >>= fun { r; w } ->
     Monitor.protect (fun () -> f r w) ~finally:begin fun () ->
       Pipe.close w ;
-      Deferred.ignore (r None)
+      begin Monitor.try_with ~extract_exn:true (fun () -> r None) >>= function
+        | Ok _ -> assert false
+        | Error Exit -> Deferred.unit
+        | Error a -> raise a
+      end
     end
   end
 
