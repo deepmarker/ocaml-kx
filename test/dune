@@ -1,3 +1,15 @@
+(test
+ (name test)
+ (modules test)
+ (package kx-async)
+ (preprocess (pps ppx_jane ppx_sexp_conv))
+ (libraries
+   hex
+   kx
+   kx-async
+   alcotest
+   alcotest-async))
+
 (executables
  (names sub)
  (public_names sub)
@@ -10,9 +22,3 @@
    async
    logs-async-reporter
    kx-async))
-
-(test
- (name test)
- (modules test)
- (preprocess (pps ppx_jane ppx_sexp_conv))
- (libraries hex alcotest alcotest-async kx kx-async))
