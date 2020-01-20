@@ -114,7 +114,7 @@ let handshake url r w =
   Reader.read_char r >>= function
   | `Eof -> failwith "EOF"
   | `Ok '\x03' -> Deferred.unit
-  | `Ok c -> failwithf "Invalid handsharke %C" c ()
+  | `Ok c -> failwithf "Invalid handshake %C" c ()
 
 let process url r w =
   handshake url r w >>= fun () ->
