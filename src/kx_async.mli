@@ -23,7 +23,7 @@ val with_connection :
   ?writer_buffer_size:int ->
   ?timeout:Time.Span.t ->
   Uri.t ->
-  (('a w sexp_option -> 'a Deferred.t) ->
+  (('a w option -> 'a Deferred.t) ->
    msg Pipe.Writer.t -> 'b Deferred.t) ->
   'b Deferred.t
 
@@ -35,9 +35,10 @@ module Persistent : sig
   val with_current_connection :
     t -> f:(conn -> 'a Deferred.t) -> 'a Deferred.t
 
-  val create' :
-    server_name:string ->
+  val create' : server_name:string ->
     ?on_event:(Event.t -> unit Deferred.t) ->
-    ?retry_delay:(unit -> Core_kernel.Time_ns.Span.t) ->
-    (unit -> Uri.t Deferred.Or_error.t) -> t
+    ?retry_delay:(unit -> Time_ns.Span.t) ->
+    ?random_state:Random.State.t ->
+    ?time_source:Time_source.t ->
+    (unit -> address Or_error.t Deferred.t) -> t
 end

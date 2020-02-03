@@ -59,7 +59,8 @@ let write ?(big_endian=Sys.big_endian) ?(typ=Async) writer w x =
   Writer.write_char writer '\x00' ;
   Writer.write_char writer '\x00' ;
   let lenbuf = Bigstring.create 4 in
-  Bigstring.(if big_endian then set_int32_be else set_int32_le) lenbuf ~pos:0 (8 + len) ;
+  Bigstring.(if big_endian then unsafe_set_int32_be else unsafe_set_int32_le)
+    lenbuf ~pos:0 (8 + len) ;
   Writer.write_bigstring writer lenbuf ;
   Faraday_async.serialize buf
     ~yield:(fun _ -> Scheduler.yield ()) ~writev:begin fun iovecs ->
