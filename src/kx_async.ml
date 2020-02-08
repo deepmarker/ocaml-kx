@@ -147,7 +147,7 @@ let with_connection
   Async_uri.with_connection
     ?version ?options ?buffer_age_limit ?interrupt
     ?reader_buffer_size ?writer_buffer_size ?timeout
-    url begin fun _ _ r w ->
+    url begin fun { r; w; _ } ->
     process url r w >>= fun { r; w } ->
     Monitor.protect (fun () -> f r w) ~finally:begin fun () ->
       Pipe.close w ;
@@ -171,7 +171,7 @@ module Persistent = struct
     create ~server_name ?on_event ?retry_delay
       ~connect:begin fun addr ->
         Monitor.try_with_or_error begin fun () ->
-          Async_uri.connect addr >>= fun (_sock, _conn, r, w) ->
+          Async_uri.connect addr >>= fun { r; w; _ } ->
           process addr r w
         end
       end
