@@ -17,8 +17,8 @@ depends: [
   "faraday-async" {>= "0.7.0"}
   "angstrom-async" {>= "0.12.1"}
   "hex" {>= "1.4.0"}
-  "alcotest" {with-test & >= "0.8.5"}
-  "alcotest-async" {with-test & >= "0.8.5"}
+  "alcotest" {with-test & >= "1.0.0"}
+  "alcotest-async" {with-test & >= "1.0.0"}
 ]
 build: [ "dune" "build" "-j" jobs "-p" name ]
 run-test: [ "dune" "runtest" "-j" jobs "-p" name ]
