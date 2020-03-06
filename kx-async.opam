@@ -7,18 +7,25 @@ dev-repo: "git+https://github.com/vbmithr/ocaml-kx.git"
 bug-reports: "https://github.com/vbmithr/ocaml-kx/issues"
 tags: []
 depends: [
+  "ocaml" {>= "4.08.0"}
   "dune" {>= "1.11.4"}
-  "kx" {= version}
+  "kx"
   "uri-sexp" {>= "3.1.0"}
-  "core" {>= "v0.12.4"}
-  "async" {>= "v0.12.0"}
-  "async-uri" {= version}
-  "logs-async" {= version}
+  "core" {>= "v0.13.0"}
+  "async" {>= "v0.13.0"}
+  "async-uri"
+  "logs-async"
   "faraday-async" {>= "0.7.0"}
   "angstrom-async" {>= "0.12.1"}
   "hex" {>= "1.4.0"}
-  "alcotest" {with-test & >= "1.0.0"}
-  "alcotest-async" {with-test & >= "1.0.0"}
+  "alcotest" {with-test & >= "1.0.1"}
+  "alcotest-async" {with-test & >= "1.0.1"}
+]
+pin-depends: [
+  ["dataframe.dev" "git+https://github.com/vbmithr/ocaml-dataframe.git"]
+  ["kx.dev" "git+https://github.com/vbmithr/ocaml-kx.git"]
+  ["async-uri.dev" "git+https://github.com/vbmithr/async-uri.git"]
+  ["logs-async.dev" "git+https://github.com/vbmithr/logs-async.git"]
 ]
 build: [ "dune" "build" "-j" jobs "-p" name ]
 run-test: [ "dune" "runtest" "-j" jobs "-p" name ]
