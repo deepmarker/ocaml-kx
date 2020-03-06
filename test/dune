@@ -9,16 +9,3 @@
    kx-async
    alcotest
    alcotest-async))
-
-(executables
- (names sub)
- (public_names sub)
- (modules sub)
- (preprocess (pps ppx_jane ppx_sexp_conv))
- (package kx-async)
- (libraries
-   logs
-   core
-   async
-   logs-async-reporter
-   kx-async))
