@@ -230,12 +230,15 @@ let test_various () =
   | Error e -> failwith e
 
 let test_server () =
-  let open Kx_async in
   let t =
-    create (t3 (a Kx.operator) (a Kx.long) (a Kx.long)) (Kx.Op.plus, 1L, 1L)
+    Kx_async.create
+      (t3 (a Kx.operator) (a Kx.long) (a Kx.long))
+      (Kx.Op.plus, 1L, 1L)
   in
-  with_connection (Uri.make ~host:"localhost" ~port:5042 ()) (fun { w; _ } ->
-      Pipe.write w t >>= fun () -> Deferred.Or_error.ok_unit)
+  let url = Uri.make ~host:"localhost" ~port:5042 () in
+  Kx_async.with_connection ~url
+    ~f:(fun { w; _ } -> Pipe.write w t >>= fun () -> Deferred.Or_error.ok_unit)
+    ()
   >>= function
   | Error e -> Error.raise e
   | Ok () -> Deferred.unit
