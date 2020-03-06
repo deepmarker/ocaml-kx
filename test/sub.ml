@@ -41,7 +41,8 @@ let add_random_trades w =
 let main port =
   let url = Uri.with_port url (Some port) in
   let sub = Kx_async.create submsg (".u.sub", "trade", "") in
-  Kx_async.with_connection url (fun { r; w } ->
+  Kx_async.with_connection ~url
+    ~f:(fun { r; w } ->
       Clock_ns.every (Time_ns.Span.of_int_sec 1) (fun () -> add_random_trades w);
       Pipe.write w sub >>= fun () ->
       let rec inner () =
@@ -50,6 +51,7 @@ let main port =
         inner ()
       in
       inner ())
+    ()
   >>= fun _ -> Deferred.unit
 
 let () =

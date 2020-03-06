@@ -12,19 +12,12 @@ type t = { r : 'a. 'a w option -> 'a Deferred.t; w : msg Pipe.Writer.t }
 
 val empty : t
 
-val process : Uri.t -> Reader.t -> Writer.t -> t Deferred.t
-
 val with_connection :
+  url:Uri.t ->
+  f:(t -> 'b Deferred.t) ->
   ?version:Async_ssl.Version.t ->
   ?options:Async_ssl.Opt.t list ->
-  ?buffer_age_limit:[ `At_most of Time.Span.t | `Unlimited ] ->
-  ?interrupt:unit Deferred.t ->
-  ?reader_buffer_size:int ->
-  ?writer_buffer_size:int ->
-  ?timeout:Time.Span.t ->
-  Uri.t ->
-  (t -> 'b Deferred.t) ->
-  'b Deferred.t
+  (unit -> 'b Deferred.t) Async.Tcp.with_connect_options
 
 module Persistent : sig
   include
@@ -33,6 +26,7 @@ module Persistent : sig
   val with_current_connection : t -> f:(conn -> 'a Deferred.t) -> 'a Deferred.t
 
   val create' :
+    ?monitor:Monitor.t ->
     server_name:string ->
     ?on_event:(Event.t -> unit Deferred.t) ->
     ?retry_delay:(unit -> Time_ns.Span.t) ->

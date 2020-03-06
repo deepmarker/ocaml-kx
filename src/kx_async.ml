@@ -110,11 +110,6 @@ let read r w =
   | false -> Angstrom_async.parse (destruct ~big_endian w) r
   | true -> parse_compressed ~big_endian ~msglen:len w r
 
-let send_client_msgs w r =
-  Pipe.iter r ~f:(fun (K { big_endian; typ; msg }) ->
-      write ~big_endian w typ msg >>= fun () ->
-      Log_async.debug (fun m -> m "@[%a@]" (Kx.pp typ) msg))
-
 let handshake url r w =
   Writer.write w
     (Printf.sprintf "%s:%s\x03\x00"
@@ -125,31 +120,34 @@ let handshake url r w =
   | `Ok '\x03' -> Deferred.unit
   | `Ok c -> failwithf "Invalid handshake %C" c ()
 
-let process url r w =
+let process ?(monitor = Monitor.current ()) url r w =
   handshake url r w >>= fun () ->
   Monitor.detach_and_iter_errors (Writer.monitor w) ~f:(fun exn ->
-      Writer.close w >>> fun () -> Log.err (fun m -> m "%a" Exn.pp exn));
-  let reader_closed = Ivar.create () in
+      Writer.close w >>> fun () -> Monitor.send_exn monitor exn);
   let protected_read = function
-    | None ->
-        Ivar.fill_if_empty reader_closed ();
-        raise Exit
+    | None -> Reader.close r >>= fun () -> raise Exit
     | Some wit -> (
-        if Ivar.is_full reader_closed then
+        if Reader.is_closed r then
           invalid_arg "Kx_async: Cannot read from closed reader";
         read r wit >>= function
         | Error msg -> Writer.close w >>= fun () -> failwith msg
         | Ok v -> return v )
   in
-  let client_write = Pipe.create_writer (send_client_msgs w) in
-  don't_wait_for (Ivar.read reader_closed >>= fun () -> Reader.close r);
+  let client_write =
+    let send_client_msgs w r =
+      Pipe.iter ~continue_on_error:false r
+        ~f:(fun (K { big_endian; typ; msg }) ->
+          write ~big_endian w typ msg >>= fun () ->
+          Log_async.debug (fun m -> m "@[%a@]" (Kx.pp typ) msg))
+    in
+    Pipe.create_writer (fun r ->
+        Deferred.any_unit [ send_client_msgs w r; Writer.close_started w ])
+  in
   don't_wait_for (Pipe.closed client_write >>= fun () -> Writer.close w);
   return { r = protected_read; w = client_write }
 
-let with_connection ?version ?options ?buffer_age_limit ?interrupt
-    ?reader_buffer_size ?writer_buffer_size ?timeout url f =
-  Async_uri.with_connection ?version ?options ?buffer_age_limit ?interrupt
-    ?reader_buffer_size ?writer_buffer_size ?timeout url (fun { r; w; _ } ->
+let with_connection ~url ~f =
+  Async_uri.with_connection ~url ~f:(fun { r; w; _ } ->
       process url r w >>= fun a ->
       Monitor.protect
         (fun () -> f a)
@@ -168,8 +166,9 @@ module Persistent = struct
     | None -> failwith "no current connection available"
     | Some c -> f c
 
-  let create' ~server_name ?on_event ?retry_delay =
-    create ~server_name ?on_event ?retry_delay ~connect:(fun addr ->
+  let create' ?monitor =
+    create ~connect:(fun addr ->
         Monitor.try_with_or_error (fun () ->
-            Async_uri.connect addr >>= fun { r; w; _ } -> process addr r w))
+            Async_uri.connect addr >>= fun { r; w; _ } ->
+            process ?monitor addr r w))
 end
