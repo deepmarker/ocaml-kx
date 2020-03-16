@@ -46,6 +46,10 @@ let pack_unpack_atom =
       pack_unpack "symbol" (a sym) "aiue";
       pack_unpack "timestamp" (a timestamp) Ptime.epoch;
       pack_unpack "timestamp_null" (a timestamp) Kx.np;
+      pack_unpack "timestamp_older" (a timestamp)
+        (Option.value_exn (Ptime.of_date (2019, 01, 01)));
+      pack_unpack "timestamp_2243" (a timestamp)
+        (Option.value_exn (Ptime.of_date (2243, 01, 01)));
       pack_unpack "month" (a month) (2018, 4, 0);
       pack_unpack "month" (a month) (2019, 1, 0);
       pack_unpack "month" (a month) (2019, 2, 0);
@@ -339,13 +343,33 @@ let date ds =
 
 let date () =
   date
-    [ (1985, 5, 20); (2019, 6, 10); (2019, 1, 1); (2019, 1, 2); (2000, 1, 1) ]
+    [
+      (1985, 5, 20);
+      (2019, 6, 10);
+      (2019, 1, 1);
+      (2019, 1, 2);
+      (2000, 1, 1);
+      (3000, 1, 1);
+      (9999, 1, 1);
+    ]
+
+let timestamp ts =
+  let open Alcotest in
+  let testable = testable Ptime.pp Stdlib.( = ) in
+  List.iter
+    ~f:(fun ts ->
+      let ts' = timestamp_of_int64 (int64_of_timestamp ts) in
+      check testable (Format.asprintf "%a" Ptime.pp ts) ts ts')
+    ts
+
+let timestamp () = timestamp [ Ptime.v (100000, 0L) ]
 
 let tests_utils =
   [
     test_case_sync "compress" `Quick compress;
     test_case_sync "utilities" `Quick utilities;
     test_case_sync "date" `Quick date;
+    test_case_sync "timestamp" `Quick timestamp;
   ]
 
 let tests_kx =

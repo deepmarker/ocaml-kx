@@ -557,6 +557,10 @@ val pp : 'a w -> Format.formatter -> 'a -> unit
 
 (**/*)
 
+val int64_of_timestamp : Ptime.t -> int64
+
+val timestamp_of_int64 : int64 -> Ptime.t
+
 val int32_of_month : Ptime.date -> int32
 
 val month_of_int32 : int32 -> Ptime.date

@@ -70,14 +70,7 @@ let day_in_minutes d = Int32.of_int (d * 24 * 60)
 
 let day_in_seconds d = Int32.of_int (d * 24 * 3600)
 
-let int64_of_timestamp = function
-  | ts when Ptime.(equal ts min) -> nj
-  | ts when Ptime.(equal ts max) -> wj
-  | ts when Ptime.(equal ts ptime_neginf) -> Int64.neg wj
-  | ts ->
-      let span_since_kxepoch = Ptime.(Span.sub (to_span ts) kx_epoch_span) in
-      let d, ps = Ptime.Span.to_d_ps span_since_kxepoch in
-      Int64.(add (day_in_ns d) (div ps 1_000L))
+let ps_count_in_day = 86_400_000_000_000_000L
 
 let timestamp_of_int64 = function
   | i when Int64.(equal i nj) -> Ptime.min
@@ -91,10 +84,32 @@ let timestamp_of_int64 = function
       let remaining_ps =
         Int64.(mul (rem nanos_since_kxepoch one_day_in_ns) 1_000L)
       in
-      let span = Ptime.Span.v (days_since_kxepoch, remaining_ps) in
+      let d, ps =
+        if remaining_ps < 0L then
+          (pred days_since_kxepoch, Int64.add ps_count_in_day remaining_ps)
+        else (days_since_kxepoch, remaining_ps)
+      in
+      let span = Ptime.Span.v (d, ps) in
       match Ptime.add_span kx_epoch span with
       | None -> invalid_arg "timestamp_of_int64"
       | Some ts -> ts )
+
+let min_kx_ts = timestamp_of_int64 Int64.(add min_int 2L)
+
+let max_kx_ts = timestamp_of_int64 Int64.(pred max_int)
+
+let int64_of_timestamp = function
+  | ts when Ptime.(equal ts min) -> nj
+  | ts when Ptime.(equal ts max) -> wj
+  | ts when Ptime.(equal ts ptime_neginf) -> Int64.neg wj
+  | ts when Ptime.is_later ts ~than:max_kx_ts ->
+      invalid_arg "ts is too big to be representable by kdb+"
+  | ts when Ptime.is_earlier ts ~than:min_kx_ts ->
+      invalid_arg "ts is too small to be representable by kdb+"
+  | ts ->
+      let span_since_kxepoch = Ptime.(Span.sub (to_span ts) kx_epoch_span) in
+      let d, ps = Ptime.Span.to_d_ps span_since_kxepoch in
+      Int64.(add (day_in_ns d) (div ps 1_000L))
 
 let min_span = Ptime.to_span Ptime.min
 
