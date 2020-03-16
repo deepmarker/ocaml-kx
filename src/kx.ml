@@ -245,6 +245,42 @@ let wv = span_of_second wi
 
 let minus_wv = span_of_second (Int32.neg wi)
 
+module Maybe = struct
+  let maybe eqf eq v = if eqf eq v then None else Some v
+
+  let of_g = maybe Uuidm.equal ng
+
+  let of_h = maybe ( = ) nh
+
+  let of_i = maybe ( = ) ni
+
+  let of_j = maybe ( = ) nj
+
+  let of_f = maybe Float.equal nf
+
+  let of_p = maybe Ptime.equal np
+
+  let of_s = maybe String.equal ""
+
+  let of_n = maybe Ptime.Span.equal nn
+
+  let to_g = Option.value ~default:ng
+
+  let to_h = Option.value ~default:nh
+
+  let to_i = Option.value ~default:ni
+
+  let to_j = Option.value ~default:nj
+
+  let to_f = Option.value ~default:nf
+
+  let to_p = Option.value ~default:np
+
+  let to_n = Option.value ~default:nn
+
+  let to_s = Option.value ~default:""
+end
+
 type _ typ =
   | Boolean : bool typ
   | Guid : Uuidm.t typ

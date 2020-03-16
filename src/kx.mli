@@ -549,6 +549,40 @@ val wv : Ptime.Span.t
 
 val minus_wv : Ptime.Span.t
 
+module Maybe : sig
+  val of_g : Uuidm.t -> Uuidm.t option
+
+  val of_h : int -> int option
+
+  val of_i : int32 -> int32 option
+
+  val of_j : int64 -> int64 option
+
+  val of_f : float -> float option
+
+  val of_p : Ptime.t -> Ptime.t option
+
+  val of_n : Ptime.Span.t -> Ptime.Span.t option
+
+  val of_s : string -> string option
+
+  val to_g : Uuidm.t option -> Uuidm.t
+
+  val to_h : int option -> int
+
+  val to_i : int32 option -> int32
+
+  val to_j : int64 option -> int64
+
+  val to_f : float option -> float
+
+  val to_p : Ptime.t option -> Ptime.t
+
+  val to_n : Ptime.Span.t option -> Ptime.Span.t
+
+  val to_s : string option -> string
+end
+
 val equal_w : 'a w -> 'b w -> bool
 
 val equal : 'a w -> 'a -> 'b w -> 'b -> bool
