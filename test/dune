@@ -1,7 +1,6 @@
 (test
  (name test)
  (package kx)
- (preprocess (pps ppx_jane))
  (modules test)
  (libraries
    hex
@@ -11,7 +10,6 @@
 (test
  (name test_async)
  (package kx-async)
- (preprocess (pps ppx_jane))
  (modules test_async)
  (libraries
    hex

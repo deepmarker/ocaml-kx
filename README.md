@@ -1,4 +1,4 @@
-# ocaml-kx [![Build Status](https://travis-ci.org/vbmithr/ocaml-kx.svg?branch=master)](https://travis-ci.org/vbmithr/ocaml-kx)
+# ocaml-kx [![Build Status](https://travis-ci.com/deepmarker/ocaml-kx.svg?branch=master)](https://travis-ci.com/github/deepmarker/ocaml-kx)
 
 ## Introduction
 
@@ -24,7 +24,7 @@ exchanging data between Kdb+ and an OCaml program.
 
 * The parsing and printing of q IPC is done with
   [Angstrom](https://github.com/inhabitedtype/angstrom) and
-    [Faraday](https://github.com/inhabitedtype/faraday)
+    [Faraday](https://github.com/inhabitedtype/faraday).
 
 * Jane Street's [Async](https://opensource.janestreet.com/async) is
   used (in a separate module) to handle connectivity to a Kdb+ database.
