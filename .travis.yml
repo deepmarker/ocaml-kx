@@ -1,11 +1,10 @@
+dist: bionic
 language: c
 install: test -e .travis.opam.sh || wget https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-opam.sh
 script:
 - bash -ex .travis-opam.sh
 env:
   jobs:
-    - OCAML_VERSION="4.08" PACKAGE="kx"
-    - OCAML_VERSION="4.08" PACKAGE="kx-async"
     - OCAML_VERSION="4.09" PACKAGE="kx"
     - OCAML_VERSION="4.09" PACKAGE="kx-async"
 os:
