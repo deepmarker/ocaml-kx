@@ -8,12 +8,14 @@ module Log = (val Logs.src_log src : Logs.LOG)
 
 module Log_async = (val Logs_async.src_log src : Logs_async.LOG)
 
-type msg = K : { big_endian : bool; typ : 'a w; msg : 'a } -> msg
+type msg =
+  | K : { big_endian : bool; typ : Kx.msgtyp; w : 'a w; msg : 'a } -> msg
 
-let create ?(big_endian = Sys.big_endian) typ msg = K { big_endian; typ; msg }
+let create ?(typ = Async) ?(big_endian = Sys.big_endian) w msg =
+  K { big_endian; typ; w; msg }
 
-let pp_serialized ppf (K { big_endian; typ; msg }) =
-  let serialized = construct_bigstring ~big_endian ~typ:Async typ msg in
+let pp_serialized ppf (K { big_endian; typ; w; msg }) =
+  let serialized = construct_bigstring ~big_endian ~typ w msg in
   Format.fprintf ppf "0x%a" Hex.pp (Hex.of_bigstring serialized)
 
 let handle_chunk wbuf pos nb_to_read =
@@ -134,11 +136,13 @@ let process ?(monitor = Monitor.current ()) url r w =
         | Ok v -> return v )
   in
   let client_write =
-    let send_client_msgs w r =
-      Pipe.iter ~continue_on_error:false r
-        ~f:(fun (K { big_endian; typ; msg }) ->
-          write ~big_endian w typ msg >>= fun () ->
-          Log_async.debug (fun m -> m "@[%a@]" (Kx.pp typ) msg))
+    let send_client_msgs wr rd =
+      Pipe.iter ~continue_on_error:false rd
+        ~f:(fun (K { big_endian; typ; w; msg }) ->
+          write ~typ ~big_endian wr w msg >>= fun () ->
+          Log_async.debug (fun m ->
+              m "%b %a @[%a@]" big_endian Sexp.pp (Kx.sexp_of_msgtyp typ)
+                (Kx.pp w) msg))
     in
     Pipe.create_writer (fun r ->
         Deferred.any_unit [ send_client_msgs w r; Writer.close_started w ])

@@ -4,7 +4,7 @@ open Kx
 
 type msg
 
-val create : ?big_endian:bool -> 'a w -> 'a -> msg
+val create : ?typ:Kx.msgtyp -> ?big_endian:bool -> 'a w -> 'a -> msg
 
 val pp_serialized : Format.formatter -> msg -> unit
 

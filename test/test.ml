@@ -1,14 +1,11 @@
-open Core
-open Async
 open Kx
-open Alcotest_async
+open Alcotest
 
-let make_testable : type a. a w -> a Alcotest.testable =
- fun a -> Alcotest.testable (Kx.pp a) (fun x y -> Kx.equal a x a y)
+let make_testable : type a. a w -> a testable =
+ fun a -> testable (Kx.pp a) (fun x y -> Kx.equal a x a y)
 
 let pack_unpack : type a. string -> a w -> a -> unit =
  fun name w a ->
-  let open Alcotest in
   let tt = make_testable w in
   let serialized = construct_bigstring ~comp:true ~typ:Async w a in
   let payload =
@@ -23,12 +20,11 @@ let pack_unpack : type a. string -> a w -> a -> unit =
   | Ok { big_endian; len; _ }, Ok v ->
       check bool (name ^ "_big_endian") Sys.big_endian big_endian;
       check int32 (name ^ "_msglen")
-        (Int32.of_int_exn (Bigstringaf.length serialized))
+        (Int32.of_int (Bigstringaf.length serialized))
         len;
       check tt name a v
 
-let pack_unpack msg w v =
-  test_case_sync msg `Quick (fun () -> pack_unpack msg w v)
+let pack_unpack msg w v = test_case msg `Quick (fun () -> pack_unpack msg w v)
 
 let pack_unpack_atom =
   Kx.
@@ -36,20 +32,35 @@ let pack_unpack_atom =
       pack_unpack "bool" (a bool) true;
       pack_unpack "guid" (a guid) Uuidm.nil;
       pack_unpack "byte" (a byte) '\x00';
-      pack_unpack "short" (a short) 0;
-      pack_unpack "int" (a int) 0l;
-      pack_unpack "long" (a long) 0L;
-      pack_unpack "real" (a real) 0.;
-      pack_unpack "float" (a float) 0.;
+      pack_unpack "0h" (a short) 0;
+      pack_unpack "0Nh" (a short) nh;
+      pack_unpack "0Wh" (a short) wh;
+      pack_unpack "-0Wh" (a short) minus_wh;
+      pack_unpack "0i" (a int) 0l;
+      pack_unpack "0Ni" (a int) ni;
+      pack_unpack "0Wi" (a int) wi;
+      pack_unpack "-0Wi" (a int) minus_wi;
+      pack_unpack "0j" (a long) 0L;
+      pack_unpack "0Nj" (a long) nj;
+      pack_unpack "0Wj" (a long) wj;
+      pack_unpack "-0Wj" (a long) minus_wj;
+      pack_unpack "0e" (a real) 0.;
+      pack_unpack "0Ne" (a real) nf;
+      pack_unpack "0We" (a real) wf;
+      pack_unpack "-0We" (a real) minus_wf;
+      pack_unpack "0f" (a float) 0.;
+      pack_unpack "0Nf" (a float) nf;
+      pack_unpack "0Wf" (a float) wf;
+      pack_unpack "-0Wf" (a float) minus_wf;
       pack_unpack "char" (a char) '\x00';
       pack_unpack "empty symbol" (a sym) "";
       pack_unpack "symbol" (a sym) "aiue";
       pack_unpack "timestamp" (a timestamp) Ptime.epoch;
       pack_unpack "timestamp_null" (a timestamp) Kx.np;
       pack_unpack "timestamp_older" (a timestamp)
-        (Option.value_exn (Ptime.of_date (2019, 01, 01)));
+        (Option.get (Ptime.of_date (2019, 01, 01)));
       pack_unpack "timestamp_2243" (a timestamp)
-        (Option.value_exn (Ptime.of_date (2243, 01, 01)));
+        (Option.get (Ptime.of_date (2243, 01, 01)));
       pack_unpack "month" (a month) (2018, 4, 0);
       pack_unpack "month" (a month) (2019, 1, 0);
       pack_unpack "month" (a month) (2019, 2, 0);
@@ -76,9 +87,9 @@ let pack_unpack_vect =
       pack_unpack "vect byte" (s byte) "\x00\x01\x02";
       pack_unpack "vect short" (v short) [| 0; 1; 2 |];
       pack_unpack "vect int" (v int)
-        [| 0l; 1l; 2l; Int32.max_value; Int32.min_value |];
+        [| 0l; 1l; 2l; Int32.max_int; Int32.min_int |];
       pack_unpack "vect long" (v long)
-        [| 0L; 1L; 2L; Int64.max_value; Int64.min_value |];
+        [| 0L; 1L; 2L; Int64.max_int; Int64.min_int |];
       pack_unpack "vect real" (v real)
         Float.[| 0.; 1.; nan; infinity; neg_infinity |];
       pack_unpack "vect float" (v float)
@@ -212,7 +223,6 @@ let pack_unpack_union =
   [ pack_unpack "int case" w (Int 2); pack_unpack "float case" w (Float 4.) ]
 
 let unpack_buggy () =
-  let open Alcotest in
   let test =
     Cstruct.of_string
       "\001\002\000\0004\000\000\000\245:/home/vb/code/TorQ/hdb/database2019.06.21\000"
@@ -233,41 +243,7 @@ let test_various () =
   | Ok _ -> ()
   | Error e -> failwith e
 
-let test_server () =
-  let t =
-    Kx_async.create
-      (t3 (a Kx.operator) (a Kx.long) (a Kx.long))
-      (Kx.Op.plus, 1L, 1L)
-  in
-  let url = Uri.make ~host:"localhost" ~port:5042 () in
-  Kx_async.with_connection ~url
-    ~f:(fun { w; _ } -> Pipe.write w t >>= fun () -> Deferred.Or_error.ok_unit)
-    ()
-  >>= function
-  | Error e -> Error.raise e
-  | Ok () -> Deferred.unit
-
-let test_headersless msg w () =
-  let r =
-    Pipe.create_reader ~close_on_exception:false (fun w -> Pipe.write w msg)
-  in
-  Reader.of_pipe (Info.of_string "") r >>= fun r ->
-  Angstrom_async.parse Kx.(destruct w) r >>= function
-  | Ok _v -> Deferred.unit
-  | Error e -> failwith e
-
-let test_async hex w () =
-  let r =
-    Pipe.create_reader ~close_on_exception:false (fun w ->
-        Pipe.write w (Hex.to_string hex))
-  in
-  Reader.of_pipe (Info.of_string "") r >>= fun r ->
-  Angstrom_async.parse Kx.hdr r >>= fun _hdr ->
-  Angstrom_async.parse Kx.(destruct w) r >>= function
-  | Ok _v -> Deferred.unit
-  | Error e -> failwith e
-
-let test_nonasync hex w () =
+let test_sync hex w () =
   let buf = Hex.to_bigstring hex in
   let buflen = Bigstringaf.length buf in
   let _hdr = Angstrom.parse_bigstring Kx.hdr buf in
@@ -297,16 +273,16 @@ let compress n =
   set_int16_le buf 2 0;
   set_int32_le buf 4 256l;
   for i = n to 31 do
-    Bigstringaf.set_int64_le buf (i * 8) (Random.int64 Int64.max_value)
+    Bigstringaf.set_int64_le buf (i * 8) (Random.int64 Int64.max_int)
   done;
   try
     let buf' = compress buf in
-    printf "compressed: %S\n" (to_string buf');
+    Printf.printf "compressed: %S\n" (to_string buf');
     let newlen = length buf' in
     let oldlen = length buf in
-    printf "compress successful, ratio %g\n"
+    Printf.printf "compress successful, ratio %g\n"
       (Int.to_float newlen /. Int.to_float oldlen);
-    let uncompLen = Int32.to_int_exn (get_int32_le buf' 8) in
+    let uncompLen = Int32.to_int (get_int32_le buf' 8) in
     let buf'' = create uncompLen in
     uncompress buf'' buf';
     blit buf ~src_off:0 buf'' ~dst_off:0 ~len:8;
@@ -320,7 +296,6 @@ let compress () =
   done
 
 let utilities () =
-  let open Alcotest in
   check int32 "month1" 0l (int32_of_month (2000, 1, 0));
   check int32 "month2" 4l (int32_of_month (2000, 5, 0));
   check int32 "month3" 12l (int32_of_month (2001, 1, 0));
@@ -333,10 +308,9 @@ let utilities () =
   done
 
 let date ds =
-  let open Alcotest in
   let testable = testable pp_print_date Stdlib.( = ) in
   List.iter
-    ~f:(fun d ->
+    (fun d ->
       let d' = date_of_int32 (int32_of_date d) in
       check testable (Format.asprintf "%a" pp_print_date d) d d')
     ds
@@ -354,10 +328,9 @@ let date () =
     ]
 
 let timestamp ts =
-  let open Alcotest in
   let testable = testable Ptime.pp Stdlib.( = ) in
   List.iter
-    ~f:(fun ts ->
+    (fun ts ->
       let ts' = timestamp_of_int64 (int64_of_timestamp ts) in
       check testable (Format.asprintf "%a" Ptime.pp ts) ts ts')
     ts
@@ -366,159 +339,129 @@ let timestamp () = timestamp [ Ptime.v (100000, 0L) ]
 
 let tests_utils =
   [
-    test_case_sync "compress" `Quick compress;
-    test_case_sync "utilities" `Quick utilities;
-    test_case_sync "date" `Quick date;
-    test_case_sync "timestamp" `Quick timestamp;
+    test_case "compress" `Quick compress;
+    test_case "utilities" `Quick utilities;
+    test_case "date" `Quick date;
+    test_case "timestamp" `Quick timestamp;
   ]
 
 let tests_kx =
   [
-    test_case_sync "unpack_buggy" `Quick unpack_buggy;
-    test_case_sync "various" `Quick test_various;
-    test_case_sync "sorted dict atom" `Quick
-      (test_nonasync
+    test_case "unpack_buggy" `Quick unpack_buggy;
+    test_case "various" `Quick test_various;
+    test_case "sorted dict atom" `Quick
+      (test_sync
          (`Hex
            "01000000210000007f0b0102000000610062000600020000000200000003000000")
          Kx.(dict ~sorted:true (v ~attr:Sorted sym) (v int)));
-    test_case_sync "dict vector" `Quick
-      (test_nonasync
+    test_case "dict vector" `Quick
+      (test_sync
          (`Hex
            "010000002d000000630b0002000000610062000000020000000600010000000200000006000100000003000000")
          Kx.(dict (v sym) (list (v int))));
-    test_case_sync "table" `Quick
-      (test_nonasync
+    test_case "table" `Quick
+      (test_sync
          (`Hex
            "010000002f0000006200630b0002000000610062000000020000000600010000000200000006000100000003000000")
          Kx.(table (list (v int))));
-    test_case_sync "sorted table" `Quick
-      (test_nonasync
+    test_case "sorted table" `Quick
+      (test_sync
          (`Hex
            "010000002f0000006201630b0002000000610062000000020000000603010000000200000006000100000003000000")
          Kx.(table ~sorted:true (t2 (v ~attr:Parted int) (v int))));
-    test_case_sync "sorted table2" `Quick
-      (test_nonasync
+    test_case "sorted table2" `Quick
+      (test_sync
          (`Hex
            "010000002f0000006201630b0002000000610062000000020000000603010000000200000006000100000003000000")
          Kx.(table2 ~sorted:true int int));
-    test_case_sync "strange float" `Quick
-      (test_nonasync (`Hex "0100000011000000f759f03b5dc8d78840") Kx.(a float));
-    test_case_sync "strange float vect" `Quick
-      (test_nonasync (`Hex "010000001600000009000100000059f03b5dc8d78840")
+    test_case "strange float" `Quick
+      (test_sync (`Hex "0100000011000000f759f03b5dc8d78840") Kx.(a float));
+    test_case "strange float vect" `Quick
+      (test_sync (`Hex "010000001600000009000100000059f03b5dc8d78840")
          Kx.(v float));
-    test_case_sync "strange dict" `Quick
-      (test_nonasync
+    test_case "strange dict" `Quick
+      (test_sync
          (`Hex
            "0100000028000000630b000100000073697a650000000100000009000100000059f03b5dc8d78840")
          Kx.(dict (v sym) (list (v float))));
-    test_case_sync "strange table" `Quick
-      (test_nonasync
+    test_case "strange table" `Quick
+      (test_sync
          (`Hex
            "010000002a0000006200630b000100000073697a650000000100000009000100000059f03b5dc8d78840")
          Kx.(table1 float));
-    test_case_sync "strange table2" `Quick
-      (test_nonasync
+    test_case "strange table2" `Quick
+      (test_sync
          (`Hex
            "01000000430000006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000")
          Kx.(table2 float long));
-    test_case_sync "keyed_table" `Quick
-      (test_nonasync
-         (`Hex
-           "0100000068000000636200630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000064cc5d4bc8d788400700010000003b22000000000000")
-         Kx.(dict (table1 sym) (table2 float long)));
-    test_case_sync "keyed_table2" `Quick
-      (test_nonasync
-         (`Hex
-           "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000")
-         Kx.(dict (table1 ~sorted:true sym) (table2 float long)));
-    test_case_sync "keyed_table3" `Quick
-      (test_nonasync
-         (`Hex
-           "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000")
-         Kx.(dict (table1 ~sorted:true sym) (table2 float long)));
-    test_case_sync "keyed_table4" `Quick
-      (test_nonasync
-         (`Hex
-           "0100000069000000636200630b000100000073796d000000010000000b0001000000414c474f5553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000000000000d41f1a410700010000005001000000000000")
-         Kx.(dict (table1 sym) (table2 float long)));
-    test_case_sync "keyed_table5" `Quick
-      (test_nonasync
-         (`Hex
-           "0100000069000000636200630b000100000073796d000000010000000b0001000000414c474f5553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000000000000d41f1a410700010000005001000000000000")
-         Kx.(dict (table1 sym) (table2 float long)));
-    test_case_sync "keyed_table7" `Quick
-      (test_nonasync
-         (`Hex
-           "01000000840000007f6201630b000100000073796d000000010000000b0102000000414c474f5553442e434250004241544554482e434250006200630b000200000073697a65007472616465636f756e740000000200000009000200000000000000d07e19410000000040f3d14007000200000045010000000000001900000000000000")
-         Kx.(
-           dict ~sorted:true
-             (table1 ~attr2:Sorted ~sorted:true sym)
-             (table2 float long)));
-    test_case_sync "keyed_table8" `Quick
-      (test_nonasync
-         (`Hex
-           "0100000069000000636200630b000100000073796d000000010000000b0001000000414c474f5553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000000000000d07e19410700010000004501000000000000")
-         Kx.(dict (table1 sym) (table2 float long)));
-    test_case_sync "keyed_table9" `Quick
-      (test_nonasync
-         (`Hex
-           "01000000690000007f6201630b000100000073796d000000010000000b0001000000414c474f5553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000000000000d07e19410700010000004501000000000000")
-         Kx.(dict ~sorted:true (table1 ~sorted:true sym) (table2 float long)));
-    test_case_sync "table10" `Quick
-      (test_nonasync
-         (`Hex
-           "01000000380000006201630b000100000073796d000000010000000b0102000000414c474f5553442e434250004241544554482e43425000")
-         Kx.(table1 ~sorted:true ~attr2:Sorted sym));
-  ]
-
-let tests_kx_async =
-  [
-    test_case "vect symbol headerless" `Quick
-      (test_headersless
-         "\011\000\003\000\000\000countbysym\000hloc\000search\000"
-         Kx.(v sym));
-    test_case "atom symbol headerless" `Quick
-      (test_headersless "\245a\000" Kx.(a sym));
-    test_case "vect bool" `Quick
-      (test_async (`Hex "0100000011000000010003000000010100") Kx.(v bool));
-    test_case "vect char" `Quick
-      (test_async (`Hex "01000000110000000a0003000000617569") Kx.(v char));
-    test_case "vect byte" `Quick
-      (test_async (`Hex "01000000100000000400020000001234") Kx.(v byte));
-    test_case "vect short" `Quick
-      (test_async (`Hex "0100000014000000050003000000010002000300")
-         Kx.(v short));
-    test_case "vect int" `Quick
-      (test_async (`Hex "01000000160000000600020000000100000002000000")
-         Kx.(v int));
-    test_case "vect long" `Quick
-      (test_async
-         (`Hex "010000001e00000007000200000001000000000000000200000000000000")
-         Kx.(v long));
-    test_case "vect float" `Quick
-      (test_async
-         (`Hex "010000001e000000090002000000000000000000f03f0000000000000040")
-         Kx.(v float));
-    test_case "atom empty symbol" `Quick
-      (test_async (`Hex "010000000a000000f500") Kx.(a sym));
-    test_case "atom symbol" `Quick
-      (test_async (`Hex "010000000b000000f56100") Kx.(a sym));
-    test_case "vect symbol" `Quick
-      (test_async (`Hex "01000000120000000b000200000061006200") Kx.(v sym));
     test_case "keyed_table" `Quick
-      (test_async
+      (test_sync
          (`Hex
            "0100000068000000636200630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000064cc5d4bc8d788400700010000003b22000000000000")
          Kx.(dict (table1 sym) (table2 float long)));
     test_case "keyed_table2" `Quick
-      (test_async
+      (test_sync
          (`Hex
            "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000")
          Kx.(dict (table1 ~sorted:true sym) (table2 float long)));
-    (* test_case "server" `Quick test_server ; *)
+    test_case "keyed_table3" `Quick
+      (test_sync
+         (`Hex
+           "0100000068000000636201630b000100000073796d000000010000000b00010000005842545553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000059f03b5dc8d788400700010000003b22000000000000")
+         Kx.(dict (table1 ~sorted:true sym) (table2 float long)));
+    test_case "keyed_table4" `Quick
+      (test_sync
+         (`Hex
+           "0100000069000000636200630b000100000073796d000000010000000b0001000000414c474f5553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000000000000d41f1a410700010000005001000000000000")
+         Kx.(dict (table1 sym) (table2 float long)));
+    test_case "keyed_table5" `Quick
+      (test_sync
+         (`Hex
+           "0100000069000000636200630b000100000073796d000000010000000b0001000000414c474f5553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000000000000d41f1a410700010000005001000000000000")
+         Kx.(dict (table1 sym) (table2 float long)));
+    test_case "keyed_table7" `Quick
+      (test_sync
+         (`Hex
+           "01000000840000007f6201630b000100000073796d000000010000000b0102000000414c474f5553442e434250004241544554482e434250006200630b000200000073697a65007472616465636f756e740000000200000009000200000000000000d07e19410000000040f3d14007000200000045010000000000001900000000000000")
+         Kx.(dict ~sorted:true (table1 ~sorted:true sym) (table2 float long)));
+    test_case "keyed_table8" `Quick
+      (test_sync
+         (`Hex
+           "0100000069000000636200630b000100000073796d000000010000000b0001000000414c474f5553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000000000000d07e19410700010000004501000000000000")
+         Kx.(dict (table1 sym) (table2 float long)));
+    test_case "keyed_table9" `Quick
+      (test_sync
+         (`Hex
+           "01000000690000007f6201630b000100000073796d000000010000000b0001000000414c474f5553442e434250006200630b000200000073697a65007472616465636f756e740000000200000009000100000000000000d07e19410700010000004501000000000000")
+         Kx.(dict ~sorted:true (table1 ~sorted:true sym) (table2 float long)));
+    test_case "table10" `Quick
+      (test_sync
+         (`Hex
+           "01000000380000006201630b000100000073796d000000010000000b0102000000414c474f5553442e434250004241544554482e43425000")
+         Kx.(table1 ~sorted:true sym));
+    test_case "trade0" `Quick
+      (test_sync
+         (`Hex
+           "01000000e70000006200630b000800000074696d650073796d00696400677569640070726963650073697a65007369646500666c6167000000080000000c0002000000c0e8f390dd60db08c0e8f390dd60db080b00020000005842545553442e424d58005842545553442e424d580007000200000000000000000000800000000000000080020002000000caf7bfe2ecd3b4dece05bc17955ebdf9284ee8cb7a7608af97774ebdbac9bae70900020000000000000000a7b7400000000000a7b740090002000000000000000000f03f00000000000022400a000200000073730a00020000007070")
+         Kx.(table8 timestamp sym long guid float float char char));
+    test_case "trade1" `Quick
+      (test_sync
+         (`Hex
+           "01000000240100006200630b000800000074696d650073796d00696400677569640070726963650073697a65007369646500666c6167000000080000000c000300000000645172de60db0800645172de60db0800645172de60db080b00030000005842545553442e424d58005842545553442e424d58005842545553442e424d580007000300000000000000000000800000000000000080000000000000008002000300000062f018c6fe2e41f1666567f3c8a0564d590a94a1f9bd54b1a77699565df2c9f8a64b4a4b714ab10d173e1258a2c51b470900030000000000000000a7b7400000000000a7b7400000000000a7b7400900030000000000000000faac4000000000002caf400000000000faa1400a00030000007373730a0003000000707070")
+         Kx.(table8 timestamp sym long guid float float char char));
+    test_case "trade2" `Quick
+      (test_sync
+         (`Hex
+           "01000000aa0000006200630b000800000074696d650073796d00696400677569640070726963650073697a65007369646500666c6167000000080000000c0001000000c0e55b99de60db080b00010000005842545553442e424d580007000100000000000000000000800200010000000002d1f376bf68fc6c19319056ae7b420900010000000000000000a7b7400900010000000000000000003f400a0001000000730a000100000070")
+         Kx.(table8 timestamp sym long guid float float char char));
+    test_case "trade3" `Quick
+      (test_sync
+         (`Hex
+           "01000000aa0000006200630b000800000074696d650073796d00696400677569640070726963650073697a65007369646500666c6167000000080000000c000100000080e397e5de60db080b00010000005842545553442e424d580007000100000000000000000000800200010000009cdd3336ac1ab33e9e9afe85b38c8cf80900010000000000000000a7b74009000100000000000000000036400a0001000000730a000100000070")
+         Kx.(table8 timestamp sym long guid float float char char));
   ]
 
-let main () =
+let () =
   run "kx"
     [
       ("utils", tests_utils);
@@ -530,9 +473,4 @@ let main () =
       ("conv", pack_unpack_conv);
       ("union", pack_unpack_union);
       ("kx", tests_kx);
-      ("kx-async", tests_kx_async);
     ]
-
-let () =
-  don't_wait_for (main ());
-  never_returns (Scheduler.go ())

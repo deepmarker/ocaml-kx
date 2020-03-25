@@ -7,21 +7,29 @@ open Sexplib.Std
 
 let ng = Uuidm.nil
 
-let nh = 0xffff_8000
+let nh = ~-0x8000
 
 let wh = 0x7fff
+
+let minus_wh = ~-0x7fff
 
 let ni = Int32.min_int
 
 let wi = Int32.max_int
 
+let minus_wi = Int32.(succ min_int)
+
 let nj = Int64.min_int
 
 let wj = Int64.max_int
 
+let minus_wj = Int64.(succ min_int)
+
 let nf = nan
 
 let wf = infinity
+
+let minus_wf = neg_infinity
 
 let ptime_neginf =
   let open Ptime in
@@ -382,7 +390,7 @@ type _ w =
   | Tup : 'a w * attribute option -> 'a w
   | Tups : 'a w * 'b w * attribute option -> ('a * 'b) w
   | Dict : 'a w * 'b w * bool -> ('a * 'b) w
-  | Table : string array w * 'b w * bool -> (string array * 'b) w
+  | Table : 'b w * bool -> (string array * 'b) w
   | Conv : ('a -> 'b) * ('b -> 'a) * 'b w -> 'a w
   | Union : 'a case list -> 'a w
 
@@ -417,7 +425,7 @@ let rec equal_w : type a b. a w -> b w -> bool =
   | Tup (a, aa), Tup (b, ba) -> equal_w a b && aa = ba
   | Tups (a, b, aa), Tups (c, d, ba) -> equal_w a c && equal_w b d && aa = ba
   | Dict (a, b, s1), Dict (c, d, s2) -> equal_w a c && equal_w b d && s1 = s2
-  | Table (a, b, s1), Table (c, d, s2) -> equal_w a c && equal_w b d && s1 = s2
+  | Table (a, s1), Table (b, s2) -> equal_w a b && s1 = s2
   | Conv (_, _, a), Conv (_, _, b) -> equal_w a b
   | Union a, Union b ->
       List.fold_left2 (fun a c1 c2 -> a && equal_case c1 c2) true a b
@@ -460,10 +468,11 @@ let rec equal : type a b. a w -> a -> b w -> b -> bool =
       let x1, x2 = x in
       let y1, y2 = y in
       equal a x1 c y1 && equal b x2 d y2 && s1 = s2
-  | Table (a, b, s1), Table (c, d, s2) ->
+  | Table (a, s1), Table (b, s2) ->
       let x1, x2 = x in
       let y1, y2 = y in
-      equal a x1 c y1 && equal b x2 d y2 && s1 = s2
+      let v = Vect (Symbol, None) in
+      equal v x1 v y1 && equal a x2 b y2 && s1 = s2
   | Conv (p1, _, a), Conv (p2, _, b) -> equal a (p1 x) b (p2 y)
   | Union c1, Union c2 ->
       equal_w aw bw
@@ -664,71 +673,61 @@ let cd9 ?(sorted = false) ?attr v1 v2 v3 v4 v5 v6 v7 v8 v9 =
 let table ?(sorted = false) vs =
   if not (is_list_type vs) then
     invalid_arg "table keys and values must be lists";
-  Table (v sym, vs, sorted)
+  Table (vs, sorted)
 
-let table1 ?(sorted = false) ?attr1 ?attr2 v1 =
-  Table (v ?attr:attr1 sym, t1 (v ?attr:attr2 v1), sorted)
+let table1 ?(sorted = false) ?attr v1 = Table (t1 (v ?attr v1), sorted)
 
 let table2 ?(sorted = false) v1 v2 =
   let attr = if sorted then Some Parted else None in
-  Table (v sym, t2 (v ?attr v1) (v v2), sorted)
+  Table (t2 (v ?attr v1) (v v2), sorted)
 
 let table3 ?(sorted = false) v1 v2 v3 =
   let attr = if sorted then Some Parted else None in
-  Table (v sym, t3 (v ?attr v1) (v v2) (v v3), sorted)
+  Table (t3 (v ?attr v1) (v v2) (v v3), sorted)
 
 let table4 ?(sorted = false) v1 v2 v3 v4 =
   let attr = if sorted then Some Parted else None in
-  Table (v sym, t4 (v ?attr v1) (v v2) (v v3) (v v4), sorted)
+  Table (t4 (v ?attr v1) (v v2) (v v3) (v v4), sorted)
 
 let table5 ?(sorted = false) v1 v2 v3 v4 v5 =
   let attr = if sorted then Some Parted else None in
-  Table (v sym, t5 (v ?attr v1) (v v2) (v v3) (v v4) (v v5), sorted)
+  Table (t5 (v ?attr v1) (v v2) (v v3) (v v4) (v v5), sorted)
 
 let table6 ?(sorted = false) v1 v2 v3 v4 v5 v6 =
   let attr = if sorted then Some Parted else None in
-  Table (v sym, t6 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6), sorted)
+  Table (t6 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6), sorted)
 
 let table7 ?(sorted = false) v1 v2 v3 v4 v5 v6 v7 =
   let attr = if sorted then Some Parted else None in
-  Table
-    (v sym, t7 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7), sorted)
+  Table (t7 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7), sorted)
 
 let table8 ?(sorted = false) v1 v2 v3 v4 v5 v6 v7 v8 =
   let attr = if sorted then Some Parted else None in
   Table
-    ( v sym,
-      t8 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8),
-      sorted )
+    (t8 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8), sorted)
 
 let table9 ?(sorted = false) v1 v2 v3 v4 v5 v6 v7 v8 v9 =
   let attr = if sorted then Some Parted else None in
   Table
-    ( v sym,
-      t9 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8) (v v9),
+    ( t9 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8) (v v9),
       sorted )
 
 module Df = struct
   let conv_df f a = conv (fun _ -> assert false) f a
 
-  let table1 ?(sorted = false) ?attr1 ?attr2 v1 =
-    Table
-      ( v ?attr:attr1 sym,
-        conv_df (fun a -> Dataframe.A.t1 a) (t1 (v ?attr:attr2 v1)),
-        sorted )
+  let table1 ?(sorted = false) ?attr v1 =
+    Table (conv_df (fun a -> Dataframe.A.t1 a) (t1 (v ?attr v1)), sorted)
 
   let table2 ?(sorted = false) v1 v2 =
     let attr = if sorted then Some Parted else None in
     Table
-      ( v sym,
-        conv_df (fun (a, b) -> Dataframe.A.t2 a b) (t2 (v ?attr v1) (v v2)),
+      ( conv_df (fun (a, b) -> Dataframe.A.t2 a b) (t2 (v ?attr v1) (v v2)),
         sorted )
 
   let table3 ?(sorted = false) v1 v2 v3 =
     let attr = if sorted then Some Parted else None in
     Table
-      ( v sym,
-        conv_df
+      ( conv_df
           (fun (a, b, c) -> Dataframe.A.t3 a b c)
           (t3 (v ?attr v1) (v v2) (v v3)),
         sorted )
@@ -736,8 +735,7 @@ module Df = struct
   let table4 ?(sorted = false) v1 v2 v3 v4 =
     let attr = if sorted then Some Parted else None in
     Table
-      ( v sym,
-        conv_df
+      ( conv_df
           (fun (a, b, c, d) -> Dataframe.A.t4 a b c d)
           (t4 (v ?attr v1) (v v2) (v v3) (v v4)),
         sorted )
@@ -745,8 +743,7 @@ module Df = struct
   let table5 ?(sorted = false) v1 v2 v3 v4 v5 =
     let attr = if sorted then Some Parted else None in
     Table
-      ( v sym,
-        conv_df
+      ( conv_df
           (fun (a, b, c, d, e) -> Dataframe.A.t5 a b c d e)
           (t5 (v ?attr v1) (v v2) (v v3) (v v4) (v v5)),
         sorted )
@@ -754,8 +751,7 @@ module Df = struct
   let table6 ?(sorted = false) v1 v2 v3 v4 v5 v6 =
     let attr = if sorted then Some Parted else None in
     Table
-      ( v sym,
-        conv_df
+      ( conv_df
           (fun (a, b, c, d, e, f) -> Dataframe.A.t6 a b c d e f)
           (t6 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6)),
         sorted )
@@ -763,8 +759,7 @@ module Df = struct
   let table7 ?(sorted = false) v1 v2 v3 v4 v5 v6 v7 =
     let attr = if sorted then Some Parted else None in
     Table
-      ( v sym,
-        conv_df
+      ( conv_df
           (fun (a, b, c, d, e, f, g) -> Dataframe.A.t7 a b c d e f g)
           (t7 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7)),
         sorted )
@@ -772,8 +767,7 @@ module Df = struct
   let table8 ?(sorted = false) v1 v2 v3 v4 v5 v6 v7 v8 =
     let attr = if sorted then Some Parted else None in
     Table
-      ( v sym,
-        conv_df
+      ( conv_df
           (fun (a, b, c, d, e, f, g, h) -> Dataframe.A.t8 a b c d e f g h)
           (t8 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8)),
         sorted )
@@ -781,8 +775,7 @@ module Df = struct
   let table9 ?(sorted = false) v1 v2 v3 v4 v5 v6 v7 v8 v9 =
     let attr = if sorted then Some Parted else None in
     Table
-      ( v sym,
-        conv_df
+      ( conv_df
           (fun (a, b, c, d, e, f, g, h, i) -> Dataframe.A.t9 a b c d e f g h i)
           (t9 (v ?attr v1) (v v2) (v v3) (v v4) (v v5) (v v6) (v v7) (v v8)
              (v v9)),
@@ -865,10 +858,10 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit =
       write_char buf (if sorted then '\x7f' else '\x63');
       construct e buf k x;
       construct e buf v y
-  | Table (k, v, sorted) ->
+  | Table (vs, sorted) ->
       write_char buf '\x62';
       write_char buf (if sorted then '\x01' else '\x00');
-      construct e buf (Dict (k, v, false)) a
+      construct e buf (Dict (v sym, vs, false)) a
   | Conv (project, _, ww) -> construct e buf ww (project a)
   | Unit ->
       write_char buf '\x65';
@@ -1078,7 +1071,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit =
       Array.iter (fun a -> FE.write_uint32 buf (ms_of_span a)) a
   | String _ -> assert false
 
-type msgtyp = Async | Sync | Response [@@deriving sexp]
+type msgtyp = Async | Sync | Response [@@deriving sexp_of]
 
 let char_of_msgtyp = function
   | Async -> '\x00'
@@ -1092,7 +1085,7 @@ let msgtyp_of_int = function
   | _ -> invalid_arg "msgtyp_of_int"
 
 type hdr = { big_endian : bool; typ : msgtyp; compressed : bool; len : int32 }
-[@@deriving sexp]
+[@@deriving sexp_of]
 
 let pp_print_hdr ppf t = Format.fprintf ppf "%a" Sexplib.Sexp.pp (sexp_of_hdr t)
 
@@ -1582,10 +1575,10 @@ and destruct : type a. ?big_endian:bool -> a w -> a Angstrom.t =
       *> destruct ~big_endian kw
       >>= fun k ->
       destruct ~big_endian vw >>| fun v -> (k, v)
-  | Table (kw, vw, _) ->
+  | Table (vw, _) ->
       char '\x62'
       *> satisfy (function '\x00' | '\x01' -> true | _ -> false)
-      *> destruct ~big_endian (Dict (kw, vw, false))
+      *> destruct ~big_endian (Dict (v sym, vw, false))
   | Unit -> skip_while (fun _ -> true)
   | Atom Boolean -> bool_atom
   | Atom Guid -> guid_atom
@@ -1688,8 +1681,10 @@ and pp : type a. a w -> Format.formatter -> a -> unit =
   | Tups _ -> pp_print_list ppf w v
   | Dict (kw, vw, _sorted) ->
       Format.fprintf ppf "%a!%a" (pp kw) (fst v) (pp vw) (snd v)
-  | Table (kw, vw, _sorted) ->
-      Format.fprintf ppf "+%a!%a" (pp kw) (fst v) (pp vw) (snd v)
+  | Table (vw, _sorted) ->
+      Format.fprintf ppf "+%a!%a"
+        (pp (Vect (Symbol, None)))
+        (fst v) (pp vw) (snd v)
   | Atom Boolean -> Format.pp_print_bool ppf v
   | Atom Guid -> Uuidm.pp ppf v
   | Atom Byte -> Format.fprintf ppf "X%c" v

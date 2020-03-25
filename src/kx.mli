@@ -258,11 +258,7 @@ val cd9 :
 val table : ?sorted:bool -> 'a w -> (string array * 'a) w
 
 val table1 :
-  ?sorted:bool ->
-  ?attr1:attribute ->
-  ?attr2:attribute ->
-  'a typ ->
-  (string array * 'a array) w
+  ?sorted:bool -> ?attr:attribute -> 'a typ -> (string array * 'a array) w
 
 val table2 :
   ?sorted:bool -> 'a typ -> 'b typ -> (string array * ('a array * 'b array)) w
@@ -364,8 +360,7 @@ val table9 :
 module Df : sig
   val table1 :
     ?sorted:bool ->
-    ?attr1:attribute ->
-    ?attr2:attribute ->
+    ?attr:attribute ->
     'a typ ->
     (string array * 'a Dataframe.t) w
 
@@ -449,12 +444,12 @@ val case : 'a w -> ('b -> 'a option) -> ('a -> 'b) -> 'b case
 
 val union : 'a case list -> 'a w
 
-type msgtyp = Async | Sync | Response
+type msgtyp = Async | Sync | Response [@@deriving sexp_of]
 
 val char_of_msgtyp : msgtyp -> char
 
 type hdr = { big_endian : bool; typ : msgtyp; compressed : bool; len : int32 }
-[@@deriving sexp]
+[@@deriving sexp_of]
 
 val pp_print_hdr : Format.formatter -> hdr -> unit
 
@@ -486,6 +481,12 @@ val nh : int
 
 val wh : int
 
+val minus_wh : int
+
+val minus_wi : int32
+
+val minus_wj : int64
+
 val ni : int32
 
 val wi : int32
@@ -497,6 +498,8 @@ val wj : int64
 val nf : float
 
 val wf : float
+
+val minus_wf : float
 
 val ptime_neginf : Ptime.t
 
