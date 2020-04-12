@@ -220,7 +220,24 @@ let pack_unpack_union =
           (fun i -> Float i);
       ]
   in
-  [ pack_unpack "int case" w (Int 2); pack_unpack "float case" w (Float 4.) ]
+  let w2 =
+    union
+      [
+        case
+          (conv (fun a -> a) (fun _ -> invalid_arg "inj") (a Kx.int))
+          (fun a -> Some a)
+          (fun a -> a);
+        case
+          (conv (fun a -> a) (fun a -> a) (a Kx.int))
+          (fun a -> Some a)
+          (fun a -> a);
+      ]
+  in
+  [
+    pack_unpack "int case" w (Int 2);
+    pack_unpack "float case" w (Float 4.);
+    pack_unpack "broken int case" w2 0l;
+  ]
 
 let unpack_buggy () =
   let test =

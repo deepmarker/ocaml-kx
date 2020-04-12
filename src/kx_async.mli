@@ -23,7 +23,7 @@ module Persistent : sig
   include
     Persistent_connection_kernel.S with type conn = t and type address = Uri.t
 
-  val with_current_connection : t -> f:(conn -> 'a Deferred.t) -> 'a Deferred.t
+  val with_current_connection_exn : t -> f:(conn -> 'a) -> 'a
 
   val create' :
     ?monitor:Monitor.t ->

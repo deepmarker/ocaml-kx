@@ -165,9 +165,9 @@ let with_connection ~url ~f =
 module Persistent = struct
   include Persistent_connection_kernel.Make (T)
 
-  let with_current_connection c ~f =
+  let with_current_connection_exn c ~f =
     match current_connection c with
-    | None -> failwith "no current connection available"
+    | None -> failwith "No connection to KDB+ available"
     | Some c -> f c
 
   let create' ?monitor =

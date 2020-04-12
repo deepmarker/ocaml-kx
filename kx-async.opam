@@ -13,8 +13,8 @@ depends: [
   "uri-sexp" {>= "3.1.0"}
   "core" {>= "v0.13.0"}
   "async" {>= "v0.13.0"}
-  "async-uri"
-  "logs-async"
+  "async-uri" {>= "0.2"}
+  "logs-async" {>= "1.1"}
   "faraday-async" {>= "0.7.0"}
   "angstrom-async" {>= "0.12.1"}
   "hex" {>= "1.4.0"}
@@ -24,8 +24,6 @@ depends: [
 pin-depends: [
   ["dataframe.dev" "git+https://github.com/deepmarker/ocaml-dataframe.git"]
   ["kx.dev" "git+https://github.com/deepmarker/ocaml-kx.git"]
-  ["async-uri.dev" "git+https://github.com/vbmithr/async-uri.git"]
-  ["logs-async.dev" "git+https://github.com/vbmithr/logs-async.git"]
 ]
 build: [ "dune" "build" "-j" jobs "-p" name ]
 run-test: [ "dune" "runtest" "-j" jobs "-p" name ]

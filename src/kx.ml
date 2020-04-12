@@ -481,7 +481,9 @@ let rec equal : type a b. a w -> a -> b w -> b -> bool =
                 (Case { encoding = e2; proj = proj2; _ }) ->
              a
              &&
-             match (proj x, proj2 y) with
+             match
+               ((try proj x with _ -> None), try proj2 y with _ -> None)
+             with
              | None, None -> true
              | Some a, Some b -> equal encoding a e2 b
              | _ -> false)
@@ -554,7 +556,7 @@ module Op = struct
   let join = 0x0c
 end
 
-let conv project inject a = Conv (project, inject, a)
+let conv proj inj a = Conv (proj, inj, a)
 
 let err = Err
 
@@ -815,7 +817,7 @@ let rec construct_list : type a. (module FE) -> Faraday.t -> a w -> a -> int =
       let lenh = construct_list e buf hw (fst a) in
       let lent = construct_list e buf tw (snd a) in
       lenh + lent
-  | Conv (project, _, w) -> construct_list e buf w (project a)
+  | Conv (proj, _, w) -> construct_list e buf w (proj a)
   | _ -> assert false
 
 and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit =
@@ -829,7 +831,8 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit =
         | Case { encoding; proj; _ } :: rest -> (
             match proj a with
             | Some t -> construct e buf encoding t
-            | None -> do_cases rest )
+            | None -> do_cases rest
+            | exception _ -> do_cases rest )
       in
       do_cases cases
   | Err ->
@@ -862,7 +865,7 @@ and construct : type a. (module FE) -> Faraday.t -> a w -> a -> unit =
       write_char buf '\x62';
       write_char buf (if sorted then '\x01' else '\x00');
       construct e buf (Dict (v sym, vs, false)) a
-  | Conv (project, _, ww) -> construct e buf ww (project a)
+  | Conv (proj, _, ww) -> construct e buf ww (proj a)
   | Unit ->
       write_char buf '\x65';
       write_char buf '\x00'
@@ -1550,7 +1553,9 @@ let rec destruct_list : type a. bool -> a w -> a Angstrom.t =
   | Tups (h, t, _) ->
       destruct_list big_endian h >>= fun a ->
       destruct_list big_endian t >>| fun b -> (a, b)
-  | Conv (_, f, ww) -> lift f (destruct_list big_endian ww)
+  | Conv (_, inj, ww) -> (
+      destruct_list big_endian ww >>= fun x ->
+      try return (inj x) with _ -> fail "" )
   | _ -> assert false
 
 and destruct : type a. ?big_endian:bool -> a w -> a Angstrom.t =
@@ -1560,11 +1565,13 @@ and destruct : type a. ?big_endian:bool -> a w -> a Angstrom.t =
       choice
         (List.map
            (fun (Case { encoding; inj; _ }) ->
-             lift inj (destruct ~big_endian encoding))
+             destruct ~big_endian encoding >>= fun x ->
+             try return (inj x) with _ -> fail "")
            cases)
   | Err -> err_atom
   | List (w, _) -> general_list big_endian (destruct ~big_endian w)
-  | Conv (_, inject, w) -> destruct ~big_endian w >>| inject
+  | Conv (_, inj, w) -> (
+      destruct ~big_endian w >>= fun x -> try return (inj x) with _ -> fail "" )
   | Tup (w, _) ->
       general_list big_endian (destruct ~big_endian w) >>| fun a -> a.(0)
   | Tups (_, _, _) as t ->
@@ -1666,7 +1673,7 @@ let rec pp_print_list : type a. Format.formatter -> a w -> a -> unit =
       pp_print_list ppf h (fst v);
       Format.pp_print_char ppf ' ';
       pp_print_list ppf t (snd v)
-  | Conv (project, _, w) -> pp_print_list ppf w (project v)
+  | Conv (proj, _, w) -> pp_print_list ppf w (proj v)
   | _ -> assert false
 
 and pp : type a. a w -> Format.formatter -> a -> unit =
@@ -1676,7 +1683,7 @@ and pp : type a. a w -> Format.formatter -> a -> unit =
   match w with
   | Unit -> Format.pp_print_string ppf "(::)"
   | List (w, _) -> Format.(pp_print_list ~pp_sep (pp w) ppf (Array.to_list v))
-  | Conv (project, _, w) -> pp w ppf (project v)
+  | Conv (proj, _, w) -> pp w ppf (proj v)
   | Tup (w, _) -> pp w ppf v
   | Tups _ -> pp_print_list ppf w v
   | Dict (kw, vw, _sorted) ->
