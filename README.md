@@ -1,4 +1,4 @@
-# ocaml-kx [![Build Status](https://travis-ci.com/deepmarker/ocaml-kx.svg?branch=master)](https://travis-ci.com/github/deepmarker/ocaml-kx)
+# ocaml-kx
 
 ## Introduction
 
