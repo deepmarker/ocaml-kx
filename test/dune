@@ -1,21 +1,15 @@
 (test
  (name test)
  (package kx)
- (preprocess (pps ppx_jane))
+ (preprocess
+  (pps ppx_jane))
  (modules test)
- (libraries
-   hex
-   kx
-   alcotest))
+ (libraries hex kx alcotest ptime.clock.os))
 
 (test
  (name test_async)
  (package kx-async)
- (preprocess (pps ppx_jane))
+ (preprocess
+  (pps ppx_jane))
  (modules test_async)
- (libraries
-   hex
-   kx
-   kx-async
-   alcotest
-   alcotest-async))
+ (libraries hex kx kx-async ptime.clock.os alcotest alcotest-async))

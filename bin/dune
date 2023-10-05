@@ -1,12 +1,4 @@
-(executables
- (names sub)
- (public_names kx-sub)
- (modules sub)
- (preprocess (pps ppx_jane))
- (package kx-async-bin)
- (libraries
-   logs
-   logs-async-reporter
-   core
-   async
-   kx-async))
+(executable
+ (public_name qcon)
+ (package kx)
+ (libraries unix))

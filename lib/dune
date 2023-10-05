@@ -1,0 +1,15 @@
+(library
+ (name kx)
+ (public_name kx)
+ (preprocess
+  (pps ppx_sexp_conv))
+ (synopsis "OCaml client for kdb+")
+ (libraries
+   fmt
+   hex
+   sexplib
+   uuidm
+   ptime
+   ocplib-endian
+   faraday
+   angstrom))
